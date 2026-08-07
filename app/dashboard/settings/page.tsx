@@ -3,36 +3,31 @@
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useLang } from '@/lib/i18n-context';
+import { useShop } from '@/lib/shop-context';
 
 export default function SettingsPage() {
   const supabase = createClient();
   const { t } = useLang();
-  const [shopId, setShopId] = useState<string | null>(null);
-  const [isOwner, setIsOwner] = useState(true);
+  const { shopId, role } = useShop();
+  const isOwner = role === 'owner';
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState('');
   const [budget, setBudget] = useState(0);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => { init(); }, []);
+  useEffect(() => { init(); }, [shopId]);
 
   async function init() {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    const { data: profile } = await supabase.from('profiles').select('shop_id, role').eq('id', user.id).single();
-    setIsOwner(profile?.role === 'owner');
-    if (profile?.role === 'owner') {
-      const { data: shop } = await supabase.from('shops').select('name, budget').eq('id', profile?.shop_id).single();
+    if (isOwner) {
+      const { data: shop } = await supabase.from('shops').select('name, budget').eq('id', shopId).single();
       setName(shop?.name || '');
       setBudget(shop?.budget || 0);
     }
-    setShopId(profile?.shop_id || null);
     setLoading(false);
   }
 
   async function save() {
-    if (!shopId) return;
     const { error: err } = await supabase.from('shops').update({ name, budget }).eq('id', shopId);
     if (err) { setError(t('common.error')); return; }
     setError('');

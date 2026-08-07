@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { useLang } from '@/lib/i18n-context';
-import { ledgerBalancesById } from '@/lib/ledger';
+import { useShop } from '@/lib/shop-context';
 
 type Supplier = {
   id: string;
@@ -19,7 +19,7 @@ function fmt(n: number) {
 export default function SuppliersPage() {
   const supabase = createClient();
   const { t } = useLang();
-  const [shopId, setShopId] = useState<string | null>(null);
+  const { shopId } = useShop();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [balances, setBalances] = useState<Record<string, number>>({});
   const [search, setSearch] = useState('');
@@ -28,28 +28,23 @@ export default function SuppliersPage() {
   const [error, setError] = useState('');
   const [form, setForm] = useState({ name: '', phone: '' });
 
-  useEffect(() => { init(); }, []);
+  useEffect(() => { loadAll(); }, [shopId]);
 
-  async function init() {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    const { data: profile } = await supabase.from('profiles').select('shop_id').eq('id', user.id).single();
-    setShopId(profile?.shop_id || null);
-    await loadAll(profile?.shop_id);
-  }
-
-  async function loadAll(sid?: string | null) {
-    const id = sid || shopId;
-    if (!id) return;
+  async function loadAll() {
     setLoading(true);
 
-    const [{ data: sups }, { data: entries }] = await Promise.all([
-      supabase.from('suppliers').select('*').eq('shop_id', id).order('name'),
-      supabase.from('supplier_entries').select('supplier_id, type, amount').eq('shop_id', id)
+    // supplier_balances aggregates in Postgres instead of pulling every
+    // ledger row to sum in JS — same scaling reason as khata_balances.
+    const [{ data: sups }, { data: bals }] = await Promise.all([
+      supabase.from('suppliers').select('*').eq('shop_id', shopId).order('name'),
+      supabase.rpc('supplier_balances', { p_shop_id: shopId })
     ]);
 
+    const balMap: Record<string, number> = {};
+    (bals || []).forEach((r: any) => { balMap[r.supplier_id] = r.balance; });
+
     setSuppliers(sups || []);
-    setBalances(ledgerBalancesById(entries || [], 'supplier_id'));
+    setBalances(balMap);
     setLoading(false);
   }
 
@@ -60,7 +55,7 @@ export default function SuppliersPage() {
   }
 
   async function saveSupplier() {
-    if (!form.name.trim() || !shopId) return;
+    if (!form.name.trim()) return;
     const { error: err } = await supabase.from('suppliers').insert({
       shop_id: shopId,
       name: form.name.trim(),

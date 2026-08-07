@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { useLang } from '@/lib/i18n-context';
-import { ledgerBalancesById } from '@/lib/ledger';
+import { useShop } from '@/lib/shop-context';
 
 type Customer = {
   id: string;
@@ -20,7 +20,7 @@ function fmt(n: number) {
 export default function KhataPage() {
   const supabase = createClient();
   const { t } = useLang();
-  const [shopId, setShopId] = useState<string | null>(null);
+  const { shopId } = useShop();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [balances, setBalances] = useState<Record<string, number>>({});
   const [search, setSearch] = useState('');
@@ -29,28 +29,25 @@ export default function KhataPage() {
   const [error, setError] = useState('');
   const [form, setForm] = useState({ name: '', phone: '', credit_limit: '' });
 
-  useEffect(() => { init(); }, []);
+  useEffect(() => { loadAll(); }, [shopId]);
 
-  async function init() {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    const { data: profile } = await supabase.from('profiles').select('shop_id').eq('id', user.id).single();
-    setShopId(profile?.shop_id || null);
-    await loadAll(profile?.shop_id);
-  }
-
-  async function loadAll(sid?: string | null) {
-    const id = sid || shopId;
-    if (!id) return;
+  async function loadAll() {
     setLoading(true);
 
-    const [{ data: custs }, { data: entries }] = await Promise.all([
-      supabase.from('customers').select('*').eq('shop_id', id).order('name'),
-      supabase.from('khata_entries').select('customer_id, type, amount').eq('shop_id', id)
+    // khata_balances aggregates in Postgres (grouped sum) instead of
+    // pulling every ledger row across every customer to sum in JS —
+    // this is what keeps the list fast no matter how many customers or
+    // how much history a shop has.
+    const [{ data: custs }, { data: bals }] = await Promise.all([
+      supabase.from('customers').select('*').eq('shop_id', shopId).order('name'),
+      supabase.rpc('khata_balances', { p_shop_id: shopId })
     ]);
 
+    const balMap: Record<string, number> = {};
+    (bals || []).forEach((r: any) => { balMap[r.customer_id] = r.balance; });
+
     setCustomers(custs || []);
-    setBalances(ledgerBalancesById(entries || [], 'customer_id'));
+    setBalances(balMap);
     setLoading(false);
   }
 
@@ -61,7 +58,7 @@ export default function KhataPage() {
   }
 
   async function saveCustomer() {
-    if (!form.name.trim() || !shopId) return;
+    if (!form.name.trim()) return;
     const { error: err } = await supabase.from('customers').insert({
       shop_id: shopId,
       name: form.name.trim(),

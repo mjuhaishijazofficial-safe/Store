@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { useLang } from '@/lib/i18n-context';
+import { useShop } from '@/lib/shop-context';
 
 type Supplier = {
   id: string;
@@ -33,8 +34,8 @@ export default function SupplierDetailPage() {
   const supplierId = params.id as string;
   const supabase = createClient();
   const { t } = useLang();
+  const { shopId } = useShop();
 
-  const [shopId, setShopId] = useState<string | null>(null);
   const [supplier, setSupplier] = useState<Supplier | null>(null);
   const [entries, setEntries] = useState<Entry[]>([]);
   const [hasMore, setHasMore] = useState(false);
@@ -46,15 +47,7 @@ export default function SupplierDetailPage() {
   const [modalType, setModalType] = useState<'purchase' | 'payment' | null>(null);
   const [form, setForm] = useState({ item_name: '', qty: '', amount: '', note: '' });
 
-  useEffect(() => { init(); }, [supplierId]);
-
-  async function init() {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    const { data: profile } = await supabase.from('profiles').select('shop_id').eq('id', user.id).single();
-    setShopId(profile?.shop_id || null);
-    await loadAll();
-  }
+  useEffect(() => { loadAll(); }, [supplierId, shopId]);
 
   async function loadBalance() {
     const [{ data: pSum }, { data: nSum }] = await Promise.all([

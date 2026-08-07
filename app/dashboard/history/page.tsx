@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useLang } from '@/lib/i18n-context';
+import { useShop } from '@/lib/shop-context';
 
 type Log = {
   id: string;
@@ -23,23 +24,20 @@ function fmt(n: number) {
 export default function HistoryPage() {
   const supabase = createClient();
   const { t } = useLang();
+  const { shopId } = useShop();
   const [logs, setLogs] = useState<Log[]>([]);
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
 
-  useEffect(() => { init(); }, []);
+  useEffect(() => { init(); }, [shopId]);
 
   async function init() {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    const { data: profile } = await supabase.from('profiles').select('shop_id').eq('id', user.id).single();
-    await loadLogs(profile?.shop_id, true);
+    await loadLogs(true);
     setLoading(false);
   }
 
-  async function loadLogs(shopId: string | null | undefined, reset: boolean) {
-    if (!shopId) return;
+  async function loadLogs(reset: boolean) {
     const offset = reset ? 0 : logs.length;
     const { data } = await supabase
       .from('transactions')
@@ -55,9 +53,7 @@ export default function HistoryPage() {
 
   async function loadMore() {
     setLoadingMore(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    const { data: profile } = await supabase.from('profiles').select('shop_id').eq('id', user!.id).single();
-    await loadLogs(profile?.shop_id, false);
+    await loadLogs(false);
     setLoadingMore(false);
   }
 

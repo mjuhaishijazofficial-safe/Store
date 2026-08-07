@@ -4,6 +4,7 @@ import Link from 'next/link';
 import SignOutButton from '@/components/SignOutButton';
 import LanguageToggle from '@/components/LanguageToggle';
 import { getServerT } from '@/lib/i18n-server';
+import { ShopProvider } from '@/lib/shop-context';
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
@@ -16,8 +17,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
     .eq('id', user.id)
     .single();
 
-  const shop: any = profile?.shops;
-  const isOwner = profile?.role === 'owner';
+  // No profile row (signup trigger hasn't landed yet, or the row was
+  // otherwise removed) means there's no shop_id to scope anything to —
+  // nothing downstream can render safely without it.
+  if (!profile) redirect('/login');
+
+  const shop: any = profile.shops;
+  const isOwner = profile.role === 'owner';
   const trialExpired =
     shop?.subscription_status === 'trialing' &&
     new Date(shop?.trial_ends_at) < new Date();
@@ -41,34 +47,36 @@ export default async function DashboardLayout({ children }: { children: React.Re
   ];
 
   return (
-    <div className="min-h-screen">
-      <header className="border-b border-white/10">
-        <div className="max-w-4xl mx-auto px-5 py-4 flex items-center justify-between gap-3">
-          <div className="font-display text-xl font-700 text-haldi">{shop?.name || 'Dukaan ERP'}</div>
-          <div className="flex items-center gap-4">
-            <LanguageToggle />
-            <SignOutButton />
+    <ShopProvider value={{ shopId: profile.shop_id, role: profile.role as 'owner' | 'staff', shopName: shop?.name || '' }}>
+      <div className="min-h-screen">
+        <header className="border-b border-chalk/10">
+          <div className="max-w-4xl mx-auto px-5 py-4 flex items-center justify-between gap-3">
+            <div className="font-display text-xl font-700 text-haldi">{shop?.name || 'Dukaan ERP'}</div>
+            <div className="flex items-center gap-4">
+              <LanguageToggle />
+              <SignOutButton />
+            </div>
           </div>
-        </div>
-        <nav className="max-w-4xl mx-auto px-5 flex gap-1 overflow-x-auto pb-2">
-          {nav.map(n => (
-            <Link key={n.href} href={n.href} className="text-sm px-3 py-1.5 rounded-full bg-board2 border border-white/10 whitespace-nowrap hover:border-haldi">
-              {n.label}
-            </Link>
-          ))}
-        </nav>
-      </header>
+          <nav className="max-w-4xl mx-auto px-5 flex gap-1 overflow-x-auto pb-2">
+            {nav.map(n => (
+              <Link key={n.href} href={n.href} className="text-sm px-3 py-1.5 rounded-full bg-board2 border border-chalk/10 whitespace-nowrap hover:border-haldi">
+                {n.label}
+              </Link>
+            ))}
+          </nav>
+        </header>
 
-      <main className="max-w-4xl mx-auto px-5 py-6">
-        {locked && (
-          <div className="card p-5 mb-6 border-mirch">
-            <div className="font-display text-lg text-mirch font-700 mb-1">{t('lock.title')}</div>
-            <div className="text-chalkdim text-sm mb-3">{t('lock.body')}</div>
-            <Link href="/dashboard/billing" className="btn-primary inline-block">{t('lock.cta')}</Link>
-          </div>
-        )}
-        {children}
-      </main>
-    </div>
+        <main className="max-w-4xl mx-auto px-5 py-6">
+          {locked && (
+            <div className="card p-5 mb-6 border-mirch">
+              <div className="font-display text-lg text-mirch font-700 mb-1">{t('lock.title')}</div>
+              <div className="text-chalkdim text-sm mb-3">{t('lock.body')}</div>
+              <Link href="/dashboard/billing" className="btn-primary inline-block">{t('lock.cta')}</Link>
+            </div>
+          )}
+          {children}
+        </main>
+      </div>
+    </ShopProvider>
   );
 }

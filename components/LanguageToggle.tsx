@@ -6,7 +6,7 @@ export default function LanguageToggle() {
   const { lang, setLang } = useLang();
 
   return (
-    <div className="flex text-xs rounded-full border border-white/10 overflow-hidden shrink-0">
+    <div className="flex text-xs rounded-full border border-chalk/10 overflow-hidden shrink-0">
       <button
         onClick={() => setLang('ur')}
         className={`px-2.5 py-1 ${lang === 'ur' ? 'bg-haldi text-board font-700' : 'text-chalkdim'}`}

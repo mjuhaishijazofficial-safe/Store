@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { useLang } from '@/lib/i18n-context';
+import { useShop } from '@/lib/shop-context';
 
 type Customer = {
   id: string;
@@ -36,9 +37,8 @@ export default function KhataDetailPage() {
   const customerId = params.id as string;
   const supabase = createClient();
   const { t } = useLang();
+  const { shopId, shopName } = useShop();
 
-  const [shopId, setShopId] = useState<string | null>(null);
-  const [shopName, setShopName] = useState('');
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [entries, setEntries] = useState<Entry[]>([]);
   const [hasMore, setHasMore] = useState(false);
@@ -53,26 +53,14 @@ export default function KhataDetailPage() {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [showDropdown, setShowDropdown] = useState(false);
 
-  useEffect(() => { init(); }, [customerId]);
+  useEffect(() => { init(); }, [customerId, shopId]);
 
   async function init() {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    const { data: profile } = await supabase.from('profiles').select('shop_id').eq('id', user.id).single();
-    const sid = profile?.shop_id || null;
-    setShopId(sid);
-    if (sid) {
-      const { data: shop } = await supabase.from('shops').select('name').eq('id', sid).single();
-      setShopName(shop?.name || '');
-      await reloadItems(sid);
-    }
-    await loadAll();
+    await Promise.all([reloadItems(), loadAll()]);
   }
 
-  async function reloadItems(sid?: string | null) {
-    const id = sid || shopId;
-    if (!id) return;
-    const { data: inv } = await supabase.from('items').select('id, name, price, unit, stock').eq('shop_id', id).order('name');
+  async function reloadItems() {
+    const { data: inv } = await supabase.from('items').select('id, name, price, unit, stock').eq('shop_id', shopId).order('name');
     setItems(inv || []);
   }
 

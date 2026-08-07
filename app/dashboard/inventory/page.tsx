@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useLang } from '@/lib/i18n-context';
+import { useShop } from '@/lib/shop-context';
 
 type Item = {
   id: string;
@@ -21,7 +22,7 @@ function fmt(n: number) {
 export default function InventoryPage() {
   const supabase = createClient();
   const { t } = useLang();
-  const [shopId, setShopId] = useState<string | null>(null);
+  const { shopId } = useShop();
   const [items, setItems] = useState<Item[]>([]);
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
@@ -35,21 +36,11 @@ export default function InventoryPage() {
   const [form, setForm] = useState({ name: '', category: '', unit: '', stock: 0, min_stock: 0, price: 0 });
   const [moveForm, setMoveForm] = useState({ qty: 0, amount: 0 });
 
-  useEffect(() => { init(); }, []);
+  useEffect(() => { loadItems(); }, [shopId]);
 
-  async function init() {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    const { data: profile } = await supabase.from('profiles').select('shop_id').eq('id', user.id).single();
-    setShopId(profile?.shop_id || null);
-    await loadItems(profile?.shop_id);
-  }
-
-  async function loadItems(sid?: string | null) {
-    const id = sid || shopId;
-    if (!id) return;
+  async function loadItems() {
     setLoading(true);
-    const { data } = await supabase.from('items').select('*').eq('shop_id', id).order('name');
+    const { data } = await supabase.from('items').select('*').eq('shop_id', shopId).order('name');
     setItems(data || []);
     setLoading(false);
   }
@@ -157,7 +148,7 @@ export default function InventoryPage() {
               <div className="flex gap-2 mt-3">
                 <button onClick={() => openMove(it, 'purchase')} className="flex-1 text-xs py-2 rounded-lg border border-dhania text-dhania">{t('inventory.stockIn')}</button>
                 <button onClick={() => openMove(it, 'sale')} className="flex-1 text-xs py-2 rounded-lg border border-mirch text-mirch">{t('inventory.stockOut')}</button>
-                <button onClick={() => openEdit(it)} className="flex-1 text-xs py-2 rounded-lg border border-white/10 text-chalkdim">{t('inventory.edit')}</button>
+                <button onClick={() => openEdit(it)} className="flex-1 text-xs py-2 rounded-lg border border-chalk/10 text-chalkdim">{t('inventory.edit')}</button>
               </div>
             </div>
           );

@@ -220,6 +220,37 @@ $$;
 -- (supplier_entries has no inventory link, so a plain insert/delete is
 -- already atomic — no RPC wrapper needed there.)
 
+-- Per-customer / per-supplier balances, aggregated in Postgres instead of
+-- shipping every raw ledger row to the browser to sum in JS. This is what
+-- makes the customer/supplier LIST pages scale to an unlimited number of
+-- customers and entries — cost stays a single grouped query server-side
+-- instead of growing with total entries ever recorded. RLS still applies
+-- (security invoker), so a shop can only ever see its own aggregates
+-- regardless of what shop_id is passed in.
+create or replace function khata_balances(p_shop_id uuid)
+returns table(customer_id uuid, balance numeric)
+language sql
+security invoker
+stable
+as $$
+  select customer_id, sum(case when type = 'purchase' then amount else -amount end) as balance
+  from khata_entries
+  where shop_id = p_shop_id
+  group by customer_id
+$$;
+
+create or replace function supplier_balances(p_shop_id uuid)
+returns table(supplier_id uuid, balance numeric)
+language sql
+security invoker
+stable
+as $$
+  select supplier_id, sum(case when type = 'purchase' then amount else -amount end) as balance
+  from supplier_entries
+  where shop_id = p_shop_id
+  group by supplier_id
+$$;
+
 -- ============================================================
 -- Helper: current user's shop_id
 -- ============================================================
