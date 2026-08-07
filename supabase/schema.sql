@@ -189,9 +189,12 @@ declare
   new_shop_id uuid;
   invited_shop_id uuid;
 begin
-  -- staff invites (see /api/staff/invite) pass invited_shop_id in the invite's
-  -- user metadata — attach to that existing shop instead of creating a new one
-  invited_shop_id := nullif(new.raw_user_meta_data->>'invited_shop_id', '')::uuid;
+  -- staff invites (see /api/staff/invite) tag the new user with invited_shop_id
+  -- in APP metadata, never user metadata — raw_user_meta_data is writable by
+  -- anyone via the public signUp() call, so trusting it here would let an
+  -- attacker self-join any shop as staff just by knowing its UUID.
+  -- raw_app_meta_data can only be set server-side with the service-role key.
+  invited_shop_id := nullif(new.raw_app_meta_data->>'invited_shop_id', '')::uuid;
 
   if invited_shop_id is not null then
     insert into profiles (id, shop_id, full_name, email, role)
