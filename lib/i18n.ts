@@ -142,6 +142,10 @@ export const dict = {
   'khataDetail.noteOptional': { ur: 'Note — optional', en: 'Note — optional' },
   'khataDetail.cancel': { ur: 'Cancel', en: 'Cancel' },
   'khataDetail.save': { ur: 'Save', en: 'Save' },
+  'khataDetail.limitWarning': { ur: 'Ye entry credit limit se zyada kar degi', en: 'This entry will put them over their credit limit' },
+  'khataDetail.remindWhatsapp': { ur: 'WhatsApp par Yaad Dilayein', en: 'Remind on WhatsApp' },
+  'khataDetail.reminderMsg': { ur: 'Aapka udhaar Rs. {amount} hai — {shop}', en: 'Your outstanding balance is Rs. {amount} — {shop}' },
+  'khataDetail.fromInventory': { ur: 'Inventory se', en: 'From inventory' },
 
   // billing
   'billing.title': { ur: 'Billing', en: 'Billing' },

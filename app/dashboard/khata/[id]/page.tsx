@@ -23,6 +23,8 @@ type Entry = {
   created_at: string;
 };
 
+type ItemLite = { id: string; name: string; price: number; unit: string | null; stock: number };
+
 function fmt(n: number) {
   return '₨' + Number(n || 0).toLocaleString('en-IN');
 }
@@ -34,12 +36,16 @@ export default function KhataDetailPage() {
   const { t } = useLang();
 
   const [shopId, setShopId] = useState<string | null>(null);
+  const [shopName, setShopName] = useState('');
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [entries, setEntries] = useState<Entry[]>([]);
+  const [items, setItems] = useState<ItemLite[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [modalType, setModalType] = useState<'purchase' | 'payment' | null>(null);
   const [form, setForm] = useState({ item_name: '', qty: '', amount: '', note: '' });
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [showDropdown, setShowDropdown] = useState(false);
 
   useEffect(() => { init(); }, [customerId]);
 
@@ -47,8 +53,21 @@ export default function KhataDetailPage() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
     const { data: profile } = await supabase.from('profiles').select('shop_id').eq('id', user.id).single();
-    setShopId(profile?.shop_id || null);
+    const sid = profile?.shop_id || null;
+    setShopId(sid);
+    if (sid) {
+      const { data: shop } = await supabase.from('shops').select('name').eq('id', sid).single();
+      setShopName(shop?.name || '');
+      await reloadItems(sid);
+    }
     await loadAll();
+  }
+
+  async function reloadItems(sid?: string | null) {
+    const id = sid || shopId;
+    if (!id) return;
+    const { data: inv } = await supabase.from('items').select('id, name, price, unit, stock').eq('shop_id', id).order('name');
+    setItems(inv || []);
   }
 
   async function loadAll() {
@@ -65,9 +84,45 @@ export default function KhataDetailPage() {
   const total = entries.reduce((sum, e) => sum + (e.type === 'purchase' ? e.amount : -e.amount), 0);
   const over = customer?.credit_limit != null && total > customer.credit_limit;
 
+  const projectedTotal = total + (modalType === 'purchase' ? (Number(form.amount) || 0) : 0);
+  const willGoOverLimit = modalType === 'purchase' && customer?.credit_limit != null && projectedTotal > customer.credit_limit;
+
+  const itemMatches = form.item_name.trim() && showDropdown
+    ? items.filter(i => i.name.toLowerCase().includes(form.item_name.toLowerCase())).slice(0, 5)
+    : [];
+
   function openModal(type: 'purchase' | 'payment') {
     setForm({ item_name: '', qty: '', amount: '', note: '' });
+    setSelectedItemId(null);
+    setShowDropdown(false);
     setModalType(type);
+  }
+
+  function onItemNameChange(v: string) {
+    setForm(f => ({ ...f, item_name: v }));
+    setSelectedItemId(null);
+    setShowDropdown(true);
+  }
+
+  function onQtyChange(v: string) {
+    const item = items.find(i => i.id === selectedItemId);
+    setForm(f => ({
+      ...f,
+      qty: v,
+      amount: item ? String((Number(v) || 1) * item.price) : f.amount
+    }));
+  }
+
+  function selectItem(item: ItemLite) {
+    const qty = form.qty || '1';
+    setForm(f => ({
+      ...f,
+      item_name: item.name,
+      qty,
+      amount: String((Number(qty) || 1) * item.price)
+    }));
+    setSelectedItemId(item.id);
+    setShowDropdown(false);
   }
 
   async function saveEntry() {
@@ -75,23 +130,44 @@ export default function KhataDetailPage() {
     const amount = Number(form.amount);
     if (!amount || amount <= 0) return;
 
+    const qtyNum = form.qty ? Number(form.qty) : null;
+
     await supabase.from('khata_entries').insert({
       shop_id: shopId,
       customer_id: customerId,
       type: modalType,
+      item_id: modalType === 'purchase' ? selectedItemId : null,
       item_name: modalType === 'purchase' ? (form.item_name.trim() || null) : null,
-      qty: modalType === 'purchase' && form.qty ? Number(form.qty) : null,
+      qty: modalType === 'purchase' ? qtyNum : null,
       amount,
       note: form.note.trim() || null
     });
 
+    // Khata + Inventory link: deduct stock when the item was picked from inventory
+    if (modalType === 'purchase' && selectedItemId) {
+      const item = items.find(i => i.id === selectedItemId);
+      if (item) {
+        const newStock = Math.max(0, item.stock - (qtyNum || 0));
+        await supabase.from('items').update({ stock: newStock }).eq('id', item.id);
+      }
+    }
+
     setModalType(null);
     await loadAll();
+    await reloadItems();
   }
 
   async function deleteEntry(id: string) {
     await supabase.from('khata_entries').delete().eq('id', id);
     await loadAll();
+  }
+
+  function remindWhatsapp() {
+    if (!customer?.phone) return;
+    let digits = customer.phone.replace(/\D/g, '');
+    if (digits.startsWith('0')) digits = '92' + digits.slice(1); // Pakistani local -> international
+    const msg = t('khataDetail.reminderMsg').replace('{amount}', fmt(total).replace('₨', '')).replace('{shop}', shopName || 'Dukaan');
+    window.open(`https://wa.me/${digits}?text=${encodeURIComponent(msg)}`, '_blank');
   }
 
   if (loading) return <div className="text-chalkdim text-sm text-center py-10">{t('khataDetail.loading')}</div>;
@@ -113,6 +189,12 @@ export default function KhataDetailPage() {
           <button onClick={() => openModal('purchase')} className="flex-1 text-sm py-2.5 rounded-lg border border-mirch text-mirch">{t('khataDetail.newSaman')}</button>
           <button onClick={() => openModal('payment')} className="flex-1 text-sm py-2.5 rounded-lg border border-dhania text-dhania">{t('khataDetail.paymentReceived')}</button>
         </div>
+
+        {total > 0 && customer.phone && (
+          <button onClick={remindWhatsapp} className="w-full mt-2 text-sm py-2.5 rounded-lg border border-dhania text-dhania">
+            {t('khataDetail.remindWhatsapp')}
+          </button>
+        )}
       </div>
 
       {entries.length === 0 && (
@@ -152,14 +234,41 @@ export default function KhataDetailPage() {
             {modalType === 'purchase' && (
               <>
                 <label className="block text-xs text-chalkdim mb-1">{t('khataDetail.itemName')}</label>
-                <input className="input mb-3" value={form.item_name} onChange={e => setForm({ ...form, item_name: e.target.value })} placeholder={t('khataDetail.itemPlaceholder')} />
+                <div className="relative mb-3">
+                  <input
+                    className="input"
+                    value={form.item_name}
+                    onChange={e => onItemNameChange(e.target.value)}
+                    onFocus={() => setShowDropdown(true)}
+                    placeholder={t('khataDetail.itemPlaceholder')}
+                  />
+                  {itemMatches.length > 0 && (
+                    <div className="absolute left-0 right-0 mt-1 card p-1 z-10 max-h-48 overflow-y-auto">
+                      {itemMatches.map(it => (
+                        <button
+                          key={it.id}
+                          type="button"
+                          onClick={() => selectItem(it)}
+                          className="w-full text-left px-3 py-2 rounded-lg hover:bg-board3 flex justify-between items-center text-sm"
+                        >
+                          <span>{it.name}</span>
+                          <span className="text-xs text-chalkdim font-mono">{fmt(it.price)}/{it.unit}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {selectedItemId && <div className="text-[10px] text-dhania mt-1">✓ {t('khataDetail.fromInventory')}</div>}
+                </div>
                 <label className="block text-xs text-chalkdim mb-1">{t('khataDetail.qtyOptional')}</label>
-                <input type="number" className="input mb-3" value={form.qty} onChange={e => setForm({ ...form, qty: e.target.value })} placeholder="e.g. 1" />
+                <input type="number" className="input mb-3" value={form.qty} onChange={e => onQtyChange(e.target.value)} placeholder="e.g. 1" />
               </>
             )}
             <label className="block text-xs text-chalkdim mb-1">{t('khataDetail.amount')}</label>
-            <input type="number" className="input mb-3" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} />
-            <label className="block text-xs text-chalkdim mb-1">{t('khataDetail.noteOptional')}</label>
+            <input type="number" className="input mb-1" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} />
+            {willGoOverLimit && (
+              <div className="text-xs text-mirch mb-2">{t('khataDetail.limitWarning')} ({fmt(customer.credit_limit!)})</div>
+            )}
+            <label className="block text-xs text-chalkdim mb-1 mt-2">{t('khataDetail.noteOptional')}</label>
             <input className="input mb-5" value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} />
             <div className="flex gap-2">
               <button onClick={() => setModalType(null)} className="btn-secondary flex-1">{t('khataDetail.cancel')}</button>
