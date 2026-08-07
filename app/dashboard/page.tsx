@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { getServerT } from '@/lib/i18n-server';
+import Link from 'next/link';
 
 function fmt(n: number) {
   return '₨' + Number(n || 0).toLocaleString('en-IN');
@@ -49,6 +50,10 @@ export default async function OverviewPage() {
           <div className="text-sm text-chalkdim mt-1">{t('overview.itemsToReorder')}</div>
         </div>
       </div>
+
+      <Link href="/dashboard/reports" className="card p-4 mt-3 block text-center text-haldi font-700 hover:border-haldi">
+        {t('overview.dailyReport')}
+      </Link>
     </div>
   );
 }

@@ -66,6 +66,20 @@ export const dict = {
   'overview.remaining': { ur: 'Baki Budget', en: 'Remaining' },
   'overview.totalItems': { ur: 'Total items in inventory', en: 'Total items in inventory' },
   'overview.itemsToReorder': { ur: 'Items jo mangwane hain', en: 'Items to reorder' },
+  'overview.dailyReport': { ur: 'Aaj ka Hisaab Dekhein →', en: "View Today's Summary →" },
+
+  // daily closing report
+  'reports.title': { ur: 'Aaj ka Hisaab', en: 'Today’s Summary' },
+  'reports.subtitle': { ur: 'Aaj ki saari activity ek nazar mein', en: 'All of today’s activity at a glance' },
+  'reports.totalSales': { ur: 'Total Bikri', en: 'Total Sales' },
+  'reports.stockPurchased': { ur: 'Naya Maal (Kharch)', en: 'Stock Purchased' },
+  'reports.udhaarDiya': { ur: 'Udhaar Diya', en: 'Credit Given' },
+  'reports.paymentMila': { ur: 'Payment Mila', en: 'Payments Received' },
+  'reports.shareWhatsapp': { ur: 'WhatsApp Par Share Karein', en: 'Share on WhatsApp' },
+  'reports.summaryMsg': {
+    ur: '{shop} — Aaj ka Hisaab\nBikri: Rs. {sales}\nUdhaar diya: Rs. {given}\nPayment mila: Rs. {received}\nNaya maal: Rs. {stock}',
+    en: '{shop} — Today’s Summary\nSales: Rs. {sales}\nCredit given: Rs. {given}\nPayments received: Rs. {received}\nStock purchased: Rs. {stock}'
+  },
 
   // inventory
   'inventory.search': { ur: 'Saman dhoondein...', en: 'Search items...' },
