@@ -44,7 +44,11 @@ export default function LoginPage() {
         <input className="input mb-4" type="email" required value={email} onChange={e => setEmail(e.target.value)} />
 
         <label className="block text-xs text-chalkdim mb-1">{t('auth.password')}</label>
-        <input className="input mb-6" type="password" required value={password} onChange={e => setPassword(e.target.value)} />
+        <input className="input mb-2" type="password" required value={password} onChange={e => setPassword(e.target.value)} />
+
+        <div className="text-right mb-4">
+          <Link href="/forgot-password" className="text-xs text-chalkdim hover:text-haldi">{t('auth.forgotPassword')}</Link>
+        </div>
 
         <button disabled={loading} className="btn-primary w-full mb-4">
           {loading ? t('auth.loggingIn') : t('auth.loginBtn')}

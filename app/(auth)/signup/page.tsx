@@ -17,13 +17,14 @@ export default function SignupPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [needsConfirmation, setNeedsConfirmation] = useState(false);
 
   async function handleSignup(e: React.FormEvent) {
     e.preventDefault();
     setError('');
     setLoading(true);
 
-    const { error: signErr } = await supabase.auth.signUp({
+    const { data, error: signErr } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -31,15 +32,34 @@ export default function SignupPage() {
       }
     });
 
+    setLoading(false);
+
     if (signErr) {
       setError(signErr.message);
-      setLoading(false);
       return;
     }
 
-    // If email confirmation is off, session exists immediately
+    // If the Supabase project has email confirmation turned on, signUp()
+    // succeeds but returns no session yet — redirecting to /dashboard here
+    // used to just bounce straight back to /login with no explanation.
+    if (!data.session) {
+      setNeedsConfirmation(true);
+      return;
+    }
+
     router.push('/dashboard');
     router.refresh();
+  }
+
+  if (needsConfirmation) {
+    return (
+      <main className="min-h-screen flex items-center justify-center px-4">
+        <div className="card w-full max-w-sm p-7 text-center">
+          <div className="font-display text-2xl font-700 text-haldi mb-3">{t('auth.confirmEmailTitle')}</div>
+          <div className="text-chalkdim text-sm">{t('auth.confirmEmailBody')}</div>
+        </div>
+      </main>
+    );
   }
 
   return (
