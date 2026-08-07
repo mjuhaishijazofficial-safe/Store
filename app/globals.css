@@ -14,7 +14,9 @@
   --color-chalk: 31 43 36;       /* #1F2B24 primary text — dark green ink */
   --color-chalkdim: 138 127 112; /* #8A7F6C secondary/muted text */
   --color-haldi: 184 121 26;     /* #B8791A turmeric gold — emphasis */
-  --color-mirch: 168 57 31;      /* #A8391F chili red — debt/negative */
+  --color-mirch: 194 58 30;      /* #C23A1E chili red — debt/negative. Brighter than the old
+                                     #A8391F (which was too dull) while still clearing 4.5:1
+                                     contrast on the cream background for small error text. */
   --color-dhania: 63 122 52;     /* #3F7A34 coriander green — positive */
 }
 

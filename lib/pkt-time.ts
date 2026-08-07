@@ -15,3 +15,19 @@ export function startOfTodayPKT(): Date {
   const d = nowShifted.getUTCDate();
   return new Date(Date.UTC(y, m, d) - PKT_OFFSET_MS);
 }
+
+// Returns the UTC instant corresponding to the 1st of this month, midnight
+// PKT.
+export function startOfMonthPKT(): Date {
+  const nowShifted = new Date(Date.now() + PKT_OFFSET_MS);
+  const y = nowShifted.getUTCFullYear();
+  const m = nowShifted.getUTCMonth();
+  return new Date(Date.UTC(y, m, 1) - PKT_OFFSET_MS);
+}
+
+// Rolling N-day window ending now, anchored to PKT's start-of-day so
+// "last 7 days" reads the same way a shopkeeper would count it.
+export function daysAgoPKT(days: number): Date {
+  const start = startOfTodayPKT();
+  return new Date(start.getTime() - days * 24 * 60 * 60 * 1000);
+}

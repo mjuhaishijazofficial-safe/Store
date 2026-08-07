@@ -53,26 +53,26 @@ export default async function ReportsPage() {
       <p className="text-chalkdim text-sm mb-5">{t('reports.subtitle')}</p>
 
       <div className="card p-5 mb-5">
-        <div className="text-xs text-chalkdim uppercase mb-1">{t('reports.profit')}</div>
+        <div className="text-xs text-chalkdim uppercase tracking-wide mb-1">{t('reports.profit')}</div>
         <div className={`font-mono font-800 text-3xl ${profit >= 0 ? 'text-dhania' : 'text-mirch'}`}>{fmt(profit)}</div>
         <div className="text-[11px] text-chalkdim mt-1">{t('reports.profitNote')}</div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 mb-5">
         <div className="card p-4">
-          <div className="text-xs text-chalkdim uppercase mb-1">{t('reports.totalSales')}</div>
+          <div className="text-xs text-chalkdim uppercase tracking-wide mb-1">{t('reports.totalSales')}</div>
           <div className="font-mono font-700 text-lg text-dhania">{fmt(totalSales)}</div>
         </div>
         <div className="card p-4">
-          <div className="text-xs text-chalkdim uppercase mb-1">{t('reports.stockPurchased')}</div>
+          <div className="text-xs text-chalkdim uppercase tracking-wide mb-1">{t('reports.stockPurchased')}</div>
           <div className="font-mono font-700 text-lg text-mirch">{fmt(stockPurchased)}</div>
         </div>
         <div className="card p-4">
-          <div className="text-xs text-chalkdim uppercase mb-1">{t('reports.udhaarDiya')}</div>
+          <div className="text-xs text-chalkdim uppercase tracking-wide mb-1">{t('reports.udhaarDiya')}</div>
           <div className="font-mono font-700 text-lg text-mirch">{fmt(udhaarDiya)}</div>
         </div>
         <div className="card p-4">
-          <div className="text-xs text-chalkdim uppercase mb-1">{t('reports.paymentMila')}</div>
+          <div className="text-xs text-chalkdim uppercase tracking-wide mb-1">{t('reports.paymentMila')}</div>
           <div className="font-mono font-700 text-lg text-dhania">{fmt(paymentMila)}</div>
         </div>
       </div>

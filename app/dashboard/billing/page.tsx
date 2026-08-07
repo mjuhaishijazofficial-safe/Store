@@ -27,7 +27,7 @@ export default async function BillingPage() {
       <h1 className="font-display text-xl font-700 mb-5">{t('billing.title')}</h1>
 
       <div className="card p-5 mb-5">
-        <div className="text-xs text-chalkdim uppercase mb-1">{t('billing.currentStatus')}</div>
+        <div className="text-xs text-chalkdim uppercase tracking-wide mb-1">{t('billing.currentStatus')}</div>
         <div className="font-display text-lg font-700 text-haldi">{statusLabel[shop?.subscription_status || 'trialing']}</div>
         {shop?.subscription_status === 'trialing' && (
           <div className="text-xs text-chalkdim mt-1">

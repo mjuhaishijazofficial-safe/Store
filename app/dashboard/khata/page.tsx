@@ -86,7 +86,7 @@ export default function KhataPage() {
 
       {!loading && topCustomers.length > 0 && (
         <>
-        <div className="text-xs text-chalkdim uppercase mb-2">{t('khata.topCustomers')}</div>
+        <div className="text-xs text-chalkdim uppercase tracking-wide mb-2">{t('khata.topCustomers')}</div>
         <div className="flex gap-2 overflow-x-auto pb-1 mb-4">
           {topCustomers.map((c, i) => (
             <Link

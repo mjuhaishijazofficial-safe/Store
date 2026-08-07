@@ -458,3 +458,24 @@ as $$
   order by sum(k.amount) desc
   limit p_limit
 $$;
+
+-- Dashboard "Top Selling Products": items ranked by quantity sold in the
+-- lookback window. Same aggregate-in-Postgres reasoning as everything
+-- else here — cost stays a single grouped query, not proportional to
+-- how much sales history the shop has.
+create or replace function top_selling_items(p_shop_id uuid, p_days int default 30, p_limit int default 5)
+returns table(item_id uuid, item_name text, unit text, qty_sold numeric, revenue numeric)
+language sql
+security invoker
+stable
+as $$
+  select i.id, i.name, i.unit, sum(t.qty), sum(t.amount)
+  from transactions t
+  join items i on i.id = t.item_id
+  where t.shop_id = p_shop_id
+    and t.type = 'sale'
+    and t.created_at >= now() - (p_days || ' days')::interval
+  group by i.id, i.name, i.unit
+  order by sum(t.qty) desc
+  limit p_limit
+$$;
