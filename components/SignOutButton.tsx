@@ -2,10 +2,12 @@
 
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
+import { useLang } from '@/lib/i18n-context';
 
 export default function SignOutButton() {
   const supabase = createClient();
   const router = useRouter();
+  const { t } = useLang();
 
   async function signOut() {
     await supabase.auth.signOut();
@@ -15,7 +17,7 @@ export default function SignOutButton() {
 
   return (
     <button onClick={signOut} className="text-sm text-chalkdim hover:text-chalk">
-      Sign Out
+      {t('nav.signout')}
     </button>
   );
 }

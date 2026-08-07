@@ -21,13 +21,13 @@ export async function POST(req: Request) {
   switch (event.type) {
     case 'checkout.session.completed': {
       const session = event.data.object as Stripe.Checkout.Session;
-      const shopId = session.subscription_data?.metadata?.shop_id;
-      if (session.subscription && shopId) {
+      const customerId = session.customer as string | null;
+      if (session.subscription && customerId) {
         await supabase.from('shops').update({
           stripe_subscription_id: session.subscription as string,
           subscription_status: 'active',
           plan: 'monthly'
-        }).eq('id', shopId);
+        }).eq('stripe_customer_id', customerId);
       }
       break;
     }

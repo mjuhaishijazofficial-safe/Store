@@ -1,9 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
+import { useLang } from '@/lib/i18n-context';
 
 type Customer = {
   id: string;
@@ -28,9 +29,9 @@ function fmt(n: number) {
 
 export default function KhataDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const customerId = params.id as string;
   const supabase = createClient();
+  const { t } = useLang();
 
   const [shopId, setShopId] = useState<string | null>(null);
   const [customer, setCustomer] = useState<Customer | null>(null);
@@ -93,29 +94,29 @@ export default function KhataDetailPage() {
     await loadAll();
   }
 
-  if (loading) return <div className="text-chalkdim text-sm text-center py-10">Load ho raha hai...</div>;
-  if (!customer) return <div className="text-chalkdim text-sm text-center py-10">Customer nahi mila</div>;
+  if (loading) return <div className="text-chalkdim text-sm text-center py-10">{t('khataDetail.loading')}</div>;
+  if (!customer) return <div className="text-chalkdim text-sm text-center py-10">{t('khataDetail.notFound')}</div>;
 
   return (
     <div>
-      <Link href="/dashboard/khata" className="text-xs text-chalkdim hover:text-haldi">&larr; Sab Customers</Link>
+      <Link href="/dashboard/khata" className="text-xs text-chalkdim hover:text-haldi">{t('khataDetail.back')}</Link>
 
       <div className="card p-5 mt-3 mb-4">
         <div className="font-display text-lg font-700">{customer.name}</div>
         <div className="text-xs text-chalkdim mb-4">{customer.phone || '—'}</div>
 
-        <div className="text-xs text-chalkdim">Total Udhaar</div>
+        <div className="text-xs text-chalkdim">{t('khataDetail.totalUdhaar')}</div>
         <div className={`font-mono font-800 text-3xl ${total > 0 ? 'text-mirch' : 'text-dhania'}`}>{fmt(total)}</div>
-        {over && <div className="text-xs text-mirch mt-1">Credit limit ({fmt(customer.credit_limit!)}) se zyada ho gaya hai</div>}
+        {over && <div className="text-xs text-mirch mt-1">{t('khataDetail.overLimit')} ({fmt(customer.credit_limit!)})</div>}
 
         <div className="flex gap-2 mt-4">
-          <button onClick={() => openModal('purchase')} className="flex-1 text-sm py-2.5 rounded-lg border border-mirch text-mirch">+ Naya Saman Diya</button>
-          <button onClick={() => openModal('payment')} className="flex-1 text-sm py-2.5 rounded-lg border border-dhania text-dhania">+ Payment Mili</button>
+          <button onClick={() => openModal('purchase')} className="flex-1 text-sm py-2.5 rounded-lg border border-mirch text-mirch">{t('khataDetail.newSaman')}</button>
+          <button onClick={() => openModal('payment')} className="flex-1 text-sm py-2.5 rounded-lg border border-dhania text-dhania">{t('khataDetail.paymentReceived')}</button>
         </div>
       </div>
 
       {entries.length === 0 && (
-        <div className="text-center py-14 text-chalkdim text-sm">Abhi tak koi entry nahi</div>
+        <div className="text-center py-14 text-chalkdim text-sm">{t('khataDetail.empty')}</div>
       )}
 
       <div className="space-y-2">
@@ -126,7 +127,7 @@ export default function KhataDetailPage() {
             <div key={e.id} className="card p-3 px-4 flex justify-between items-center">
               <div>
                 <div className="font-600 text-sm">
-                  {e.type === 'purchase' ? (e.item_name || 'Saman') + (e.qty ? ` — ${e.qty}` : '') : 'Payment mili'}
+                  {e.type === 'purchase' ? (e.item_name || t('khataDetail.itemDefault')) + (e.qty ? ` — ${e.qty}` : '') : t('khataDetail.paymentLabel')}
                 </div>
                 <div className="text-xs text-chalkdim mt-0.5">{when}{e.note ? ` • ${e.note}` : ''}</div>
               </div>
@@ -146,23 +147,23 @@ export default function KhataDetailPage() {
         <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50" onClick={() => setModalType(null)}>
           <div className="card w-full max-w-md p-5 rounded-b-none sm:rounded-b-2xl" onClick={e => e.stopPropagation()}>
             <div className="font-display text-lg text-haldi font-700 mb-4">
-              {modalType === 'purchase' ? 'Naya Saman Diya' : 'Payment Mili'}
+              {modalType === 'purchase' ? t('khataDetail.newSaman') : t('khataDetail.paymentReceived')}
             </div>
             {modalType === 'purchase' && (
               <>
-                <label className="block text-xs text-chalkdim mb-1">Saman ka naam</label>
-                <input className="input mb-3" value={form.item_name} onChange={e => setForm({ ...form, item_name: e.target.value })} placeholder="e.g. Coca Cola" />
-                <label className="block text-xs text-chalkdim mb-1">Quantity — optional</label>
+                <label className="block text-xs text-chalkdim mb-1">{t('khataDetail.itemName')}</label>
+                <input className="input mb-3" value={form.item_name} onChange={e => setForm({ ...form, item_name: e.target.value })} placeholder={t('khataDetail.itemPlaceholder')} />
+                <label className="block text-xs text-chalkdim mb-1">{t('khataDetail.qtyOptional')}</label>
                 <input type="number" className="input mb-3" value={form.qty} onChange={e => setForm({ ...form, qty: e.target.value })} placeholder="e.g. 1" />
               </>
             )}
-            <label className="block text-xs text-chalkdim mb-1">Amount (₨)</label>
+            <label className="block text-xs text-chalkdim mb-1">{t('khataDetail.amount')}</label>
             <input type="number" className="input mb-3" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} />
-            <label className="block text-xs text-chalkdim mb-1">Note — optional</label>
+            <label className="block text-xs text-chalkdim mb-1">{t('khataDetail.noteOptional')}</label>
             <input className="input mb-5" value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} />
             <div className="flex gap-2">
-              <button onClick={() => setModalType(null)} className="btn-secondary flex-1">Cancel</button>
-              <button onClick={saveEntry} className="btn-primary flex-1">Save</button>
+              <button onClick={() => setModalType(null)} className="btn-secondary flex-1">{t('khataDetail.cancel')}</button>
+              <button onClick={saveEntry} className="btn-primary flex-1">{t('khataDetail.save')}</button>
             </div>
           </div>
         </div>

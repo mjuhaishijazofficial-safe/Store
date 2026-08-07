@@ -1,8 +1,10 @@
 import { createClient } from '@/lib/supabase/server';
 import BillingActions from '@/components/BillingActions';
+import { getServerT } from '@/lib/i18n-server';
 
 export default async function BillingPage() {
   const supabase = createClient();
+  const t = getServerT();
   const { data: { user } } = await supabase.auth.getUser();
   const { data: profile } = await supabase.from('profiles').select('shop_id').eq('id', user!.id).single();
   const { data: shop } = await supabase
@@ -12,29 +14,29 @@ export default async function BillingPage() {
     .single();
 
   const statusLabel: Record<string, string> = {
-    trialing: 'Free Trial',
-    active: 'Active',
-    past_due: 'Payment Due',
-    canceled: 'Canceled'
+    trialing: t('billing.statusTrialing'),
+    active: t('billing.statusActive'),
+    past_due: t('billing.statusPastDue'),
+    canceled: t('billing.statusCanceled')
   };
 
   return (
     <div className="max-w-sm">
-      <h1 className="font-display text-xl font-700 mb-5">Billing</h1>
+      <h1 className="font-display text-xl font-700 mb-5">{t('billing.title')}</h1>
 
       <div className="card p-5 mb-5">
-        <div className="text-xs text-chalkdim uppercase mb-1">Current Status</div>
+        <div className="text-xs text-chalkdim uppercase mb-1">{t('billing.currentStatus')}</div>
         <div className="font-display text-lg font-700 text-haldi">{statusLabel[shop?.subscription_status || 'trialing']}</div>
         {shop?.subscription_status === 'trialing' && (
           <div className="text-xs text-chalkdim mt-1">
-            Trial khatam: {new Date(shop.trial_ends_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+            {t('billing.trialEnds')} {new Date(shop.trial_ends_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
           </div>
         )}
       </div>
 
       <div className="card p-5 mb-5">
-        <div className="font-mono text-3xl font-700 text-haldi mb-1">₨999<span className="text-sm text-chalkdim">/mahina</span></div>
-        <div className="text-chalkdim text-sm">Per dukaan. Cancel kabhi bhi kar sakte hain.</div>
+        <div className="font-mono text-3xl font-700 text-haldi mb-1">₨999<span className="text-sm text-chalkdim">{t('billing.perMonth')}</span></div>
+        <div className="text-chalkdim text-sm">{t('billing.perShop')}</div>
       </div>
 
       <BillingActions hasSubscription={!!shop?.stripe_customer_id} />

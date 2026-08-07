@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { getServerT } from '@/lib/i18n-server';
 
 function fmt(n: number) {
   return '₨' + Number(n || 0).toLocaleString('en-IN');
@@ -6,6 +7,7 @@ function fmt(n: number) {
 
 export default async function OverviewPage() {
   const supabase = createClient();
+  const t = getServerT();
   const { data: { user } } = await supabase.auth.getUser();
   const { data: profile } = await supabase.from('profiles').select('shop_id').eq('id', user!.id).single();
   const shopId = profile?.shop_id;
@@ -20,19 +22,19 @@ export default async function OverviewPage() {
 
   return (
     <div>
-      <h1 className="font-display text-xl font-700 mb-5">Overview</h1>
+      <h1 className="font-display text-xl font-700 mb-5">{t('overview.title')}</h1>
 
       <div className="grid grid-cols-3 gap-3 mb-8">
         <div className="card p-4 text-center">
-          <div className="text-xs text-chalkdim uppercase mb-1">Kul Budget</div>
+          <div className="text-xs text-chalkdim uppercase mb-1">{t('overview.totalBudget')}</div>
           <div className="font-mono font-700 text-lg">{fmt(budget)}</div>
         </div>
         <div className="card p-4 text-center">
-          <div className="text-xs text-chalkdim uppercase mb-1">Kharch Hua</div>
+          <div className="text-xs text-chalkdim uppercase mb-1">{t('overview.spent')}</div>
           <div className="font-mono font-700 text-lg text-mirch">{fmt(spent)}</div>
         </div>
         <div className="card p-4 text-center">
-          <div className="text-xs text-chalkdim uppercase mb-1">Baki Budget</div>
+          <div className="text-xs text-chalkdim uppercase mb-1">{t('overview.remaining')}</div>
           <div className="font-mono font-700 text-lg text-dhania">{fmt(budget - spent)}</div>
         </div>
       </div>
@@ -40,11 +42,11 @@ export default async function OverviewPage() {
       <div className="grid grid-cols-2 gap-3">
         <div className="card p-5">
           <div className="text-3xl font-mono font-700 text-haldi">{itemCount || 0}</div>
-          <div className="text-sm text-chalkdim mt-1">Total items in inventory</div>
+          <div className="text-sm text-chalkdim mt-1">{t('overview.totalItems')}</div>
         </div>
         <div className="card p-5">
           <div className="text-3xl font-mono font-700 text-mirch">{lowStock}</div>
-          <div className="text-sm text-chalkdim mt-1">Items jo mangwane hain</div>
+          <div className="text-sm text-chalkdim mt-1">{t('overview.itemsToReorder')}</div>
         </div>
       </div>
     </div>

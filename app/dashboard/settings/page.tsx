@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { useLang } from '@/lib/i18n-context';
 
 export default function SettingsPage() {
   const supabase = createClient();
+  const { t } = useLang();
   const [shopId, setShopId] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [budget, setBudget] = useState(0);
@@ -31,16 +33,16 @@ export default function SettingsPage() {
 
   return (
     <div className="max-w-sm">
-      <h1 className="font-display text-xl font-700 mb-5">Settings</h1>
+      <h1 className="font-display text-xl font-700 mb-5">{t('settings.title')}</h1>
 
-      <label className="block text-xs text-chalkdim mb-1">Dukaan ka naam</label>
+      <label className="block text-xs text-chalkdim mb-1">{t('settings.shopName')}</label>
       <input className="input mb-4" value={name} onChange={e => setName(e.target.value)} />
 
-      <label className="block text-xs text-chalkdim mb-1">Kul budget (₨)</label>
+      <label className="block text-xs text-chalkdim mb-1">{t('settings.totalBudget')}</label>
       <input type="number" className="input mb-5" value={budget} onChange={e => setBudget(Number(e.target.value))} />
 
-      <button onClick={save} className="btn-primary">Save Karein</button>
-      {saved && <div className="text-dhania text-sm mt-3">Save ho gaya ✓</div>}
+      <button onClick={save} className="btn-primary">{t('settings.save')}</button>
+      {saved && <div className="text-dhania text-sm mt-3">{t('settings.saved')}</div>}
     </div>
   );
 }

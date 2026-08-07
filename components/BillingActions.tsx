@@ -1,9 +1,11 @@
 'use client';
 
 import { useState } from 'react';
+import { useLang } from '@/lib/i18n-context';
 
 export default function BillingActions({ hasSubscription }: { hasSubscription: boolean }) {
   const [loading, setLoading] = useState(false);
+  const { t } = useLang();
 
   async function goToCheckout() {
     setLoading(true);
@@ -23,11 +25,11 @@ export default function BillingActions({ hasSubscription }: { hasSubscription: b
 
   return hasSubscription ? (
     <button onClick={goToPortal} disabled={loading} className="btn-secondary w-full">
-      {loading ? 'Loading...' : 'Subscription Manage Karein'}
+      {loading ? t('billing.loading') : t('billing.manageSubscription')}
     </button>
   ) : (
     <button onClick={goToCheckout} disabled={loading} className="btn-primary w-full">
-      {loading ? 'Loading...' : 'Subscribe Karein'}
+      {loading ? t('billing.loading') : t('billing.subscribe')}
     </button>
   );
 }

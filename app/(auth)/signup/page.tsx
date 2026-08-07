@@ -4,10 +4,13 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
+import LanguageToggle from '@/components/LanguageToggle';
+import { useLang } from '@/lib/i18n-context';
 
 export default function SignupPage() {
   const router = useRouter();
   const supabase = createClient();
+  const { t } = useLang();
   const [shopName, setShopName] = useState('');
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -42,29 +45,32 @@ export default function SignupPage() {
   return (
     <main className="min-h-screen flex items-center justify-center px-4">
       <form onSubmit={handleSignup} className="card w-full max-w-sm p-7">
-        <div className="font-display text-2xl font-700 text-haldi mb-1">Naya Account</div>
-        <div className="text-chalkdim text-sm mb-6">14 din free trial — koi card nahi chahiye</div>
+        <div className="flex justify-end mb-3">
+          <LanguageToggle />
+        </div>
+        <div className="font-display text-2xl font-700 text-haldi mb-1">{t('auth.signupTitle')}</div>
+        <div className="text-chalkdim text-sm mb-6">{t('auth.signupSub')}</div>
 
         {error && <div className="text-mirch text-sm mb-4 bg-mirch/10 p-3 rounded-lg">{error}</div>}
 
-        <label className="block text-xs text-chalkdim mb-1">Dukaan ka naam</label>
+        <label className="block text-xs text-chalkdim mb-1">{t('auth.shopName')}</label>
         <input className="input mb-4" value={shopName} onChange={e => setShopName(e.target.value)} placeholder="Chachu Kiryana Store" />
 
-        <label className="block text-xs text-chalkdim mb-1">Aap ka naam</label>
-        <input className="input mb-4" value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Aap ka naam" />
+        <label className="block text-xs text-chalkdim mb-1">{t('auth.yourName')}</label>
+        <input className="input mb-4" value={fullName} onChange={e => setFullName(e.target.value)} placeholder={t('auth.yourName')} />
 
-        <label className="block text-xs text-chalkdim mb-1">Email</label>
+        <label className="block text-xs text-chalkdim mb-1">{t('auth.email')}</label>
         <input className="input mb-4" type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="email@example.com" />
 
-        <label className="block text-xs text-chalkdim mb-1">Password</label>
-        <input className="input mb-6" type="password" required minLength={6} value={password} onChange={e => setPassword(e.target.value)} placeholder="Kam se kam 6 characters" />
+        <label className="block text-xs text-chalkdim mb-1">{t('auth.password')}</label>
+        <input className="input mb-6" type="password" required minLength={6} value={password} onChange={e => setPassword(e.target.value)} placeholder={t('auth.passwordHint')} />
 
         <button disabled={loading} className="btn-primary w-full mb-4">
-          {loading ? 'Bana rahe hain...' : 'Account Banayein'}
+          {loading ? t('auth.creating') : t('auth.createAccount')}
         </button>
 
         <div className="text-center text-sm text-chalkdim">
-          Pehle se account hai? <Link href="/login" className="text-haldi">Login karein</Link>
+          {t('auth.haveAccount')} <Link href="/login" className="text-haldi">{t('auth.loginLink')}</Link>
         </div>
       </form>
     </main>

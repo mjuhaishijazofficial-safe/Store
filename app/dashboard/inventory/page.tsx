@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { useLang } from '@/lib/i18n-context';
 
 type Item = {
   id: string;
@@ -19,6 +20,7 @@ function fmt(n: number) {
 
 export default function InventoryPage() {
   const supabase = createClient();
+  const { t } = useLang();
   const [shopId, setShopId] = useState<string | null>(null);
   const [items, setItems] = useState<Item[]>([]);
   const [search, setSearch] = useState('');
@@ -123,16 +125,16 @@ export default function InventoryPage() {
   return (
     <div>
       <div className="flex gap-2 mb-4">
-        <input className="input flex-1" placeholder="Saman dhoondein..." value={search} onChange={e => setSearch(e.target.value)} />
-        <button onClick={openAdd} className="btn-primary whitespace-nowrap">+ Naya</button>
+        <input className="input flex-1" placeholder={t('inventory.search')} value={search} onChange={e => setSearch(e.target.value)} />
+        <button onClick={openAdd} className="btn-primary whitespace-nowrap">{t('inventory.addNew')}</button>
       </div>
 
-      {loading && <div className="text-chalkdim text-sm text-center py-10">Load ho raha hai...</div>}
+      {loading && <div className="text-chalkdim text-sm text-center py-10">{t('inventory.loading')}</div>}
 
       {!loading && filtered.length === 0 && (
         <div className="text-center py-14 text-chalkdim text-sm">
-          <div className="font-display text-haldi text-base mb-1">Koi saman nahi mila</div>
-          "+ Naya" par tap kar ke item add karein
+          <div className="font-display text-haldi text-base mb-1">{t('inventory.emptyTitle')}</div>
+          {t('inventory.emptyBody')}
         </div>
       )}
 
@@ -151,13 +153,13 @@ export default function InventoryPage() {
                 </div>
               </div>
               <div className="flex justify-between text-xs text-chalkdim mt-2">
-                <span>Alert level: {it.min_stock}</span>
+                <span>{t('inventory.alertLevel')}: {it.min_stock}</span>
                 <span>{fmt(it.price)} / {it.unit}</span>
               </div>
               <div className="flex gap-2 mt-3">
-                <button onClick={() => openMove(it, 'purchase')} className="flex-1 text-xs py-2 rounded-lg border border-dhania text-dhania">+ Maal Aaya</button>
-                <button onClick={() => openMove(it, 'sale')} className="flex-1 text-xs py-2 rounded-lg border border-mirch text-mirch">− Bik/Use Hua</button>
-                <button onClick={() => openEdit(it)} className="flex-1 text-xs py-2 rounded-lg border border-white/10 text-chalkdim">Edit</button>
+                <button onClick={() => openMove(it, 'purchase')} className="flex-1 text-xs py-2 rounded-lg border border-dhania text-dhania">{t('inventory.stockIn')}</button>
+                <button onClick={() => openMove(it, 'sale')} className="flex-1 text-xs py-2 rounded-lg border border-mirch text-mirch">{t('inventory.stockOut')}</button>
+                <button onClick={() => openEdit(it)} className="flex-1 text-xs py-2 rounded-lg border border-white/10 text-chalkdim">{t('inventory.edit')}</button>
               </div>
             </div>
           );
@@ -168,36 +170,36 @@ export default function InventoryPage() {
       {modalOpen && (
         <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50" onClick={() => setModalOpen(false)}>
           <div className="card w-full max-w-md p-5 rounded-b-none sm:rounded-b-2xl" onClick={e => e.stopPropagation()}>
-            <div className="font-display text-lg text-haldi font-700 mb-4">{editing ? 'Saman Edit Karein' : 'Naya Saman'}</div>
-            <label className="block text-xs text-chalkdim mb-1">Naam</label>
+            <div className="font-display text-lg text-haldi font-700 mb-4">{editing ? t('inventory.editItemTitle') : t('inventory.newItemTitle')}</div>
+            <label className="block text-xs text-chalkdim mb-1">{t('inventory.name')}</label>
             <input className="input mb-3" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
-            <label className="block text-xs text-chalkdim mb-1">Category</label>
+            <label className="block text-xs text-chalkdim mb-1">{t('inventory.category')}</label>
             <input className="input mb-3" value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} />
             <div className="grid grid-cols-2 gap-3 mb-3">
               <div>
-                <label className="block text-xs text-chalkdim mb-1">Stock</label>
+                <label className="block text-xs text-chalkdim mb-1">{t('inventory.stock')}</label>
                 <input type="number" className="input" value={form.stock} onChange={e => setForm({ ...form, stock: Number(e.target.value) })} />
               </div>
               <div>
-                <label className="block text-xs text-chalkdim mb-1">Unit</label>
-                <input className="input" value={form.unit} onChange={e => setForm({ ...form, unit: e.target.value })} placeholder="kg / packet" />
+                <label className="block text-xs text-chalkdim mb-1">{t('inventory.unit')}</label>
+                <input className="input" value={form.unit} onChange={e => setForm({ ...form, unit: e.target.value })} placeholder={t('inventory.unitPlaceholder')} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3 mb-5">
               <div>
-                <label className="block text-xs text-chalkdim mb-1">Alert level</label>
+                <label className="block text-xs text-chalkdim mb-1">{t('inventory.alertLevel')}</label>
                 <input type="number" className="input" value={form.min_stock} onChange={e => setForm({ ...form, min_stock: Number(e.target.value) })} />
               </div>
               <div>
-                <label className="block text-xs text-chalkdim mb-1">Price/unit</label>
+                <label className="block text-xs text-chalkdim mb-1">{t('inventory.price')}</label>
                 <input type="number" className="input" value={form.price} onChange={e => setForm({ ...form, price: Number(e.target.value) })} />
               </div>
             </div>
             <div className="flex gap-2 mb-2">
-              <button onClick={() => setModalOpen(false)} className="btn-secondary flex-1">Cancel</button>
-              <button onClick={saveItem} className="btn-primary flex-1">Save</button>
+              <button onClick={() => setModalOpen(false)} className="btn-secondary flex-1">{t('inventory.cancel')}</button>
+              <button onClick={saveItem} className="btn-primary flex-1">{t('inventory.save')}</button>
             </div>
-            {editing && <button onClick={deleteItem} className="w-full text-mirch text-sm py-2">Ye saman hata dein</button>}
+            {editing && <button onClick={deleteItem} className="w-full text-mirch text-sm py-2">{t('inventory.deleteItem')}</button>}
           </div>
         </div>
       )}
@@ -207,19 +209,19 @@ export default function InventoryPage() {
         <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50" onClick={() => setMoveOpen(false)}>
           <div className="card w-full max-w-md p-5 rounded-b-none sm:rounded-b-2xl" onClick={e => e.stopPropagation()}>
             <div className="font-display text-lg text-haldi font-700 mb-4">
-              {moveType === 'purchase' ? 'Naya Maal — ' : 'Bik/Use Hua — '}{moveItem.name}
+              {moveType === 'purchase' ? t('inventory.newStockTitle') : t('inventory.outStockTitle')}{moveItem.name}
             </div>
-            <label className="block text-xs text-chalkdim mb-1">Quantity ({moveItem.unit})</label>
+            <label className="block text-xs text-chalkdim mb-1">{t('inventory.quantity')} ({moveItem.unit})</label>
             <input type="number" className="input mb-3" value={moveForm.qty} onChange={e => setMoveForm({ ...moveForm, qty: Number(e.target.value) })} />
             {moveType === 'purchase' && (
               <>
-                <label className="block text-xs text-chalkdim mb-1">Total amount (₨) — budget se katega</label>
+                <label className="block text-xs text-chalkdim mb-1">{t('inventory.totalAmount')}</label>
                 <input type="number" className="input mb-3" value={moveForm.amount} onChange={e => setMoveForm({ ...moveForm, amount: Number(e.target.value) })} />
               </>
             )}
             <div className="flex gap-2 mt-2">
-              <button onClick={() => setMoveOpen(false)} className="btn-secondary flex-1">Cancel</button>
-              <button onClick={confirmMove} className="btn-primary flex-1">Confirm</button>
+              <button onClick={() => setMoveOpen(false)} className="btn-secondary flex-1">{t('inventory.cancel')}</button>
+              <button onClick={confirmMove} className="btn-primary flex-1">{t('inventory.confirm')}</button>
             </div>
           </div>
         </div>

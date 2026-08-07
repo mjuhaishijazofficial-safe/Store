@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
+import { useLang } from '@/lib/i18n-context';
 
 type Customer = {
   id: string;
@@ -19,6 +20,7 @@ function fmt(n: number) {
 
 export default function KhataPage() {
   const supabase = createClient();
+  const { t } = useLang();
   const [shopId, setShopId] = useState<string | null>(null);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [balances, setBalances] = useState<Record<string, number>>({});
@@ -82,16 +84,16 @@ export default function KhataPage() {
   return (
     <div>
       <div className="flex gap-2 mb-4">
-        <input className="input flex-1" placeholder="Customer dhoondein..." value={search} onChange={e => setSearch(e.target.value)} />
-        <button onClick={openAdd} className="btn-primary whitespace-nowrap">+ Naya Customer</button>
+        <input className="input flex-1" placeholder={t('khata.search')} value={search} onChange={e => setSearch(e.target.value)} />
+        <button onClick={openAdd} className="btn-primary whitespace-nowrap">{t('khata.addCustomer')}</button>
       </div>
 
-      {loading && <div className="text-chalkdim text-sm text-center py-10">Load ho raha hai...</div>}
+      {loading && <div className="text-chalkdim text-sm text-center py-10">{t('khata.loading')}</div>}
 
       {!loading && filtered.length === 0 && (
         <div className="text-center py-14 text-chalkdim text-sm">
-          <div className="font-display text-haldi text-base mb-1">Koi customer nahi mila</div>
-          "+ Naya Customer" par tap kar ke add karein
+          <div className="font-display text-haldi text-base mb-1">{t('khata.emptyTitle')}</div>
+          {t('khata.emptyBody')}
         </div>
       )}
 
@@ -107,7 +109,7 @@ export default function KhataPage() {
               </div>
               <div className="text-right">
                 <div className={`font-mono font-700 ${bal > 0 ? 'text-mirch' : 'text-chalkdim'}`}>{fmt(bal)}</div>
-                {over && <div className="text-[10px] text-mirch">Limit se zyada</div>}
+                {over && <div className="text-[10px] text-mirch">{t('khata.overLimit')}</div>}
               </div>
             </Link>
           );
@@ -118,16 +120,16 @@ export default function KhataPage() {
       {modalOpen && (
         <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50" onClick={() => setModalOpen(false)}>
           <div className="card w-full max-w-md p-5 rounded-b-none sm:rounded-b-2xl" onClick={e => e.stopPropagation()}>
-            <div className="font-display text-lg text-haldi font-700 mb-4">Naya Customer</div>
-            <label className="block text-xs text-chalkdim mb-1">Naam</label>
+            <div className="font-display text-lg text-haldi font-700 mb-4">{t('khata.newCustomerTitle')}</div>
+            <label className="block text-xs text-chalkdim mb-1">{t('khata.name')}</label>
             <input className="input mb-3" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
-            <label className="block text-xs text-chalkdim mb-1">Phone</label>
+            <label className="block text-xs text-chalkdim mb-1">{t('khata.phone')}</label>
             <input className="input mb-3" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="03xx-xxxxxxx" />
-            <label className="block text-xs text-chalkdim mb-1">Credit limit (₨) — optional</label>
+            <label className="block text-xs text-chalkdim mb-1">{t('khata.creditLimit')}</label>
             <input type="number" className="input mb-5" value={form.credit_limit} onChange={e => setForm({ ...form, credit_limit: e.target.value })} />
             <div className="flex gap-2">
-              <button onClick={() => setModalOpen(false)} className="btn-secondary flex-1">Cancel</button>
-              <button onClick={saveCustomer} className="btn-primary flex-1">Save</button>
+              <button onClick={() => setModalOpen(false)} className="btn-secondary flex-1">{t('khata.cancel')}</button>
+              <button onClick={saveCustomer} className="btn-primary flex-1">{t('khata.save')}</button>
             </div>
           </div>
         </div>
