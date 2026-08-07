@@ -22,6 +22,8 @@ type Entry = {
   created_at: string;
 };
 
+const PAGE_SIZE = 30;
+
 function fmt(n: number) {
   return '₨' + Number(n || 0).toLocaleString('en-IN');
 }
@@ -35,7 +37,11 @@ export default function SupplierDetailPage() {
   const [shopId, setShopId] = useState<string | null>(null);
   const [supplier, setSupplier] = useState<Supplier | null>(null);
   const [entries, setEntries] = useState<Entry[]>([]);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   const [modalType, setModalType] = useState<'purchase' | 'payment' | null>(null);
   const [form, setForm] = useState({ item_name: '', qty: '', amount: '', note: '' });
@@ -50,21 +56,45 @@ export default function SupplierDetailPage() {
     await loadAll();
   }
 
+  async function loadBalance() {
+    const [{ data: pSum }, { data: nSum }] = await Promise.all([
+      supabase.from('supplier_entries').select('amount.sum()').eq('supplier_id', supplierId).eq('type', 'purchase').single(),
+      supabase.from('supplier_entries').select('amount.sum()').eq('supplier_id', supplierId).eq('type', 'payment').single()
+    ]);
+    setTotal(((pSum as any)?.sum || 0) - ((nSum as any)?.sum || 0));
+  }
+
+  async function loadEntries(reset: boolean) {
+    const offset = reset ? 0 : entries.length;
+    const { data: rows } = await supabase
+      .from('supplier_entries')
+      .select('*')
+      .eq('supplier_id', supplierId)
+      .order('created_at', { ascending: false })
+      .range(offset, offset + PAGE_SIZE - 1);
+
+    const newRows = rows || [];
+    setEntries(reset ? newRows : prev => [...prev, ...newRows]);
+    setHasMore(newRows.length === PAGE_SIZE);
+  }
+
+  async function loadMore() {
+    setLoadingMore(true);
+    await loadEntries(false);
+    setLoadingMore(false);
+  }
+
   async function loadAll() {
     setLoading(true);
-    const [{ data: sup }, { data: rows }] = await Promise.all([
-      supabase.from('suppliers').select('*').eq('id', supplierId).single(),
-      supabase.from('supplier_entries').select('*').eq('supplier_id', supplierId).order('created_at', { ascending: false })
-    ]);
+    const { data: sup } = await supabase.from('suppliers').select('*').eq('id', supplierId).single();
     setSupplier(sup || null);
-    setEntries(rows || []);
+    await Promise.all([loadEntries(true), loadBalance()]);
     setLoading(false);
   }
 
-  const total = entries.reduce((sum, e) => sum + (e.type === 'purchase' ? e.amount : -e.amount), 0);
-
   function openModal(type: 'purchase' | 'payment') {
     setForm({ item_name: '', qty: '', amount: '', note: '' });
+    setError('');
     setModalType(type);
   }
 
@@ -73,7 +103,7 @@ export default function SupplierDetailPage() {
     const amount = Number(form.amount);
     if (!amount || amount <= 0) return;
 
-    await supabase.from('supplier_entries').insert({
+    const { error: err } = await supabase.from('supplier_entries').insert({
       shop_id: shopId,
       supplier_id: supplierId,
       type: modalType,
@@ -83,12 +113,14 @@ export default function SupplierDetailPage() {
       note: form.note.trim() || null
     });
 
+    if (err) { setError(t('common.error')); return; }
     setModalType(null);
     await loadAll();
   }
 
   async function deleteEntry(id: string) {
-    await supabase.from('supplier_entries').delete().eq('id', id);
+    const { error: err } = await supabase.from('supplier_entries').delete().eq('id', id);
+    if (err) { setError(t('common.error')); return; }
     await loadAll();
   }
 
@@ -111,6 +143,8 @@ export default function SupplierDetailPage() {
           <button onClick={() => openModal('payment')} className="flex-1 text-sm py-2.5 rounded-lg border border-dhania text-dhania">{t('suppliersDetail.paymentDi')}</button>
         </div>
       </div>
+
+      {error && <div className="text-mirch text-sm mb-3 bg-mirch/10 p-3 rounded-lg">{error}</div>}
 
       {entries.length === 0 && (
         <div className="text-center py-14 text-chalkdim text-sm">{t('suppliersDetail.empty')}</div>
@@ -138,6 +172,12 @@ export default function SupplierDetailPage() {
           );
         })}
       </div>
+
+      {hasMore && (
+        <button onClick={loadMore} disabled={loadingMore} className="btn-secondary w-full mt-3">
+          {loadingMore ? t('suppliersDetail.loading') : t('common.loadMore')}
+        </button>
+      )}
 
       {/* Add Entry Modal */}
       {modalType && (

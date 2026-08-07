@@ -13,6 +13,7 @@ export default function SettingsPage() {
   const [name, setName] = useState('');
   const [budget, setBudget] = useState(0);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => { init(); }, []);
 
@@ -32,7 +33,9 @@ export default function SettingsPage() {
 
   async function save() {
     if (!shopId) return;
-    await supabase.from('shops').update({ name, budget }).eq('id', shopId);
+    const { error: err } = await supabase.from('shops').update({ name, budget }).eq('id', shopId);
+    if (err) { setError(t('common.error')); return; }
+    setError('');
     setSaved(true);
     setTimeout(() => setSaved(false), 1800);
   }
@@ -55,6 +58,7 @@ export default function SettingsPage() {
 
       <button onClick={save} className="btn-primary">{t('settings.save')}</button>
       {saved && <div className="text-dhania text-sm mt-3">{t('settings.saved')}</div>}
+      {error && <div className="text-mirch text-sm mt-3">{error}</div>}
     </div>
   );
 }

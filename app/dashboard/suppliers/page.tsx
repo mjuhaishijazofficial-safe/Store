@@ -4,14 +4,13 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { useLang } from '@/lib/i18n-context';
+import { ledgerBalancesById } from '@/lib/ledger';
 
 type Supplier = {
   id: string;
   name: string;
   phone: string | null;
 };
-
-type EntryRow = { supplier_id: string; type: 'purchase' | 'payment'; amount: number };
 
 function fmt(n: number) {
   return '₨' + Number(n || 0).toLocaleString('en-IN');
@@ -26,6 +25,7 @@ export default function SuppliersPage() {
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [form, setForm] = useState({ name: '', phone: '' });
 
   useEffect(() => { init(); }, []);
@@ -48,29 +48,25 @@ export default function SuppliersPage() {
       supabase.from('supplier_entries').select('supplier_id, type, amount').eq('shop_id', id)
     ]);
 
-    const bal: Record<string, number> = {};
-    (entries as EntryRow[] || []).forEach(e => {
-      const delta = e.type === 'purchase' ? e.amount : -e.amount;
-      bal[e.supplier_id] = (bal[e.supplier_id] || 0) + delta;
-    });
-
     setSuppliers(sups || []);
-    setBalances(bal);
+    setBalances(ledgerBalancesById(entries || [], 'supplier_id'));
     setLoading(false);
   }
 
   function openAdd() {
     setForm({ name: '', phone: '' });
+    setError('');
     setModalOpen(true);
   }
 
   async function saveSupplier() {
     if (!form.name.trim() || !shopId) return;
-    await supabase.from('suppliers').insert({
+    const { error: err } = await supabase.from('suppliers').insert({
       shop_id: shopId,
       name: form.name.trim(),
       phone: form.phone.trim() || null
     });
+    if (err) { setError(t('common.error')); return; }
     setModalOpen(false);
     await loadAll();
   }
@@ -118,6 +114,7 @@ export default function SuppliersPage() {
         <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50" onClick={() => setModalOpen(false)}>
           <div className="card w-full max-w-md p-5 rounded-b-none sm:rounded-b-2xl" onClick={e => e.stopPropagation()}>
             <div className="font-display text-lg text-haldi font-700 mb-4">{t('suppliers.newSupplierTitle')}</div>
+            {error && <div className="text-mirch text-sm mb-3 bg-mirch/10 p-3 rounded-lg">{error}</div>}
             <label className="block text-xs text-chalkdim mb-1">{t('suppliers.name')}</label>
             <input className="input mb-3" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
             <label className="block text-xs text-chalkdim mb-1">{t('suppliers.phone')}</label>
