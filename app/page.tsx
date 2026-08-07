@@ -2,8 +2,8 @@ import Link from 'next/link';
 import LanguageToggle from '@/components/LanguageToggle';
 import { getServerT } from '@/lib/i18n-server';
 
-export default function Home() {
-  const t = getServerT();
+export default async function Home() {
+  const t = await getServerT();
 
   return (
     <main className="max-w-5xl mx-auto px-6 py-16">

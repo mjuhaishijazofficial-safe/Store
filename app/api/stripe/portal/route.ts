@@ -5,7 +5,7 @@ import { requireEnv } from '@/lib/env';
 
 export async function POST() {
   const stripe = new Stripe(requireEnv('STRIPE_SECRET_KEY'));
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 

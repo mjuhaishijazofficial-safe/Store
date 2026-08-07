@@ -9,8 +9,9 @@ export const metadata: Metadata = {
   description: 'Inventory, budget aur bikri ka poora hisaab — ek jagah.'
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-  const cookieLang = cookies().get(LANG_COOKIE)?.value;
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const cookieStore = await cookies();
+  const cookieLang = cookieStore.get(LANG_COOKIE)?.value;
   const initialLang: Lang = cookieLang === 'en' || cookieLang === 'ur' ? cookieLang : DEFAULT_LANG;
 
   return (

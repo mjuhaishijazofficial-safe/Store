@@ -9,7 +9,7 @@ export async function POST() {
   // where secrets aren't set, and would fail the build itself rather
   // than only failing an actual request that needs them.
   const stripe = new Stripe(requireEnv('STRIPE_SECRET_KEY'));
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 

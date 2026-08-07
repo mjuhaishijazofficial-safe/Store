@@ -4,8 +4,8 @@ import { getServerT } from '@/lib/i18n-server';
 import InviteStaffForm from '@/components/InviteStaffForm';
 
 export default async function StaffPage() {
-  const supabase = createClient();
-  const t = getServerT();
+  const supabase = await createClient();
+  const t = await getServerT();
   const { data: { user } } = await supabase.auth.getUser();
   const { data: profile } = await supabase.from('profiles').select('shop_id, role').eq('id', user!.id).single();
 

@@ -6,8 +6,8 @@ function fmt(n: number) {
 }
 
 export default async function ReorderPage() {
-  const supabase = createClient();
-  const t = getServerT();
+  const supabase = await createClient();
+  const t = await getServerT();
   const { data: { user } } = await supabase.auth.getUser();
   const { data: profile } = await supabase.from('profiles').select('shop_id').eq('id', user!.id).single();
   const { data: items } = await supabase.from('items').select('*').eq('shop_id', profile?.shop_id).order('name');

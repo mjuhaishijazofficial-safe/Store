@@ -7,8 +7,8 @@ function fmt(n: number) {
 }
 
 export default async function OverviewPage() {
-  const supabase = createClient();
-  const t = getServerT();
+  const supabase = await createClient();
+  const t = await getServerT();
   const { data: { user } } = await supabase.auth.getUser();
   const { data: profile } = await supabase.from('profiles').select('shop_id').eq('id', user!.id).single();
   const shopId = profile?.shop_id;

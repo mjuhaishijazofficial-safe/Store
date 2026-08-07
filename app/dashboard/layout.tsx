@@ -6,7 +6,7 @@ import LanguageToggle from '@/components/LanguageToggle';
 import { getServerT } from '@/lib/i18n-server';
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/login');
 
@@ -23,7 +23,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
     new Date(shop?.trial_ends_at) < new Date();
   const locked = shop?.subscription_status === 'canceled' || shop?.subscription_status === 'past_due' || trialExpired;
 
-  const t = getServerT();
+  const t = await getServerT();
 
   const nav = [
     { href: '/dashboard', label: t('nav.overview') },

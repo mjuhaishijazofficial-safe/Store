@@ -4,8 +4,8 @@ import BillingActions from '@/components/BillingActions';
 import { getServerT } from '@/lib/i18n-server';
 
 export default async function BillingPage() {
-  const supabase = createClient();
-  const t = getServerT();
+  const supabase = await createClient();
+  const t = await getServerT();
   const { data: { user } } = await supabase.auth.getUser();
   const { data: profile } = await supabase.from('profiles').select('shop_id, role').eq('id', user!.id).single();
   if (profile?.role !== 'owner') redirect('/dashboard');
