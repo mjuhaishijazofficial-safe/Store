@@ -26,7 +26,7 @@ export default function InviteStaffForm() {
 
     if (!res.ok) {
       setIsError(true);
-      setMsg(data.error || 'Error');
+      setMsg(data.error === 'email_taken' ? t('staff.emailTaken') : (data.error || t('common.error')));
       return;
     }
 

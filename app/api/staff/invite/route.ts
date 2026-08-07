@@ -34,7 +34,19 @@ export async function POST(req: Request) {
     app_metadata: { invited_shop_id: profile.shop_id }
   });
 
-  if (createErr) return NextResponse.json({ error: createErr.message }, { status: 400 });
+  if (createErr) {
+    // auth.users emails are unique across the whole Supabase project, not
+    // just this shop — this email may belong to a completely different
+    // shop (or an old test signup), which is why it won't show up
+    // anywhere in this shop's own Staff list even though it's taken.
+    // Surface a code the client can translate into a clear explanation
+    // instead of relaying Supabase's raw English message verbatim.
+    const alreadyExists = /already.*regist|already.*exist/i.test(createErr.message);
+    return NextResponse.json(
+      { error: alreadyExists ? 'email_taken' : createErr.message },
+      { status: 400 }
+    );
+  }
 
   // No password is set yet — send Supabase's built-in recovery email so
   // they can set one. /reset-password also doubles as the invite-accept

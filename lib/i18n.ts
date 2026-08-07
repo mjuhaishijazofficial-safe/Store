@@ -239,6 +239,10 @@ export const dict = {
   'staff.roleOwner': { ur: 'Owner', en: 'Owner' },
   'staff.roleStaff': { ur: 'Staff', en: 'Staff' },
   'staff.ownerOnly': { ur: 'Ye page sirf owner dekh sakte hain.', en: 'Only the shop owner can view this page.' },
+  'staff.emailTaken': {
+    ur: 'Ye email pehle se kisi (shayad kisi aur dukaan ke) account se juda hua hai — is dukaan ke Staff list mein na dikhne ka matlab hai wo account kahin aur bana tha. Koi doosra email try karein, ya Supabase dashboard mein us purane account ko dekh/hata kar dobara try karein.',
+    en: 'This email already belongs to an account (possibly from a different shop) — the fact it isn’t in this shop’s Staff list just means that account lives elsewhere. Try a different email, or check/remove that old account in the Supabase dashboard and try again.'
+  },
 
   // billing
   'billing.title': { ur: 'Billing', en: 'Billing' },
