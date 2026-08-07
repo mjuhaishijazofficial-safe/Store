@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
 import LanguageToggle from '@/components/LanguageToggle';
+import ThemeToggle from '@/components/ThemeToggle';
 import { useLang } from '@/lib/i18n-context';
 
 export default function LoginPage() {
@@ -33,7 +34,8 @@ export default function LoginPage() {
   return (
     <main className="min-h-screen flex items-center justify-center px-4">
       <form onSubmit={handleLogin} className="card w-full max-w-sm p-7">
-        <div className="flex justify-end mb-3">
+        <div className="flex justify-end gap-2 mb-3">
+          <ThemeToggle />
           <LanguageToggle />
         </div>
         <div className="font-display text-2xl font-700 text-haldi mb-6">{t('auth.loginTitle')}</div>

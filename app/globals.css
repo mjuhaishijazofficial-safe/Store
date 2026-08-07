@@ -4,14 +4,37 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Light "paper ledger" — default. Values are R G B triples (no commas),
+   consumed via rgb(var(--x) / <alpha-value>) so Tailwind's opacity
+   modifiers (bg-board2/60, border-chalk/10, ...) keep working. */
 :root {
-  --board: #F7F2E7;
+  --color-board: 247 242 231;    /* #F7F2E7 page background — warm cream paper */
+  --color-board2: 255 255 255;   /* #FFFFFF card surface */
+  --color-board3: 237 228 208;   /* #EDE4D0 secondary surface / inputs */
+  --color-chalk: 31 43 36;       /* #1F2B24 primary text — dark green ink */
+  --color-chalkdim: 138 127 112; /* #8A7F6C secondary/muted text */
+  --color-haldi: 184 121 26;     /* #B8791A turmeric gold — emphasis */
+  --color-mirch: 168 57 31;      /* #A8391F chili red — debt/negative */
+  --color-dhania: 63 122 52;     /* #3F7A34 coriander green — positive */
+}
+
+/* Dark — opt-in via the toggle. This is close to the original theme this
+   product shipped with before the light redesign. */
+html[data-theme='dark'] {
+  --color-board: 31 43 36;       /* #1F2B24 */
+  --color-board2: 40 54 45;      /* #28362D */
+  --color-board3: 49 66 58;      /* #31423A */
+  --color-chalk: 237 232 221;    /* #EDE8DD */
+  --color-chalkdim: 169 179 166; /* #A9B3A6 */
+  --color-haldi: 224 163 46;     /* #E0A32E */
+  --color-mirch: 193 80 46;      /* #C1502E */
+  --color-dhania: 107 155 94;    /* #6B9B5E */
 }
 
 body {
-  background: #F7F2E7;
-  color: #1F2B24;
+  @apply bg-board text-chalk;
   font-family: 'Inter', sans-serif;
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
 
 .font-display {
@@ -23,22 +46,18 @@ body {
 }
 
 .card {
-  background: #FFFFFF;
-  border: 1px solid rgba(31, 43, 36, 0.10);
+  @apply bg-board2 border border-chalk/10;
   border-radius: 14px;
-  box-shadow: 0 1px 2px rgba(31, 43, 36, 0.04);
+  box-shadow: 0 1px 2px rgb(var(--color-chalk) / 0.04);
 }
 
 a.card:hover, button.card:hover {
-  border-color: rgba(31, 43, 36, 0.22);
-  box-shadow: 0 2px 8px rgba(31, 43, 36, 0.08);
+  border-color: rgb(var(--color-chalk) / 0.22);
+  box-shadow: 0 2px 8px rgb(var(--color-chalk) / 0.08);
 }
 
 .input {
-  width: 100%;
-  background: #F3ECDB;
-  border: 1px solid rgba(31, 43, 36, 0.16);
-  color: #1F2B24;
+  @apply w-full bg-board3 text-chalk border border-chalk/[0.16];
   padding: 10px 12px;
   border-radius: 9px;
   font-size: 14.5px;
@@ -46,12 +65,12 @@ a.card:hover, button.card:hover {
 }
 
 .input::placeholder {
-  color: #8A7F6C;
+  @apply text-chalkdim;
 }
 
 .input:focus {
   outline: none;
-  border-color: #B8791A;
+  border-color: rgb(var(--color-haldi));
 }
 
 .btn-primary,
@@ -60,8 +79,7 @@ a.card:hover, button.card:hover {
 }
 
 .btn-primary {
-  background: #1F2B24;
-  color: #F7F2E7;
+  @apply bg-chalk text-board;
   font-weight: 700;
   border-radius: 10px;
   padding: 10px 18px;
@@ -81,15 +99,14 @@ a.card:hover, button.card:hover {
 }
 
 .btn-secondary {
-  background: #EDE4D0;
-  color: #1F2B24;
+  @apply bg-board3 text-chalk;
   font-weight: 600;
   border-radius: 10px;
   padding: 10px 18px;
 }
 
 .btn-secondary:hover {
-  background: #E4D8BC;
+  filter: brightness(0.95);
 }
 
 .btn-secondary:active {

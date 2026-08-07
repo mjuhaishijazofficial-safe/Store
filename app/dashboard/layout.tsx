@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import SignOutButton from '@/components/SignOutButton';
 import LanguageToggle from '@/components/LanguageToggle';
+import ThemeToggle from '@/components/ThemeToggle';
 import { getServerT } from '@/lib/i18n-server';
 import { ShopProvider } from '@/lib/shop-context';
 
@@ -53,6 +54,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <div className="max-w-4xl mx-auto px-5 py-4 flex items-center justify-between gap-3">
             <div className="font-display text-xl font-700 text-haldi">{shop?.name || 'Dukaan ERP'}</div>
             <div className="flex items-center gap-4">
+              <ThemeToggle />
               <LanguageToggle />
               <SignOutButton />
             </div>

@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import LanguageToggle from '@/components/LanguageToggle';
+import ThemeToggle from '@/components/ThemeToggle';
 import { getServerT } from '@/lib/i18n-server';
 
 export default async function Home() {
@@ -10,6 +11,7 @@ export default async function Home() {
       <div className="flex items-center justify-between mb-20 gap-3">
         <div className="font-display text-2xl font-800 text-haldi">Dukaan ERP</div>
         <div className="flex items-center gap-3">
+          <ThemeToggle />
           <LanguageToggle />
           <Link href="/login" className="btn-secondary text-sm">{t('landing.login')}</Link>
           <Link href="/signup" className="btn-primary text-sm">{t('landing.freeTrialNav')}</Link>
