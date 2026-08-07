@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient, createAdminClient } from '@/lib/supabase/server';
+import { requireEnv } from '@/lib/env';
 
 export async function POST(req: Request) {
   const { email } = await req.json();
@@ -39,7 +40,7 @@ export async function POST(req: Request) {
   // they can set one. /reset-password also doubles as the invite-accept
   // landing page.
   const { error: sendErr } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-    redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/reset-password`
+    redirectTo: `${requireEnv('NEXT_PUBLIC_APP_URL')}/reset-password`
   });
 
   if (sendErr) return NextResponse.json({ error: sendErr.message }, { status: 400 });
