@@ -23,6 +23,7 @@ export default function KhataPage() {
   const { shopId } = useShop();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [balances, setBalances] = useState<Record<string, number>>({});
+  const [topCustomers, setTopCustomers] = useState<{ customer_id: string; customer_name: string; total_purchases: number }[]>([]);
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -38,9 +39,10 @@ export default function KhataPage() {
     // pulling every ledger row across every customer to sum in JS —
     // this is what keeps the list fast no matter how many customers or
     // how much history a shop has.
-    const [{ data: custs }, { data: bals }] = await Promise.all([
+    const [{ data: custs }, { data: bals }, { data: top }] = await Promise.all([
       supabase.from('customers').select('*').eq('shop_id', shopId).order('name'),
-      supabase.rpc('khata_balances', { p_shop_id: shopId })
+      supabase.rpc('khata_balances', { p_shop_id: shopId }),
+      supabase.rpc('khata_top_customers', { p_shop_id: shopId, p_limit: 5 })
     ]);
 
     const balMap: Record<string, number> = {};
@@ -48,6 +50,7 @@ export default function KhataPage() {
 
     setCustomers(custs || []);
     setBalances(balMap);
+    setTopCustomers(top || []);
     setLoading(false);
   }
 
@@ -80,6 +83,27 @@ export default function KhataPage() {
         <input className="input flex-1" placeholder={t('khata.search')} value={search} onChange={e => setSearch(e.target.value)} />
         <button onClick={openAdd} className="btn-primary whitespace-nowrap">{t('khata.addCustomer')}</button>
       </div>
+
+      {!loading && topCustomers.length > 0 && (
+        <>
+        <div className="text-xs text-chalkdim uppercase mb-2">{t('khata.topCustomers')}</div>
+        <div className="flex gap-2 overflow-x-auto pb-1 mb-4">
+          {topCustomers.map((c, i) => (
+            <Link
+              key={c.customer_id}
+              href={`/dashboard/khata/${c.customer_id}`}
+              className="card px-3 py-2 flex items-center gap-2 whitespace-nowrap shrink-0"
+            >
+              <span className="text-haldi font-mono font-700 text-xs">#{i + 1}</span>
+              <div>
+                <div className="text-xs font-700">{c.customer_name}</div>
+                <div className="text-[10px] text-chalkdim font-mono">{fmt(c.total_purchases)}</div>
+              </div>
+            </Link>
+          ))}
+        </div>
+        </>
+      )}
 
       {loading && <div className="text-chalkdim text-sm text-center py-10">{t('khata.loading')}</div>}
 

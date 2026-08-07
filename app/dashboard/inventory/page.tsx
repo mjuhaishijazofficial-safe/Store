@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useLang } from '@/lib/i18n-context';
 import { useShop } from '@/lib/shop-context';
+import BarcodeScannerModal from '@/components/BarcodeScannerModal';
 
 type Item = {
   id: string;
@@ -13,6 +14,8 @@ type Item = {
   stock: number;
   min_stock: number;
   price: number;
+  cost_price: number;
+  barcode: string | null;
 };
 
 function fmt(n: number) {
@@ -32,8 +35,9 @@ export default function InventoryPage() {
   const [moveType, setMoveType] = useState<'purchase' | 'sale'>('purchase');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [scannerOpen, setScannerOpen] = useState(false);
 
-  const [form, setForm] = useState({ name: '', category: '', unit: '', stock: 0, min_stock: 0, price: 0 });
+  const [form, setForm] = useState({ name: '', category: '', unit: '', stock: 0, min_stock: 0, price: 0, cost_price: 0, barcode: '' });
   const [moveForm, setMoveForm] = useState({ qty: 0, amount: 0 });
 
   useEffect(() => { loadItems(); }, [shopId]);
@@ -45,25 +49,39 @@ export default function InventoryPage() {
     setLoading(false);
   }
 
-  function openAdd() {
+  function openAdd(prefillBarcode?: string) {
     setEditing(null);
-    setForm({ name: '', category: '', unit: '', stock: 0, min_stock: 0, price: 0 });
+    setForm({ name: '', category: '', unit: '', stock: 0, min_stock: 0, price: 0, cost_price: 0, barcode: prefillBarcode || '' });
     setError('');
     setModalOpen(true);
   }
 
   function openEdit(it: Item) {
     setEditing(it);
-    setForm({ name: it.name, category: it.category || '', unit: it.unit || '', stock: it.stock, min_stock: it.min_stock, price: it.price });
+    setForm({ name: it.name, category: it.category || '', unit: it.unit || '', stock: it.stock, min_stock: it.min_stock, price: it.price, cost_price: it.cost_price || 0, barcode: it.barcode || '' });
     setError('');
     setModalOpen(true);
   }
 
+  function handleScanned(code: string) {
+    setScannerOpen(false);
+    const existing = items.find(i => i.barcode === code);
+    if (existing) {
+      openEdit(existing);
+    } else {
+      openAdd(code);
+    }
+  }
+
   async function saveItem() {
     if (!form.name.trim() || !shopId) return;
+    // Empty string vs null matters here: the barcode unique index only
+    // excludes NULLs, so two items saved with an empty string would
+    // collide on it.
+    const payload = { ...form, barcode: form.barcode.trim() || null };
     const { error: err } = editing
-      ? await supabase.from('items').update({ ...form }).eq('id', editing.id)
-      : await supabase.from('items').insert({ ...form, shop_id: shopId });
+      ? await supabase.from('items').update(payload).eq('id', editing.id)
+      : await supabase.from('items').insert({ ...payload, shop_id: shopId });
 
     if (err) { setError(t('common.error')); return; }
     setModalOpen(false);
@@ -115,7 +133,8 @@ export default function InventoryPage() {
     <div>
       <div className="flex gap-2 mb-4">
         <input className="input flex-1" placeholder={t('inventory.search')} value={search} onChange={e => setSearch(e.target.value)} />
-        <button onClick={openAdd} className="btn-primary whitespace-nowrap">{t('inventory.addNew')}</button>
+        <button onClick={() => setScannerOpen(true)} className="btn-secondary whitespace-nowrap">{t('inventory.scan')}</button>
+        <button onClick={() => openAdd()} className="btn-primary whitespace-nowrap">{t('inventory.addNew')}</button>
       </div>
 
       {loading && <div className="text-chalkdim text-sm text-center py-10">{t('inventory.loading')}</div>}
@@ -175,15 +194,23 @@ export default function InventoryPage() {
                 <input className="input" value={form.unit} onChange={e => setForm({ ...form, unit: e.target.value })} placeholder={t('inventory.unitPlaceholder')} />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3 mb-5">
+            <div className="grid grid-cols-2 gap-3 mb-3">
               <div>
                 <label className="block text-xs text-chalkdim mb-1">{t('inventory.alertLevel')}</label>
                 <input type="number" className="input" value={form.min_stock} onChange={e => setForm({ ...form, min_stock: Number(e.target.value) })} />
               </div>
               <div>
-                <label className="block text-xs text-chalkdim mb-1">{t('inventory.price')}</label>
+                <label className="block text-xs text-chalkdim mb-1">{t('inventory.sellingPrice')}</label>
                 <input type="number" className="input" value={form.price} onChange={e => setForm({ ...form, price: Number(e.target.value) })} />
               </div>
+            </div>
+            <div className="mb-3">
+              <label className="block text-xs text-chalkdim mb-1">{t('inventory.costPrice')}</label>
+              <input type="number" className="input" value={form.cost_price} onChange={e => setForm({ ...form, cost_price: Number(e.target.value) })} />
+            </div>
+            <div className="mb-5">
+              <label className="block text-xs text-chalkdim mb-1">{t('inventory.barcode')}</label>
+              <input className="input" value={form.barcode} onChange={e => setForm({ ...form, barcode: e.target.value })} />
             </div>
             <div className="flex gap-2 mb-2">
               <button onClick={() => setModalOpen(false)} className="btn-secondary flex-1">{t('inventory.cancel')}</button>
@@ -216,6 +243,10 @@ export default function InventoryPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {scannerOpen && (
+        <BarcodeScannerModal onDetected={handleScanned} onClose={() => setScannerOpen(false)} />
       )}
     </div>
   );

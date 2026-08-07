@@ -41,9 +41,13 @@ create table if not exists items (
   unit text default 'unit',
   stock numeric not null default 0,
   min_stock numeric not null default 0,
-  price numeric not null default 0,
+  price numeric not null default 0,       -- selling price
+  cost_price numeric not null default 0,  -- what the shop paid — used to compute profit
+  barcode text,                           -- optional, for the barcode scanner
   created_at timestamptz not null default now()
 );
+alter table items add column if not exists cost_price numeric not null default 0;
+alter table items add column if not exists barcode text;
 
 -- 4. TRANSACTIONS (purchase / sale log) ------------------------------
 create table if not exists transactions (
@@ -377,3 +381,67 @@ create index if not exists idx_khata_shop on khata_entries(shop_id);
 create index if not exists idx_suppliers_shop on suppliers(shop_id);
 create index if not exists idx_supplier_entries_supplier on supplier_entries(supplier_id, created_at desc);
 create index if not exists idx_supplier_entries_shop on supplier_entries(shop_id);
+create unique index if not exists idx_items_shop_barcode on items(shop_id, barcode) where barcode is not null;
+
+-- ============================================================
+-- Smart Reorder: predicts days-until-stockout per item from actual
+-- recent sales velocity, instead of only flagging items already below
+-- min_stock. avg_daily_sale = total sold in the lookback window / days
+-- in that window; days_remaining = current stock / that rate. Items
+-- with no recent sales get days_remaining = null (nothing to predict
+-- from) rather than a misleading number.
+-- ============================================================
+create or replace function reorder_predictions(p_shop_id uuid, p_lookback_days int default 30)
+returns table(
+  item_id uuid,
+  item_name text,
+  unit text,
+  stock numeric,
+  min_stock numeric,
+  avg_daily_sale numeric,
+  days_remaining numeric
+)
+language sql
+security invoker
+stable
+as $$
+  select
+    i.id,
+    i.name,
+    i.unit,
+    i.stock,
+    i.min_stock,
+    coalesce(sold.total_qty, 0) / p_lookback_days::numeric,
+    case when coalesce(sold.total_qty, 0) > 0
+      then i.stock / (sold.total_qty / p_lookback_days::numeric)
+      else null
+    end
+  from items i
+  left join (
+    select item_id, sum(qty) as total_qty
+    from transactions
+    where shop_id = p_shop_id
+      and type = 'sale'
+      and created_at >= now() - (p_lookback_days || ' days')::interval
+    group by item_id
+  ) sold on sold.item_id = i.id
+  where i.shop_id = p_shop_id
+$$;
+
+-- Customer Analytics: top customers by lifetime purchase volume (not
+-- balance owed — a customer who buys a lot and pays on time should
+-- still show up as a top customer).
+create or replace function khata_top_customers(p_shop_id uuid, p_limit int default 5)
+returns table(customer_id uuid, customer_name text, total_purchases numeric)
+language sql
+security invoker
+stable
+as $$
+  select c.id, c.name, sum(k.amount)
+  from customers c
+  join khata_entries k on k.customer_id = c.id and k.type = 'purchase'
+  where c.shop_id = p_shop_id
+  group by c.id, c.name
+  order by sum(k.amount) desc
+  limit p_limit
+$$;

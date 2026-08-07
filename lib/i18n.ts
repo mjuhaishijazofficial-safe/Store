@@ -94,6 +94,8 @@ export const dict = {
   'reports.stockPurchased': { ur: 'Naya Maal (Kharch)', en: 'Stock Purchased' },
   'reports.udhaarDiya': { ur: 'Udhaar Diya', en: 'Credit Given' },
   'reports.paymentMila': { ur: 'Payment Mila', en: 'Payments Received' },
+  'reports.profit': { ur: 'Aaj ka Profit', en: "Today's Profit" },
+  'reports.profitNote': { ur: 'Sirf becha hua saman — cost price se hisaab', en: 'From items sold only — based on cost price' },
   'reports.shareWhatsapp': { ur: 'WhatsApp Par Share Karein', en: 'Share on WhatsApp' },
   'reports.summaryMsg': {
     ur: '{shop} — Aaj ka Hisaab\nBikri: Rs. {sales}\nUdhaar diya: Rs. {given}\nPayment mila: Rs. {received}\nNaya maal: Rs. {stock}',
@@ -118,6 +120,8 @@ export const dict = {
   'inventory.unit': { ur: 'Unit', en: 'Unit' },
   'inventory.unitPlaceholder': { ur: 'kg / packet', en: 'kg / packet' },
   'inventory.price': { ur: 'Price/unit', en: 'Price/unit' },
+  'inventory.sellingPrice': { ur: 'Bikri Price', en: 'Selling Price' },
+  'inventory.costPrice': { ur: 'Cost Price (aapko kitne mein pada)', en: 'Cost Price (what you paid)' },
   'inventory.cancel': { ur: 'Cancel', en: 'Cancel' },
   'inventory.save': { ur: 'Save', en: 'Save' },
   'inventory.deleteItem': { ur: 'Ye saman hata dein', en: 'Delete this item' },
@@ -126,6 +130,13 @@ export const dict = {
   'inventory.quantity': { ur: 'Quantity', en: 'Quantity' },
   'inventory.totalAmount': { ur: 'Total amount (₨) — budget se katega', en: 'Total amount (₨) — deducted from budget' },
   'inventory.confirm': { ur: 'Confirm', en: 'Confirm' },
+  'inventory.scan': { ur: '📷 Scan', en: '📷 Scan' },
+  'inventory.scanTitle': { ur: 'Barcode Scan Karein', en: 'Scan Barcode' },
+  'inventory.scanHint': { ur: 'Barcode ko camera ke saamne rakhein', en: 'Hold the barcode in front of the camera' },
+  'inventory.scanCameraError': { ur: 'Camera access nahi mila — permission check karein', en: 'Could not access camera — check permissions' },
+  'inventory.scanFoundExisting': { ur: 'Ye saman pehle se hai — edit khul gaya', en: 'This item already exists — opened for edit' },
+  'inventory.scanNewItem': { ur: 'Naya barcode — saman ki tafseel dein', en: 'New barcode — fill in the item details' },
+  'inventory.barcode': { ur: 'Barcode', en: 'Barcode' },
 
   // reorder
   'reorder.title': { ur: 'Mangwana Hai', en: 'Reorder' },
@@ -136,6 +147,10 @@ export const dict = {
   'reorder.alert': { ur: 'Alert', en: 'Alert' },
   'reorder.orderQty': { ur: 'mangwayein', en: 'to order' },
   'reorder.estCost': { ur: 'Andaza lagat', en: 'Est. cost' },
+  'reorder.smartTitle': { ur: 'Jald Khatam Ho Sakta Hai', en: 'Predicted to Run Out Soon' },
+  'reorder.smartSubtitle': { ur: 'Pichle 30 din ki bikri ke hisaab se andaza — abhi alert level tak nahi pahuncha', en: 'Estimated from the last 30 days of sales — not at alert level yet' },
+  'reorder.daysLeft': { ur: 'din baaki (andaza)', en: 'days left (estimate)' },
+  'reorder.dailyRate': { ur: '/din bikta hai', en: '/day sold' },
 
   // history
   'history.title': { ur: 'History — Purchases & Bikri', en: 'History — Purchases & Sales' },
@@ -150,6 +165,7 @@ export const dict = {
   'khata.emptyTitle': { ur: 'Koi customer nahi mila', en: 'No customers found' },
   'khata.emptyBody': { ur: '"+ Naya Customer" par tap kar ke add karein', en: 'Tap "+ New Customer" to add one' },
   'khata.overLimit': { ur: 'Limit se zyada', en: 'Over limit' },
+  'khata.topCustomers': { ur: 'Sabse Zyada Khareedari', en: 'Top Customers' },
   'khata.newCustomerTitle': { ur: 'Naya Customer', en: 'New Customer' },
   'khata.name': { ur: 'Naam', en: 'Name' },
   'khata.phone': { ur: 'Phone', en: 'Phone' },

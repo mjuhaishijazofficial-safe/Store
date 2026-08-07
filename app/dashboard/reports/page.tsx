@@ -17,15 +17,28 @@ export default async function ReportsPage() {
 
   const startIso = startOfTodayPKT().toISOString();
 
-  const [{ data: txns }, { data: khataRows }] = await Promise.all([
+  const [{ data: txns }, { data: khataRows }, { data: sales }] = await Promise.all([
     supabase.from('transactions').select('type, amount').eq('shop_id', shopId).gte('created_at', startIso),
-    supabase.from('khata_entries').select('type, amount').eq('shop_id', shopId).gte('created_at', startIso)
+    supabase.from('khata_entries').select('type, amount').eq('shop_id', shopId).gte('created_at', startIso),
+    // Separate query with the items join (cost_price) just for the sold
+    // rows — profit needs cost_price per line, which the summary query
+    // above doesn't fetch.
+    supabase.from('transactions').select('qty, amount, items(cost_price)').eq('shop_id', shopId).eq('type', 'sale').gte('created_at', startIso)
   ]);
 
   const totalSales = (txns || []).filter((r: any) => r.type === 'sale').reduce((s: number, r: any) => s + (r.amount || 0), 0);
   const stockPurchased = (txns || []).filter((r: any) => r.type === 'purchase').reduce((s: number, r: any) => s + (r.amount || 0), 0);
   const udhaarDiya = (khataRows || []).filter((r: any) => r.type === 'purchase').reduce((s: number, r: any) => s + (r.amount || 0), 0);
   const paymentMila = (khataRows || []).filter((r: any) => r.type === 'payment').reduce((s: number, r: any) => s + (r.amount || 0), 0);
+
+  // Profit = today's sale revenue minus cost of goods sold, using each
+  // item's current cost_price (not a historical snapshot — if a cost
+  // changes mid-day this is an approximation, close enough for a daily
+  // read rather than formal accounting).
+  const profit = (sales || []).reduce((s: number, r: any) => {
+    const costPrice = r.items?.cost_price || 0;
+    return s + (r.amount || 0) - (r.qty || 0) * costPrice;
+  }, 0);
 
   const shareText = t('reports.summaryMsg')
     .replace('{shop}', shop?.name || 'Dukaan')
@@ -38,6 +51,12 @@ export default async function ReportsPage() {
     <div className="max-w-md">
       <h1 className="font-display text-xl font-700 mb-1">{t('reports.title')}</h1>
       <p className="text-chalkdim text-sm mb-5">{t('reports.subtitle')}</p>
+
+      <div className="card p-5 mb-5">
+        <div className="text-xs text-chalkdim uppercase mb-1">{t('reports.profit')}</div>
+        <div className={`font-mono font-800 text-3xl ${profit >= 0 ? 'text-dhania' : 'text-mirch'}`}>{fmt(profit)}</div>
+        <div className="text-[11px] text-chalkdim mt-1">{t('reports.profitNote')}</div>
+      </div>
 
       <div className="grid grid-cols-2 gap-3 mb-5">
         <div className="card p-4">

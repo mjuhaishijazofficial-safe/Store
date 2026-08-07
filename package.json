@@ -12,6 +12,8 @@
   "dependencies": {
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.112.1",
+    "@zxing/browser": "^0.2.1",
+    "@zxing/library": "^0.23.0",
     "next": "^16.3.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
