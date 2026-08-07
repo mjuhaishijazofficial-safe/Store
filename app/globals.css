@@ -18,17 +18,22 @@
   --color-dhania: 63 122 52;     /* #3F7A34 coriander green — positive */
 }
 
-/* Dark — opt-in via the toggle. This is close to the original theme this
-   product shipped with before the light redesign. */
+/* Dark — opt-in via the toggle. Navy "fintech dashboard" palette, hand-
+   picked from ui-ux-pro-max-skill's colors.csv (Financial Dashboard /
+   Fintech / Banking rows: deep navy-black surfaces, vivid green/red for
+   positive/negative amounts) — the actual category this product is in,
+   rather than just a dimmed copy of the light theme. Gold accent kept
+   close to the light theme's haldi so the brand mark reads the same in
+   both modes. */
 html[data-theme='dark'] {
-  --color-board: 31 43 36;       /* #1F2B24 */
-  --color-board2: 40 54 45;      /* #28362D */
-  --color-board3: 49 66 58;      /* #31423A */
-  --color-chalk: 237 232 221;    /* #EDE8DD */
-  --color-chalkdim: 169 179 166; /* #A9B3A6 */
-  --color-haldi: 224 163 46;     /* #E0A32E */
-  --color-mirch: 193 80 46;      /* #C1502E */
-  --color-dhania: 107 155 94;    /* #6B9B5E */
+  --color-board: 11 17 32;       /* #0B1120 page background — near-black navy */
+  --color-board2: 19 27 46;      /* #131B2E card surface */
+  --color-board3: 28 39 64;      /* #1C2740 secondary surface / inputs */
+  --color-chalk: 241 245 249;    /* #F1F5F9 primary text — soft near-white */
+  --color-chalkdim: 139 150 172; /* #8B96AC secondary/muted text — slate */
+  --color-haldi: 232 163 61;     /* #E8A33D turmeric gold — emphasis */
+  --color-mirch: 239 68 68;      /* #EF4444 debt/negative */
+  --color-dhania: 34 197 94;     /* #22C55E payments/positive */
 }
 
 body {
@@ -48,12 +53,15 @@ body {
 .card {
   @apply bg-board2 border border-chalk/10;
   border-radius: 14px;
-  box-shadow: 0 1px 2px rgb(var(--color-chalk) / 0.04);
+  /* Shadows read as depth, not tint — always dark regardless of theme,
+     unlike borders (which correctly flip light/dark with --color-chalk
+     so they stay visible against whichever surface is active). */
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
 a.card:hover, button.card:hover {
   border-color: rgb(var(--color-chalk) / 0.22);
-  box-shadow: 0 2px 8px rgb(var(--color-chalk) / 0.08);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 .input {
