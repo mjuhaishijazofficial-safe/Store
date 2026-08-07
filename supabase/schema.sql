@@ -289,39 +289,52 @@ alter table suppliers enable row level security;
 alter table supplier_entries enable row level security;
 
 -- shops: a user can only see/update their own shop
+-- Postgres has no "create policy if not exists" — drop-then-create is the
+-- standard idempotent pattern, needed so this whole script can be safely
+-- re-run (which it has been, repeatedly, as features got added).
+drop policy if exists "shop_select_own" on shops;
 create policy "shop_select_own" on shops for select using (id = my_shop_id());
 -- only the owner can change shop settings/budget/billing — staff can read, not write
+drop policy if exists "shop_update_own" on shops;
 create policy "shop_update_own" on shops for update
   using (id = my_shop_id() and my_role() = 'owner');
 
 -- profiles: user can see profiles within their shop
+drop policy if exists "profile_select_same_shop" on profiles;
 create policy "profile_select_same_shop" on profiles for select using (shop_id = my_shop_id());
+drop policy if exists "profile_insert_self" on profiles;
 create policy "profile_insert_self" on profiles for insert with check (id = auth.uid());
 -- no update/delete policy on profiles — role changes only happen via the
 -- security-definer signup trigger, never directly by a user (staff can't self-promote)
 
 -- items: fully scoped to shop_id
+drop policy if exists "items_all_own_shop" on items;
 create policy "items_all_own_shop" on items for all
   using (shop_id = my_shop_id())
   with check (shop_id = my_shop_id());
 
 -- transactions: fully scoped to shop_id
+drop policy if exists "transactions_all_own_shop" on transactions;
 create policy "transactions_all_own_shop" on transactions for all
   using (shop_id = my_shop_id())
   with check (shop_id = my_shop_id());
 
 -- customers / khata_entries: fully scoped to shop_id
+drop policy if exists "customers_own_shop" on customers;
 create policy "customers_own_shop" on customers for all
   using (shop_id = my_shop_id())
   with check (shop_id = my_shop_id());
+drop policy if exists "khata_own_shop" on khata_entries;
 create policy "khata_own_shop" on khata_entries for all
   using (shop_id = my_shop_id())
   with check (shop_id = my_shop_id());
 
 -- suppliers / supplier_entries: fully scoped to shop_id
+drop policy if exists "suppliers_own_shop" on suppliers;
 create policy "suppliers_own_shop" on suppliers for all
   using (shop_id = my_shop_id())
   with check (shop_id = my_shop_id());
+drop policy if exists "supplier_entries_own_shop" on supplier_entries;
 create policy "supplier_entries_own_shop" on supplier_entries for all
   using (shop_id = my_shop_id())
   with check (shop_id = my_shop_id());
