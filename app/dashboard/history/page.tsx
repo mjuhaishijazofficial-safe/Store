@@ -17,7 +17,7 @@ export default async function HistoryPage() {
 
   return (
     <div>
-      <h1 className="font-display text-xl font-700 mb-5">Khata — Purchases &amp; Bikri</h1>
+      <h1 className="font-display text-xl font-700 mb-5">History — Purchases &amp; Bikri</h1>
 
       {(!logs || logs.length === 0) && (
         <div className="text-center py-14 text-chalkdim text-sm">Abhi tak koi entry nahi</div>

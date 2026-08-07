@@ -54,6 +54,31 @@ create table if not exists transactions (
   created_at timestamptz not null default now()
 );
 
+-- 5. CUSTOMERS (khata / credit ledger) --------------------------------
+create table if not exists customers (
+  id uuid primary key default gen_random_uuid(),
+  shop_id uuid not null references shops(id) on delete cascade,
+  name text not null,
+  phone text,
+  credit_limit numeric,                 -- optional, for credit-limit alerts
+  created_at timestamptz not null default now()
+);
+
+-- 6. KHATA_ENTRIES (each purchase-on-credit / payment) -----------------
+create table if not exists khata_entries (
+  id uuid primary key default gen_random_uuid(),
+  shop_id uuid not null references shops(id) on delete cascade,
+  customer_id uuid not null references customers(id) on delete cascade,
+  type text not null check (type in ('purchase','payment')),
+  item_id uuid references items(id),    -- optional link to inventory
+  item_name text,                       -- e.g. "Coca Cola" (purchase entries)
+  qty numeric,
+  amount numeric not null,              -- purchase = udhaar chadha, payment = utra
+  note text,
+  created_by uuid references auth.users(id),
+  created_at timestamptz not null default now()
+);
+
 -- ============================================================
 -- Helper: current user's shop_id
 -- ============================================================
@@ -73,6 +98,8 @@ alter table shops enable row level security;
 alter table profiles enable row level security;
 alter table items enable row level security;
 alter table transactions enable row level security;
+alter table customers enable row level security;
+alter table khata_entries enable row level security;
 
 -- shops: a user can only see/update their own shop
 create policy "shop_select_own" on shops for select using (id = my_shop_id());
@@ -89,6 +116,14 @@ create policy "items_all_own_shop" on items for all
 
 -- transactions: fully scoped to shop_id
 create policy "transactions_all_own_shop" on transactions for all
+  using (shop_id = my_shop_id())
+  with check (shop_id = my_shop_id());
+
+-- customers / khata_entries: fully scoped to shop_id
+create policy "customers_own_shop" on customers for all
+  using (shop_id = my_shop_id())
+  with check (shop_id = my_shop_id());
+create policy "khata_own_shop" on khata_entries for all
   using (shop_id = my_shop_id())
   with check (shop_id = my_shop_id());
 
@@ -128,3 +163,6 @@ create index if not exists idx_items_shop on items(shop_id);
 create index if not exists idx_transactions_shop on transactions(shop_id);
 create index if not exists idx_transactions_created on transactions(shop_id, created_at desc);
 create index if not exists idx_profiles_shop on profiles(shop_id);
+create index if not exists idx_customers_shop on customers(shop_id);
+create index if not exists idx_khata_customer on khata_entries(customer_id, created_at desc);
+create index if not exists idx_khata_shop on khata_entries(shop_id);
