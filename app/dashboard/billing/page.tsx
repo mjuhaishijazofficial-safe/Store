@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { redirect } from 'next/navigation';
 import BillingActions from '@/components/BillingActions';
 import { getServerT } from '@/lib/i18n-server';
 
@@ -6,7 +7,8 @@ export default async function BillingPage() {
   const supabase = createClient();
   const t = getServerT();
   const { data: { user } } = await supabase.auth.getUser();
-  const { data: profile } = await supabase.from('profiles').select('shop_id').eq('id', user!.id).single();
+  const { data: profile } = await supabase.from('profiles').select('shop_id, role').eq('id', user!.id).single();
+  if (profile?.role !== 'owner') redirect('/dashboard');
   const { data: shop } = await supabase
     .from('shops')
     .select('subscription_status, plan, trial_ends_at, stripe_customer_id')

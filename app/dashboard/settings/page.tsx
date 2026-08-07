@@ -8,6 +8,8 @@ export default function SettingsPage() {
   const supabase = createClient();
   const { t } = useLang();
   const [shopId, setShopId] = useState<string | null>(null);
+  const [isOwner, setIsOwner] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [name, setName] = useState('');
   const [budget, setBudget] = useState(0);
   const [saved, setSaved] = useState(false);
@@ -17,11 +19,15 @@ export default function SettingsPage() {
   async function init() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
-    const { data: profile } = await supabase.from('profiles').select('shop_id').eq('id', user.id).single();
-    const { data: shop } = await supabase.from('shops').select('name, budget').eq('id', profile?.shop_id).single();
+    const { data: profile } = await supabase.from('profiles').select('shop_id, role').eq('id', user.id).single();
+    setIsOwner(profile?.role === 'owner');
+    if (profile?.role === 'owner') {
+      const { data: shop } = await supabase.from('shops').select('name, budget').eq('id', profile?.shop_id).single();
+      setName(shop?.name || '');
+      setBudget(shop?.budget || 0);
+    }
     setShopId(profile?.shop_id || null);
-    setName(shop?.name || '');
-    setBudget(shop?.budget || 0);
+    setLoading(false);
   }
 
   async function save() {
@@ -29,6 +35,12 @@ export default function SettingsPage() {
     await supabase.from('shops').update({ name, budget }).eq('id', shopId);
     setSaved(true);
     setTimeout(() => setSaved(false), 1800);
+  }
+
+  if (loading) return null;
+
+  if (!isOwner) {
+    return <div className="text-chalkdim text-sm py-10 text-center">{t('staff.ownerOnly')}</div>;
   }
 
   return (

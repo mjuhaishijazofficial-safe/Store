@@ -191,6 +191,18 @@ export const dict = {
   'suppliersDetail.cancel': { ur: 'Cancel', en: 'Cancel' },
   'suppliersDetail.save': { ur: 'Save', en: 'Save' },
 
+  // staff / multi-shop access
+  'nav.staff': { ur: 'Staff', en: 'Staff' },
+  'staff.title': { ur: 'Staff', en: 'Staff' },
+  'staff.inviteTitle': { ur: 'Naya Staff Invite Karein', en: 'Invite Staff' },
+  'staff.email': { ur: 'Email', en: 'Email' },
+  'staff.inviteBtn': { ur: 'Invite Bhejein', en: 'Send Invite' },
+  'staff.inviting': { ur: 'Bhej rahe hain...', en: 'Sending...' },
+  'staff.invited': { ur: 'Invite bhej diya gaya ✓', en: 'Invite sent ✓' },
+  'staff.roleOwner': { ur: 'Owner', en: 'Owner' },
+  'staff.roleStaff': { ur: 'Staff', en: 'Staff' },
+  'staff.ownerOnly': { ur: 'Ye page sirf owner dekh sakte hain.', en: 'Only the shop owner can view this page.' },
+
   // billing
   'billing.title': { ur: 'Billing', en: 'Billing' },
   'billing.currentStatus': { ur: 'Current Status', en: 'Current Status' },

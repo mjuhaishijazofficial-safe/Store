@@ -12,11 +12,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('shop_id, full_name, shops(name, subscription_status, trial_ends_at)')
+    .select('shop_id, full_name, role, shops(name, subscription_status, trial_ends_at)')
     .eq('id', user.id)
     .single();
 
   const shop: any = profile?.shops;
+  const isOwner = profile?.role === 'owner';
   const trialExpired =
     shop?.subscription_status === 'trialing' &&
     new Date(shop?.trial_ends_at) < new Date();
@@ -31,8 +32,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
     { href: '/dashboard/khata', label: t('nav.khata') },
     { href: '/dashboard/suppliers', label: t('nav.suppliers') },
     { href: '/dashboard/history', label: t('nav.history') },
-    { href: '/dashboard/billing', label: t('nav.billing') },
-    { href: '/dashboard/settings', label: t('nav.settings') }
+    // billing/settings/staff are owner-only — staff never even see the tabs
+    ...(isOwner ? [
+      { href: '/dashboard/staff', label: t('nav.staff') },
+      { href: '/dashboard/billing', label: t('nav.billing') },
+      { href: '/dashboard/settings', label: t('nav.settings') }
+    ] : [])
   ];
 
   return (

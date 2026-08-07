@@ -23,9 +23,11 @@ create table if not exists profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   shop_id uuid not null references shops(id) on delete cascade,
   full_name text,
+  email text,
   role text not null default 'owner',    -- owner | staff
   created_at timestamptz not null default now()
 );
+alter table profiles add column if not exists email text;
 
 -- 3. ITEMS (inventory) -----------------------------------------------
 create table if not exists items (
@@ -114,6 +116,15 @@ as $$
   select shop_id from profiles where id = auth.uid()
 $$;
 
+create or replace function my_role()
+returns text
+language sql
+security definer
+stable
+as $$
+  select role from profiles where id = auth.uid()
+$$;
+
 -- ============================================================
 -- Row Level Security — this is what makes it multi-tenant safe
 -- ============================================================
@@ -128,11 +139,15 @@ alter table supplier_entries enable row level security;
 
 -- shops: a user can only see/update their own shop
 create policy "shop_select_own" on shops for select using (id = my_shop_id());
-create policy "shop_update_own" on shops for update using (id = my_shop_id());
+-- only the owner can change shop settings/budget/billing — staff can read, not write
+create policy "shop_update_own" on shops for update
+  using (id = my_shop_id() and my_role() = 'owner');
 
 -- profiles: user can see profiles within their shop
 create policy "profile_select_same_shop" on profiles for select using (shop_id = my_shop_id());
 create policy "profile_insert_self" on profiles for insert with check (id = auth.uid());
+-- no update/delete policy on profiles — role changes only happen via the
+-- security-definer signup trigger, never directly by a user (staff can't self-promote)
 
 -- items: fully scoped to shop_id
 create policy "items_all_own_shop" on items for all
@@ -172,13 +187,23 @@ set search_path = public
 as $$
 declare
   new_shop_id uuid;
+  invited_shop_id uuid;
 begin
-  insert into shops (name, owner_id)
-  values (coalesce(new.raw_user_meta_data->>'shop_name', 'Meri Dukaan'), new.id)
-  returning id into new_shop_id;
+  -- staff invites (see /api/staff/invite) pass invited_shop_id in the invite's
+  -- user metadata — attach to that existing shop instead of creating a new one
+  invited_shop_id := nullif(new.raw_user_meta_data->>'invited_shop_id', '')::uuid;
 
-  insert into profiles (id, shop_id, full_name, role)
-  values (new.id, new_shop_id, new.raw_user_meta_data->>'full_name', 'owner');
+  if invited_shop_id is not null then
+    insert into profiles (id, shop_id, full_name, email, role)
+    values (new.id, invited_shop_id, new.raw_user_meta_data->>'full_name', new.email, 'staff');
+  else
+    insert into shops (name, owner_id)
+    values (coalesce(new.raw_user_meta_data->>'shop_name', 'Meri Dukaan'), new.id)
+    returning id into new_shop_id;
+
+    insert into profiles (id, shop_id, full_name, email, role)
+    values (new.id, new_shop_id, new.raw_user_meta_data->>'full_name', new.email, 'owner');
+  end if;
 
   return new;
 end;
