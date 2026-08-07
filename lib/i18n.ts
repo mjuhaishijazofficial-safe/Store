@@ -192,6 +192,8 @@ export const dict = {
   'khataDetail.cancel': { ur: 'Cancel', en: 'Cancel' },
   'khataDetail.save': { ur: 'Save', en: 'Save' },
   'khataDetail.limitWarning': { ur: 'Ye entry credit limit se zyada kar degi', en: 'This entry will put them over their credit limit' },
+  'khataDetail.advanceBalance': { ur: 'Advance Balance (In ke paas)', en: 'Advance Balance' },
+  'khataDetail.advanceDepleted': { ur: 'ka advance khatam ho gaya hai — ab naya udhaar shuru ho gaya hai', en: "'s advance has run out — new credit has started" },
   'khataDetail.remindWhatsapp': { ur: 'WhatsApp par Yaad Dilayein', en: 'Remind on WhatsApp' },
   'khataDetail.reminderMsg': { ur: 'Aapka udhaar Rs. {amount} hai — {shop}', en: 'Your outstanding balance is Rs. {amount} — {shop}' },
   'khataDetail.fromInventory': { ur: 'Inventory se', en: 'From inventory' },

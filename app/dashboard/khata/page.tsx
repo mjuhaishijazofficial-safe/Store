@@ -125,7 +125,8 @@ export default function KhataPage() {
                 <div className="text-xs text-chalkdim">{c.phone || '—'}</div>
               </div>
               <div className="text-right">
-                <div className={`font-mono font-700 ${bal > 0 ? 'text-mirch' : 'text-chalkdim'}`}>{fmt(bal)}</div>
+                <div className={`font-mono font-700 ${bal > 0 ? 'text-mirch' : bal < 0 ? 'text-dhania' : 'text-chalkdim'}`}>{fmt(Math.abs(bal))}</div>
+                {bal < 0 && <div className="text-[10px] text-dhania">{t('khataDetail.advanceBalance')}</div>}
                 {over && <div className="text-[10px] text-mirch">{t('khata.overLimit')}</div>}
               </div>
             </Link>

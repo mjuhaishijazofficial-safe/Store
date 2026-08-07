@@ -47,6 +47,7 @@ export default function KhataDetailPage() {
   const [items, setItems] = useState<ItemLite[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [advanceDepletedNotice, setAdvanceDepletedNotice] = useState(false);
 
   const [modalType, setModalType] = useState<'purchase' | 'payment' | null>(null);
   const [form, setForm] = useState({ item_name: '', qty: '', amount: '', note: '' });
@@ -66,13 +67,19 @@ export default function KhataDetailPage() {
 
   // Balance comes from a DB-side sum, not by adding up whatever page of
   // entries happens to be loaded on screen — otherwise pagination would
-  // silently understate the real total.
-  async function loadBalance() {
+  // silently understate the real total. A negative balance means the
+  // customer has paid more than they've bought — an advance sitting with
+  // the shop, consumed by future purchases before any new debt accrues.
+  // Returns the value (not just setting state) so callers can compare
+  // before/after and catch the moment the advance runs out.
+  async function loadBalance(): Promise<number> {
     const [{ data: pSum }, { data: nSum }] = await Promise.all([
       supabase.from('khata_entries').select('amount.sum()').eq('customer_id', customerId).eq('type', 'purchase').single(),
       supabase.from('khata_entries').select('amount.sum()').eq('customer_id', customerId).eq('type', 'payment').single()
     ]);
-    setTotal(((pSum as any)?.sum || 0) - ((nSum as any)?.sum || 0));
+    const newTotal = ((pSum as any)?.sum || 0) - ((nSum as any)?.sum || 0);
+    setTotal(newTotal);
+    return newTotal;
   }
 
   async function loadEntries(reset: boolean) {
@@ -153,6 +160,7 @@ export default function KhataDetailPage() {
     if (!amount || amount <= 0) return;
 
     const qtyNum = form.qty ? Number(form.qty) : null;
+    const wasAdvance = total < 0;
 
     // Atomic: the ledger insert and the linked inventory stock deduction
     // happen in one DB transaction (record_khata_entry) instead of two
@@ -171,8 +179,15 @@ export default function KhataDetailPage() {
     if (err) { setError(t('common.error')); return; }
 
     setModalType(null);
-    await loadAll();
+    const [, newTotal] = await Promise.all([loadEntries(true), loadBalance()]);
     await reloadItems();
+
+    // The customer had an advance sitting with the shop and this entry
+    // just used the last of it — flag it so the shopkeeper notices new
+    // debt has started, not just silently see a number tick past zero.
+    if (wasAdvance && newTotal >= 0) {
+      setAdvanceDepletedNotice(true);
+    }
   }
 
   async function deleteEntry(id: string) {
@@ -202,8 +217,8 @@ export default function KhataDetailPage() {
         <div className="font-display text-lg font-700">{customer.name}</div>
         <div className="text-xs text-chalkdim mb-4">{customer.phone || '—'}</div>
 
-        <div className="text-xs text-chalkdim">{t('khataDetail.totalUdhaar')}</div>
-        <div className={`font-mono font-800 text-3xl ${total > 0 ? 'text-mirch' : 'text-dhania'}`}>{fmt(total)}</div>
+        <div className="text-xs text-chalkdim">{total < 0 ? t('khataDetail.advanceBalance') : t('khataDetail.totalUdhaar')}</div>
+        <div className={`font-mono font-800 text-3xl ${total > 0 ? 'text-mirch' : 'text-dhania'}`}>{fmt(Math.abs(total))}</div>
         {over && <div className="text-xs text-mirch mt-1">{t('khataDetail.overLimit')} ({fmt(customer.credit_limit!)})</div>}
 
         <div className="flex gap-2 mt-4">
@@ -217,6 +232,13 @@ export default function KhataDetailPage() {
           </button>
         )}
       </div>
+
+      {advanceDepletedNotice && (
+        <div className="flex items-start justify-between gap-2 text-haldi text-sm mb-3 bg-haldi/10 p-3 rounded-lg">
+          <span><strong>{customer.name}</strong> {t('khataDetail.advanceDepleted')}</span>
+          <button onClick={() => setAdvanceDepletedNotice(false)} className="text-chalkdim shrink-0">✕</button>
+        </div>
+      )}
 
       {error && <div className="text-mirch text-sm mb-3 bg-mirch/10 p-3 rounded-lg">{error}</div>}
 
