@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { getServerT } from '@/lib/i18n-server';
+import { startOfTodayPKT } from '@/lib/pkt-time';
 import ShareWhatsAppButton from '@/components/ShareWhatsAppButton';
 
 function fmt(n: number) {
@@ -14,9 +15,7 @@ export default async function ReportsPage() {
   const shopId = profile?.shop_id;
   const { data: shop } = await supabase.from('shops').select('name').eq('id', shopId).single();
 
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-  const startIso = todayStart.toISOString();
+  const startIso = startOfTodayPKT().toISOString();
 
   const [{ data: txns }, { data: khataRows }] = await Promise.all([
     supabase.from('transactions').select('type, amount').eq('shop_id', shopId).gte('created_at', startIso),

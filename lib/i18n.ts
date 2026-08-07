@@ -12,6 +12,7 @@ export const dict = {
   // shared
   'common.error': { ur: 'Kuch ghalat ho gaya — dobara koshish karein', en: 'Something went wrong — please try again' },
   'common.loadMore': { ur: 'Aur Dikhayein', en: 'Load More' },
+  'common.loading': { ur: 'Load ho raha hai...', en: 'Loading...' },
 
   // nav / shell
   'nav.overview': { ur: 'Overview', en: 'Overview' },
