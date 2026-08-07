@@ -79,6 +79,29 @@ create table if not exists khata_entries (
   created_at timestamptz not null default now()
 );
 
+-- 7. SUPPLIERS (reverse khata — what the shop owes suppliers) ----------
+create table if not exists suppliers (
+  id uuid primary key default gen_random_uuid(),
+  shop_id uuid not null references shops(id) on delete cascade,
+  name text not null,
+  phone text,
+  created_at timestamptz not null default now()
+);
+
+-- 8. SUPPLIER_ENTRIES (each maal-liya / payment-di) ---------------------
+create table if not exists supplier_entries (
+  id uuid primary key default gen_random_uuid(),
+  shop_id uuid not null references shops(id) on delete cascade,
+  supplier_id uuid not null references suppliers(id) on delete cascade,
+  type text not null check (type in ('purchase','payment')), -- purchase = maal liya (charhta hai), payment = maine di (utarta hai)
+  item_name text,
+  qty numeric,
+  amount numeric not null,
+  note text,
+  created_by uuid references auth.users(id),
+  created_at timestamptz not null default now()
+);
+
 -- ============================================================
 -- Helper: current user's shop_id
 -- ============================================================
@@ -100,6 +123,8 @@ alter table items enable row level security;
 alter table transactions enable row level security;
 alter table customers enable row level security;
 alter table khata_entries enable row level security;
+alter table suppliers enable row level security;
+alter table supplier_entries enable row level security;
 
 -- shops: a user can only see/update their own shop
 create policy "shop_select_own" on shops for select using (id = my_shop_id());
@@ -124,6 +149,14 @@ create policy "customers_own_shop" on customers for all
   using (shop_id = my_shop_id())
   with check (shop_id = my_shop_id());
 create policy "khata_own_shop" on khata_entries for all
+  using (shop_id = my_shop_id())
+  with check (shop_id = my_shop_id());
+
+-- suppliers / supplier_entries: fully scoped to shop_id
+create policy "suppliers_own_shop" on suppliers for all
+  using (shop_id = my_shop_id())
+  with check (shop_id = my_shop_id());
+create policy "supplier_entries_own_shop" on supplier_entries for all
   using (shop_id = my_shop_id())
   with check (shop_id = my_shop_id());
 
@@ -166,3 +199,6 @@ create index if not exists idx_profiles_shop on profiles(shop_id);
 create index if not exists idx_customers_shop on customers(shop_id);
 create index if not exists idx_khata_customer on khata_entries(customer_id, created_at desc);
 create index if not exists idx_khata_shop on khata_entries(shop_id);
+create index if not exists idx_suppliers_shop on suppliers(shop_id);
+create index if not exists idx_supplier_entries_supplier on supplier_entries(supplier_id, created_at desc);
+create index if not exists idx_supplier_entries_shop on supplier_entries(shop_id);
