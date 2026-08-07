@@ -30,6 +30,7 @@ export default function InventoryPage() {
   const [moveItem, setMoveItem] = useState<Item | null>(null);
   const [moveType, setMoveType] = useState<'purchase' | 'sale'>('purchase');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   const [form, setForm] = useState({ name: '', category: '', unit: '', stock: 0, min_stock: 0, price: 0 });
   const [moveForm, setMoveForm] = useState({ qty: 0, amount: 0 });
@@ -56,29 +57,32 @@ export default function InventoryPage() {
   function openAdd() {
     setEditing(null);
     setForm({ name: '', category: '', unit: '', stock: 0, min_stock: 0, price: 0 });
+    setError('');
     setModalOpen(true);
   }
 
   function openEdit(it: Item) {
     setEditing(it);
     setForm({ name: it.name, category: it.category || '', unit: it.unit || '', stock: it.stock, min_stock: it.min_stock, price: it.price });
+    setError('');
     setModalOpen(true);
   }
 
   async function saveItem() {
     if (!form.name.trim() || !shopId) return;
-    if (editing) {
-      await supabase.from('items').update({ ...form }).eq('id', editing.id);
-    } else {
-      await supabase.from('items').insert({ ...form, shop_id: shopId });
-    }
+    const { error: err } = editing
+      ? await supabase.from('items').update({ ...form }).eq('id', editing.id)
+      : await supabase.from('items').insert({ ...form, shop_id: shopId });
+
+    if (err) { setError(t('common.error')); return; }
     setModalOpen(false);
     await loadItems();
   }
 
   async function deleteItem() {
     if (!editing) return;
-    await supabase.from('items').delete().eq('id', editing.id);
+    const { error: err } = await supabase.from('items').delete().eq('id', editing.id);
+    if (err) { setError(t('common.error')); return; }
     setModalOpen(false);
     await loadItems();
   }
@@ -87,34 +91,28 @@ export default function InventoryPage() {
     setMoveItem(it);
     setMoveType(type);
     setMoveForm({ qty: 0, amount: 0 });
+    setError('');
     setMoveOpen(true);
   }
 
   async function confirmMove() {
     if (!moveItem || !shopId || moveForm.qty <= 0) return;
 
-    const newStock = moveType === 'purchase'
-      ? moveItem.stock + moveForm.qty
-      : Math.max(0, moveItem.stock - moveForm.qty);
-
-    await supabase.from('items').update({ stock: newStock }).eq('id', moveItem.id);
-
     const amount = moveType === 'purchase' ? (moveForm.amount || moveForm.qty * moveItem.price) : 0;
 
-    await supabase.from('transactions').insert({
-      shop_id: shopId,
-      item_id: moveItem.id,
-      item_name: moveItem.name,
-      type: moveType,
-      qty: moveForm.qty,
-      unit: moveItem.unit,
-      amount
+    // Atomic: stock update + transactions log row happen in one DB
+    // transaction (record_stock_move), so a mid-way failure can't leave
+    // a logged move with no matching stock change, and concurrent moves
+    // from two staff members on the same item can't silently clobber
+    // each other the way two separate read-then-write calls could.
+    const { error: err } = await supabase.rpc('record_stock_move', {
+      p_item_id: moveItem.id,
+      p_type: moveType,
+      p_qty: moveForm.qty,
+      p_amount: amount
     });
 
-    if (moveType === 'purchase' && amount > 0) {
-      const { data: shop } = await supabase.from('shops').select('spent').eq('id', shopId).single();
-      await supabase.from('shops').update({ spent: (shop?.spent || 0) + amount }).eq('id', shopId);
-    }
+    if (err) { setError(t('common.error')); return; }
 
     setMoveOpen(false);
     await loadItems();
@@ -171,6 +169,7 @@ export default function InventoryPage() {
         <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50" onClick={() => setModalOpen(false)}>
           <div className="card w-full max-w-md p-5 rounded-b-none sm:rounded-b-2xl" onClick={e => e.stopPropagation()}>
             <div className="font-display text-lg text-haldi font-700 mb-4">{editing ? t('inventory.editItemTitle') : t('inventory.newItemTitle')}</div>
+            {error && <div className="text-mirch text-sm mb-3 bg-mirch/10 p-3 rounded-lg">{error}</div>}
             <label className="block text-xs text-chalkdim mb-1">{t('inventory.name')}</label>
             <input className="input mb-3" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
             <label className="block text-xs text-chalkdim mb-1">{t('inventory.category')}</label>
@@ -211,6 +210,7 @@ export default function InventoryPage() {
             <div className="font-display text-lg text-haldi font-700 mb-4">
               {moveType === 'purchase' ? t('inventory.newStockTitle') : t('inventory.outStockTitle')}{moveItem.name}
             </div>
+            {error && <div className="text-mirch text-sm mb-3 bg-mirch/10 p-3 rounded-lg">{error}</div>}
             <label className="block text-xs text-chalkdim mb-1">{t('inventory.quantity')} ({moveItem.unit})</label>
             <input type="number" className="input mb-3" value={moveForm.qty} onChange={e => setMoveForm({ ...moveForm, qty: Number(e.target.value) })} />
             {moveType === 'purchase' && (

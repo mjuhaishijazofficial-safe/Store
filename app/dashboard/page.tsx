@@ -13,13 +13,25 @@ export default async function OverviewPage() {
   const { data: profile } = await supabase.from('profiles').select('shop_id').eq('id', user!.id).single();
   const shopId = profile?.shop_id;
 
-  const { data: shop } = await supabase.from('shops').select('budget, spent').eq('id', shopId).single();
+  const { data: shop } = await supabase.from('shops').select('budget').eq('id', shopId).single();
   const { data: items } = await supabase.from('items').select('id, stock, min_stock').eq('shop_id', shopId);
   const { count: itemCount } = await supabase.from('items').select('*', { count: 'exact', head: true }).eq('shop_id', shopId);
 
+  // spent is computed from the transactions log, not stored on shops —
+  // same "never store a running balance" rule as khata/supplier ledgers.
+  // (shops.spent used to be updated from two separate client-side writes
+  // per purchase, which could race under concurrent staff use and drift
+  // from reality; this can't drift because there's nothing to keep in sync.)
+  const { data: spentRow } = await supabase
+    .from('transactions')
+    .select('amount.sum()')
+    .eq('shop_id', shopId)
+    .eq('type', 'purchase')
+    .single();
+
   const lowStock = (items || []).filter((i: any) => i.stock <= i.min_stock).length;
   const budget = shop?.budget || 0;
-  const spent = shop?.spent || 0;
+  const spent = (spentRow as any)?.sum || 0;
 
   return (
     <div>

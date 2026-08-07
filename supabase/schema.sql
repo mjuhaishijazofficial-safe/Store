@@ -14,7 +14,10 @@ create table if not exists shops (
   stripe_customer_id text,
   stripe_subscription_id text,
   budget numeric not null default 0,
-  spent numeric not null default 0,
+  spent numeric not null default 0, -- DEPRECATED: no longer written to. Overview now computes
+                                     -- spent from sum(transactions where type='purchase') so it
+                                     -- can't drift or race. Column kept for now to avoid a
+                                     -- destructive migration; safe to drop in a later cleanup.
   created_at timestamptz not null default now()
 );
 
@@ -103,6 +106,119 @@ create table if not exists supplier_entries (
   created_by uuid references auth.users(id),
   created_at timestamptz not null default now()
 );
+
+-- ============================================================
+-- Atomic write functions
+--
+-- Stock updates and their paired ledger inserts used to be two (or three)
+-- separate client-side calls: read stock, compute new value, write it back,
+-- insert a log row. That's a lost-update race under any concurrency (now a
+-- real risk with multi-staff access) and not atomic — if the second call
+-- fails, you get a ledger entry with no matching stock change and no error
+-- surfaced anywhere. These run as SECURITY INVOKER so the caller's own RLS
+-- grants still apply — this only buys atomicity, not extra privilege.
+-- ============================================================
+
+-- Inventory stock-in / stock-out, atomic with the transactions log row.
+create or replace function record_stock_move(
+  p_item_id uuid,
+  p_type text,
+  p_qty numeric,
+  p_amount numeric default 0
+)
+returns void
+language plpgsql
+security invoker
+as $$
+declare
+  v_shop_id uuid;
+  v_item_name text;
+  v_unit text;
+begin
+  if p_type not in ('purchase', 'sale') then
+    raise exception 'invalid type: %', p_type;
+  end if;
+  if p_qty is null or p_qty <= 0 then
+    raise exception 'qty must be positive';
+  end if;
+
+  select shop_id, name, unit into v_shop_id, v_item_name, v_unit
+  from items where id = p_item_id;
+
+  if v_shop_id is null then
+    raise exception 'item not found';
+  end if;
+
+  if p_type = 'purchase' then
+    update items set stock = stock + p_qty where id = p_item_id;
+  else
+    update items set stock = greatest(0, stock - p_qty) where id = p_item_id;
+  end if;
+
+  insert into transactions (shop_id, item_id, item_name, type, qty, unit, amount, created_by)
+  values (v_shop_id, p_item_id, v_item_name, p_type, p_qty, v_unit, coalesce(p_amount, 0), auth.uid());
+end;
+$$;
+
+-- Khata purchase/payment entry, atomic with the inventory stock deduction
+-- when the item was picked from inventory.
+create or replace function record_khata_entry(
+  p_customer_id uuid,
+  p_type text,
+  p_item_id uuid,
+  p_item_name text,
+  p_qty numeric,
+  p_amount numeric,
+  p_note text
+)
+returns void
+language plpgsql
+security invoker
+as $$
+declare
+  v_shop_id uuid := my_shop_id();
+begin
+  if p_type not in ('purchase', 'payment') then
+    raise exception 'invalid type: %', p_type;
+  end if;
+  if p_amount is null or p_amount <= 0 then
+    raise exception 'amount must be positive';
+  end if;
+
+  insert into khata_entries (shop_id, customer_id, type, item_id, item_name, qty, amount, note, created_by)
+  values (v_shop_id, p_customer_id, p_type, p_item_id, p_item_name, p_qty, p_amount, p_note, auth.uid());
+
+  if p_type = 'purchase' and p_item_id is not null then
+    update items set stock = greatest(0, stock - coalesce(p_qty, 0)) where id = p_item_id;
+  end if;
+end;
+$$;
+
+-- Deleting a khata entry restores any inventory stock it had deducted —
+-- previously a plain DELETE left items.stock permanently wrong.
+create or replace function delete_khata_entry(p_entry_id uuid)
+returns void
+language plpgsql
+security invoker
+as $$
+declare
+  v_type text;
+  v_item_id uuid;
+  v_qty numeric;
+begin
+  select type, item_id, qty into v_type, v_item_id, v_qty
+  from khata_entries where id = p_entry_id;
+
+  delete from khata_entries where id = p_entry_id;
+
+  if v_type = 'purchase' and v_item_id is not null then
+    update items set stock = stock + coalesce(v_qty, 0) where id = v_item_id;
+  end if;
+end;
+$$;
+
+-- (supplier_entries has no inventory link, so a plain insert/delete is
+-- already atomic — no RPC wrapper needed there.)
 
 -- ============================================================
 -- Helper: current user's shop_id

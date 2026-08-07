@@ -9,6 +9,10 @@ export const LANG_COOKIE = 'lang';
 export const DEFAULT_LANG: Lang = 'ur';
 
 export const dict = {
+  // shared
+  'common.error': { ur: 'Kuch ghalat ho gaya — dobara koshish karein', en: 'Something went wrong — please try again' },
+  'common.loadMore': { ur: 'Aur Dikhayein', en: 'Load More' },
+
   // nav / shell
   'nav.overview': { ur: 'Overview', en: 'Overview' },
   'nav.inventory': { ur: 'Saman', en: 'Inventory' },

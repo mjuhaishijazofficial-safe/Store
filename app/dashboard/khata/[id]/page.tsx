@@ -25,6 +25,8 @@ type Entry = {
 
 type ItemLite = { id: string; name: string; price: number; unit: string | null; stock: number };
 
+const PAGE_SIZE = 30;
+
 function fmt(n: number) {
   return '₨' + Number(n || 0).toLocaleString('en-IN');
 }
@@ -39,8 +41,12 @@ export default function KhataDetailPage() {
   const [shopName, setShopName] = useState('');
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [entries, setEntries] = useState<Entry[]>([]);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [total, setTotal] = useState(0);
   const [items, setItems] = useState<ItemLite[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   const [modalType, setModalType] = useState<'purchase' | 'payment' | null>(null);
   const [form, setForm] = useState({ item_name: '', qty: '', amount: '', note: '' });
@@ -70,18 +76,45 @@ export default function KhataDetailPage() {
     setItems(inv || []);
   }
 
+  // Balance comes from a DB-side sum, not by adding up whatever page of
+  // entries happens to be loaded on screen — otherwise pagination would
+  // silently understate the real total.
+  async function loadBalance() {
+    const [{ data: pSum }, { data: nSum }] = await Promise.all([
+      supabase.from('khata_entries').select('amount.sum()').eq('customer_id', customerId).eq('type', 'purchase').single(),
+      supabase.from('khata_entries').select('amount.sum()').eq('customer_id', customerId).eq('type', 'payment').single()
+    ]);
+    setTotal(((pSum as any)?.sum || 0) - ((nSum as any)?.sum || 0));
+  }
+
+  async function loadEntries(reset: boolean) {
+    const offset = reset ? 0 : entries.length;
+    const { data: rows } = await supabase
+      .from('khata_entries')
+      .select('*')
+      .eq('customer_id', customerId)
+      .order('created_at', { ascending: false })
+      .range(offset, offset + PAGE_SIZE - 1);
+
+    const newRows = rows || [];
+    setEntries(reset ? newRows : prev => [...prev, ...newRows]);
+    setHasMore(newRows.length === PAGE_SIZE);
+  }
+
+  async function loadMore() {
+    setLoadingMore(true);
+    await loadEntries(false);
+    setLoadingMore(false);
+  }
+
   async function loadAll() {
     setLoading(true);
-    const [{ data: cust }, { data: rows }] = await Promise.all([
-      supabase.from('customers').select('*').eq('id', customerId).single(),
-      supabase.from('khata_entries').select('*').eq('customer_id', customerId).order('created_at', { ascending: false })
-    ]);
+    const { data: cust } = await supabase.from('customers').select('*').eq('id', customerId).single();
     setCustomer(cust || null);
-    setEntries(rows || []);
+    await Promise.all([loadEntries(true), loadBalance()]);
     setLoading(false);
   }
 
-  const total = entries.reduce((sum, e) => sum + (e.type === 'purchase' ? e.amount : -e.amount), 0);
   const over = customer?.credit_limit != null && total > customer.credit_limit;
 
   const projectedTotal = total + (modalType === 'purchase' ? (Number(form.amount) || 0) : 0);
@@ -95,6 +128,7 @@ export default function KhataDetailPage() {
     setForm({ item_name: '', qty: '', amount: '', note: '' });
     setSelectedItemId(null);
     setShowDropdown(false);
+    setError('');
     setModalType(type);
   }
 
@@ -132,25 +166,21 @@ export default function KhataDetailPage() {
 
     const qtyNum = form.qty ? Number(form.qty) : null;
 
-    await supabase.from('khata_entries').insert({
-      shop_id: shopId,
-      customer_id: customerId,
-      type: modalType,
-      item_id: modalType === 'purchase' ? selectedItemId : null,
-      item_name: modalType === 'purchase' ? (form.item_name.trim() || null) : null,
-      qty: modalType === 'purchase' ? qtyNum : null,
-      amount,
-      note: form.note.trim() || null
+    // Atomic: the ledger insert and the linked inventory stock deduction
+    // happen in one DB transaction (record_khata_entry) instead of two
+    // separate client calls, so a mid-way failure can't leave a "Naya
+    // Saman Diya" entry recorded with no matching stock change.
+    const { error: err } = await supabase.rpc('record_khata_entry', {
+      p_customer_id: customerId,
+      p_type: modalType,
+      p_item_id: modalType === 'purchase' ? selectedItemId : null,
+      p_item_name: modalType === 'purchase' ? (form.item_name.trim() || null) : null,
+      p_qty: modalType === 'purchase' ? qtyNum : null,
+      p_amount: amount,
+      p_note: form.note.trim() || null
     });
 
-    // Khata + Inventory link: deduct stock when the item was picked from inventory
-    if (modalType === 'purchase' && selectedItemId) {
-      const item = items.find(i => i.id === selectedItemId);
-      if (item) {
-        const newStock = Math.max(0, item.stock - (qtyNum || 0));
-        await supabase.from('items').update({ stock: newStock }).eq('id', item.id);
-      }
-    }
+    if (err) { setError(t('common.error')); return; }
 
     setModalType(null);
     await loadAll();
@@ -158,8 +188,11 @@ export default function KhataDetailPage() {
   }
 
   async function deleteEntry(id: string) {
-    await supabase.from('khata_entries').delete().eq('id', id);
+    // Atomic: also restores any inventory stock this entry had deducted.
+    const { error: err } = await supabase.rpc('delete_khata_entry', { p_entry_id: id });
+    if (err) { setError(t('common.error')); return; }
     await loadAll();
+    await reloadItems();
   }
 
   function remindWhatsapp() {
@@ -197,6 +230,8 @@ export default function KhataDetailPage() {
         )}
       </div>
 
+      {error && <div className="text-mirch text-sm mb-3 bg-mirch/10 p-3 rounded-lg">{error}</div>}
+
       {entries.length === 0 && (
         <div className="text-center py-14 text-chalkdim text-sm">{t('khataDetail.empty')}</div>
       )}
@@ -223,6 +258,12 @@ export default function KhataDetailPage() {
           );
         })}
       </div>
+
+      {hasMore && (
+        <button onClick={loadMore} disabled={loadingMore} className="btn-secondary w-full mt-3">
+          {loadingMore ? t('khataDetail.loading') : t('common.loadMore')}
+        </button>
+      )}
 
       {/* Add Entry Modal */}
       {modalType && (
