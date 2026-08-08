@@ -10,6 +10,7 @@ import BarcodeScannerModal from '@/components/BarcodeScannerModal';
 import SaleReceiptModal from '@/components/SaleReceiptModal';
 import BarcodeSvg from '@/components/BarcodeSvg';
 import PrintBarcodeLabelModal from '@/components/PrintBarcodeLabelModal';
+import SaleCartModal from '@/components/SaleCartModal';
 import { saveCache, loadCache } from '@/lib/offline-cache';
 import { generateInternalBarcode, isValidEan13 } from '@/lib/barcode';
 import { useSectionGuard } from '@/lib/use-section-guard';
@@ -51,6 +52,7 @@ export default function InventoryPage() {
   const [receiptTxn, setReceiptTxn] = useState<{ item_name: string; qty: number; unit: string | null; amount: number; created_at: string } | null>(null);
   const [lookupState, setLookupState] = useState<'idle' | 'loading' | 'found' | 'not_found'>('idle');
   const [printLabel, setPrintLabel] = useState<{ code: string; name: string } | null>(null);
+  const [cartOpen, setCartOpen] = useState(false);
 
   const [form, setForm] = useState({ name: '', category: '', unit: '', stock: 0, min_stock: 0, price: 0, cost_price: 0, barcode: '', expiry_date: '' });
   const [moveForm, setMoveForm] = useState({ qty: 0, amount: 0 });
@@ -299,6 +301,11 @@ export default function InventoryPage() {
 
   return (
     <div>
+      {/* A real customer visit is almost never one item — this is the
+          primary "ring up a sale" path; the per-item Stock Out button
+          further down stays for quick single-item corrections. */}
+      <button onClick={() => setCartOpen(true)} className="btn-primary w-full mb-3 text-base py-3">{t('cart.newSale')}</button>
+
       <div className="flex gap-2 mb-2">
         <input className="input flex-1" placeholder={t('inventory.search')} value={search} onChange={e => setSearch(e.target.value)} />
         <button onClick={() => setScannerOpen(true)} className="btn-secondary whitespace-nowrap">{t('inventory.scan')}</button>
@@ -540,6 +547,15 @@ export default function InventoryPage() {
 
       {printLabel && (
         <PrintBarcodeLabelModal code={printLabel.code} itemName={printLabel.name} onClose={() => setPrintLabel(null)} />
+      )}
+
+      {cartOpen && (
+        <SaleCartModal
+          items={items}
+          shopName={shopName || 'Dukaan'}
+          onClose={() => setCartOpen(false)}
+          onDone={loadItems}
+        />
       )}
     </div>
   );

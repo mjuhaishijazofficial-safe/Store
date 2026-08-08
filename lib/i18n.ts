@@ -270,6 +270,19 @@ export const dict = {
   'inventory.generateBarcode': { ur: 'Naya Banayein', en: 'Generate' },
   'inventory.printLabel': { ur: '🏷 Label Print Karein', en: '🏷 Print Label' },
 
+  // cart (multi-item sale)
+  'cart.newSale': { ur: '🛒 Nayi Bikri', en: '🛒 New Sale' },
+  'cart.title': { ur: 'Bikri — Cart', en: 'New Sale' },
+  'cart.searchPlaceholder': { ur: 'Item talash karein cart mein add karne ke liye', en: 'Search an item to add to the cart' },
+  'cart.empty': { ur: 'Cart khali hai — item talash karke add karein', en: 'Cart is empty — search an item to add it' },
+  'cart.qty': { ur: 'Qty', en: 'Qty' },
+  'cart.unitPrice': { ur: 'Rate', en: 'Unit Price' },
+  'cart.overStock': { ur: 'Stock se zyada hai', en: 'More than available stock' },
+  'cart.total': { ur: 'Total', en: 'Total' },
+  'cart.completeSale': { ur: 'Bikri Complete Karein', en: 'Complete Sale' },
+  'cart.scanNotInInventory': { ur: 'Ye barcode inventory mein nahi mila', en: "This barcode isn't in your inventory" },
+  'cart.partialFailure': { ur: '{n} item(s) save nahi ho sake — dobara koshish karein', en: '{n} item(s) could not be saved — please try again' },
+
   // reorder
   'reorder.title': { ur: 'Mangwana Hai', en: 'Reorder' },
   'reorder.subtitle': { ur: 'item(s) jo kam ho gaye hain', en: 'item(s) running low' },
@@ -293,6 +306,7 @@ export const dict = {
   'history.empty': { ur: 'Abhi tak koi entry nahi', en: 'No entries yet' },
   'history.purchaseIn': { ur: 'Naya maal aaya', en: 'Stock received' },
   'history.saleOut': { ur: 'Bik/use hua', en: 'Sold/used' },
+  'history.cartSale': { ur: 'Bikri — {n} items', en: 'Sale — {n} items' },
 
   // khata list
   'khata.search': { ur: 'Customer dhoondein...', en: 'Search customers...' },

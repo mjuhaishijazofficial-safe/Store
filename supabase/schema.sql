@@ -70,6 +70,12 @@ create table if not exists transactions (
   created_by uuid references auth.users(id),
   created_at timestamptz not null default now()
 );
+-- Groups the line items of one multi-item cart sale (see SaleCartModal)
+-- into a single "bill" for display in History — null for every purchase
+-- and for a single-item Stock Out, which aren't part of a cart at all.
+-- No foreign key: it's a client-generated grouping tag, not a row this
+-- table (or any other) needs to join back to.
+alter table transactions add column if not exists sale_ref uuid;
 
 -- 5. CUSTOMERS (khata / credit ledger) --------------------------------
 create table if not exists customers (
@@ -183,7 +189,8 @@ create or replace function record_stock_move(
   p_item_id uuid,
   p_type text,
   p_qty numeric,
-  p_amount numeric default 0
+  p_amount numeric default 0,
+  p_sale_ref uuid default null
 )
 returns void
 language plpgsql
@@ -214,8 +221,8 @@ begin
     update items set stock = greatest(0, stock - p_qty) where id = p_item_id;
   end if;
 
-  insert into transactions (shop_id, item_id, item_name, type, qty, unit, amount, created_by)
-  values (v_shop_id, p_item_id, v_item_name, p_type, p_qty, v_unit, coalesce(p_amount, 0), auth.uid());
+  insert into transactions (shop_id, item_id, item_name, type, qty, unit, amount, created_by, sale_ref)
+  values (v_shop_id, p_item_id, v_item_name, p_type, p_qty, v_unit, coalesce(p_amount, 0), auth.uid(), p_sale_ref);
 end;
 $$;
 
