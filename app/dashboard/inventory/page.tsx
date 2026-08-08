@@ -8,7 +8,10 @@ import { useToast } from '@/lib/toast-context';
 import { downloadCsv, parseCsv } from '@/lib/csv';
 import BarcodeScannerModal from '@/components/BarcodeScannerModal';
 import SaleReceiptModal from '@/components/SaleReceiptModal';
+import BarcodeSvg from '@/components/BarcodeSvg';
+import PrintBarcodeLabelModal from '@/components/PrintBarcodeLabelModal';
 import { saveCache, loadCache } from '@/lib/offline-cache';
+import { generateInternalBarcode, isValidEan13 } from '@/lib/barcode';
 
 type Item = {
   id: string;
@@ -45,6 +48,7 @@ export default function InventoryPage() {
   const [showingStale, setShowingStale] = useState(false);
   const [receiptTxn, setReceiptTxn] = useState<{ item_name: string; qty: number; unit: string | null; amount: number; created_at: string } | null>(null);
   const [lookupState, setLookupState] = useState<'idle' | 'loading' | 'found' | 'not_found'>('idle');
+  const [printLabel, setPrintLabel] = useState<{ code: string; name: string } | null>(null);
 
   const [form, setForm] = useState({ name: '', category: '', unit: '', stock: 0, min_stock: 0, price: 0, cost_price: 0, barcode: '', expiry_date: '' });
   const [moveForm, setMoveForm] = useState({ qty: 0, amount: 0 });
@@ -330,7 +334,14 @@ export default function InventoryPage() {
               <div className="flex justify-between items-start">
                 <div>
                   <div className="font-700">{it.name}</div>
-                  <div className="text-xs text-chalkdim">{it.category || '—'}</div>
+                  <div className="text-xs text-chalkdim">
+                    {it.category || '—'}
+                    {it.barcode && isValidEan13(it.barcode) && (
+                      <button onClick={() => setPrintLabel({ code: it.barcode!, name: it.name })} className="ml-2 text-chalkdim hover:text-haldi underline">
+                        {t('inventory.printLabel')}
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <div className={`font-mono font-700 text-right ${low ? 'text-mirch' : ''}`}>
                   {it.stock} <span className="block text-[10px] font-normal text-chalkdim">{it.unit}</span>
@@ -393,7 +404,30 @@ export default function InventoryPage() {
             </div>
             <div className="mb-3">
               <label className="block text-xs text-chalkdim mb-1">{t('inventory.barcode')}</label>
-              <input className="input" value={form.barcode} onChange={e => setForm({ ...form, barcode: e.target.value })} />
+              <div className="flex gap-2">
+                <input className="input flex-1" value={form.barcode} onChange={e => setForm({ ...form, barcode: e.target.value })} />
+                <button
+                  type="button"
+                  onClick={() => setForm({ ...form, barcode: generateInternalBarcode() })}
+                  className="btn-secondary whitespace-nowrap text-xs px-3"
+                >
+                  {t('inventory.generateBarcode')}
+                </button>
+              </div>
+              {/* Items that never came with a manufacturer barcode (loose
+                  rice, sugar sold by weight, house-brand goods) couldn't
+                  be scan-to-sell at all before — this mints one and lets
+                  the shopkeeper print + stick a label on it themselves. */}
+              {form.barcode && isValidEan13(form.barcode) && (
+                <div className="mt-2 flex items-center gap-3">
+                  <div className="bg-white p-1 rounded shrink-0">
+                    <BarcodeSvg code={form.barcode} width={140} height={50} />
+                  </div>
+                  <button type="button" onClick={() => setPrintLabel({ code: form.barcode, name: form.name })} className="text-xs text-chalkdim hover:text-haldi underline">
+                    {t('inventory.printLabel')}
+                  </button>
+                </div>
+              )}
             </div>
             <div className="mb-5">
               <label className="block text-xs text-chalkdim mb-1">{t('inventory.expiryDate')}</label>
@@ -500,6 +534,10 @@ export default function InventoryPage() {
 
       {receiptTxn && (
         <SaleReceiptModal shopName={shopName || 'Dukaan'} txn={receiptTxn} onClose={() => setReceiptTxn(null)} />
+      )}
+
+      {printLabel && (
+        <PrintBarcodeLabelModal code={printLabel.code} itemName={printLabel.name} onClose={() => setPrintLabel(null)} />
       )}
     </div>
   );

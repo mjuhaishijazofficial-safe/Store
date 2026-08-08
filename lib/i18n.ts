@@ -267,6 +267,8 @@ export const dict = {
   'inventory.barcode': { ur: 'Barcode', en: 'Barcode' },
   'inventory.expiryDate': { ur: 'Expiry Date — optional', en: 'Expiry Date — optional' },
   'inventory.expiryHint': { ur: 'Sirf un items ke liye jo expire hote hain (medicine, dairy, waghera)', en: 'Only for items that actually expire (medicine, dairy, etc.)' },
+  'inventory.generateBarcode': { ur: 'Naya Banayein', en: 'Generate' },
+  'inventory.printLabel': { ur: '🏷 Label Print Karein', en: '🏷 Print Label' },
 
   // reorder
   'reorder.title': { ur: 'Mangwana Hai', en: 'Reorder' },
