@@ -15,7 +15,7 @@ function StatCard({ icon, iconClass, label, value, valueClass = '', href }: { ic
         {icon}
       </div>
       <div className="text-[11px] text-chalkdim uppercase tracking-wide mb-1">{label}</div>
-      <div className={`font-mono font-700 text-lg ${valueClass}`}>{value}</div>
+      <div className={`font-mono font-700 text-base sm:text-lg truncate ${valueClass}`}>{value}</div>
     </>
   );
 

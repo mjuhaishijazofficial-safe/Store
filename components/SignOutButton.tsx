@@ -16,7 +16,7 @@ export default function SignOutButton() {
   }
 
   return (
-    <button onClick={signOut} className="text-sm text-chalkdim hover:text-chalk">
+    <button onClick={signOut} className="text-sm text-chalkdim hover:text-chalk whitespace-nowrap">
       {t('nav.signout')}
     </button>
   );

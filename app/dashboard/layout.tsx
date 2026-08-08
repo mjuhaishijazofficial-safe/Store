@@ -4,6 +4,7 @@ import Link from 'next/link';
 import SignOutButton from '@/components/SignOutButton';
 import LanguageToggle from '@/components/LanguageToggle';
 import ThemeToggle from '@/components/ThemeToggle';
+import DashboardNav from '@/components/DashboardNav';
 import { StoreIcon } from '@/components/icons';
 import { getServerT } from '@/lib/i18n-server';
 import { ShopProvider } from '@/lib/shop-context';
@@ -57,29 +58,23 @@ export default async function DashboardLayout({ children }: { children: React.Re
     <ShopProvider value={{ shopId: profile.shop_id, role: profile.role as 'owner' | 'staff', shopName: shop?.name || '' }}>
       <div className="min-h-screen">
         <header className="border-b border-chalk/10">
-          <div className="max-w-4xl mx-auto px-5 py-4 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2.5">
+          <div className="max-w-4xl mx-auto px-5 py-4 flex items-center flex-wrap gap-x-3 gap-y-2 justify-between">
+            <div className="flex items-center gap-2.5 min-w-0">
               <div className="w-10 h-10 rounded-xl bg-haldi/15 text-haldi flex items-center justify-center shrink-0">
                 <StoreIcon className="w-6 h-6" />
               </div>
-              <div>
-                <div className="font-display text-2xl font-800 text-haldi leading-none">{shop?.name || 'Dukaan ERP'}</div>
-                <div className="text-[11px] text-chalkdim tracking-wide mt-0.5">{t('header.subtitle')}</div>
+              <div className="min-w-0">
+                <div className="font-display text-xl sm:text-2xl font-800 text-haldi leading-tight truncate">{shop?.name || 'Dukaan ERP'}</div>
+                <div className="text-[11px] text-chalkdim tracking-wide mt-0.5 whitespace-nowrap">{t('header.subtitle')}</div>
               </div>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3 shrink-0">
               <ThemeToggle />
               <LanguageToggle />
               <SignOutButton />
             </div>
           </div>
-          <nav className="max-w-4xl mx-auto px-5 flex gap-2.5 overflow-x-auto pb-3">
-            {nav.map(n => (
-              <Link key={n.href} href={n.href} className="text-sm px-3.5 py-1.5 rounded-full bg-board2 border border-chalk/10 whitespace-nowrap hover:border-haldi">
-                {n.label}
-              </Link>
-            ))}
-          </nav>
+          <DashboardNav items={nav} />
         </header>
 
         <main className="max-w-4xl mx-auto px-5 py-6">
