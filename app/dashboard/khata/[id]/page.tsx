@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { useLang } from '@/lib/i18n-context';
 import { useShop } from '@/lib/shop-context';
+import { useToast } from '@/lib/toast-context';
 
 type Customer = {
   id: string;
@@ -38,6 +39,7 @@ export default function KhataDetailPage() {
   const supabase = createClient();
   const { t } = useLang();
   const { shopId, shopName } = useShop();
+  const { showToast } = useToast();
 
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [entries, setEntries] = useState<Entry[]>([]);
@@ -46,7 +48,6 @@ export default function KhataDetailPage() {
   const [total, setTotal] = useState(0);
   const [items, setItems] = useState<ItemLite[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [advanceDepletedNotice, setAdvanceDepletedNotice] = useState(false);
 
   const [modalType, setModalType] = useState<'purchase' | 'payment' | null>(null);
@@ -123,7 +124,6 @@ export default function KhataDetailPage() {
     setForm({ item_name: '', qty: '', amount: '', note: '' });
     setSelectedItemId(null);
     setShowDropdown(false);
-    setError('');
     setModalType(type);
   }
 
@@ -176,7 +176,7 @@ export default function KhataDetailPage() {
       p_note: form.note.trim() || null
     });
 
-    if (err) { setError(t('common.error')); return; }
+    if (err) { showToast(t('common.error'), 'error'); return; }
 
     setModalType(null);
     const [, newTotal] = await Promise.all([loadEntries(true), loadBalance()]);
@@ -193,7 +193,7 @@ export default function KhataDetailPage() {
   async function deleteEntry(id: string) {
     // Atomic: also restores any inventory stock this entry had deducted.
     const { error: err } = await supabase.rpc('delete_khata_entry', { p_entry_id: id });
-    if (err) { setError(t('common.error')); return; }
+    if (err) { showToast(t('common.error'), 'error'); return; }
     await loadAll();
     await reloadItems();
   }
@@ -239,8 +239,6 @@ export default function KhataDetailPage() {
           <button onClick={() => setAdvanceDepletedNotice(false)} className="text-chalkdim shrink-0">✕</button>
         </div>
       )}
-
-      {error && <div className="text-mirch text-sm mb-3 bg-mirch/10 p-3 rounded-lg">{error}</div>}
 
       {entries.length === 0 && (
         <div className="text-center py-14 text-chalkdim text-sm">{t('khataDetail.empty')}</div>

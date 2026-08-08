@@ -3,19 +3,24 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLang } from '@/lib/i18n-context';
+import { useToast } from '@/lib/toast-context';
 
 export default function InviteStaffForm() {
   const { t } = useLang();
   const router = useRouter();
+  const { showToast } = useToast();
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
-  const [msg, setMsg] = useState('');
-  const [isError, setIsError] = useState(false);
+  // email_taken gets a full explanatory paragraph, not a flash-and-gone
+  // message — worth keeping visible inline rather than an auto-dismissing
+  // toast. Every other outcome (success, generic failure) is transient
+  // action feedback and fits the toast pattern used everywhere else.
+  const [emailTakenMsg, setEmailTakenMsg] = useState('');
 
   async function invite() {
     if (!email.trim()) return;
     setLoading(true);
-    setMsg('');
+    setEmailTakenMsg('');
     const res = await fetch('/api/staff/invite', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -25,14 +30,16 @@ export default function InviteStaffForm() {
     setLoading(false);
 
     if (!res.ok) {
-      setIsError(true);
-      setMsg(data.error === 'email_taken' ? t('staff.emailTaken') : (data.error || t('common.error')));
+      if (data.error === 'email_taken') {
+        setEmailTakenMsg(t('staff.emailTaken'));
+      } else {
+        showToast(data.error || t('common.error'), 'error');
+      }
       return;
     }
 
-    setIsError(false);
     setEmail('');
-    setMsg(t('staff.invited'));
+    showToast(t('staff.invited'), 'success');
     router.refresh();
   }
 
@@ -44,7 +51,7 @@ export default function InviteStaffForm() {
       <button onClick={invite} disabled={loading} className="btn-primary w-full">
         {loading ? t('staff.inviting') : t('staff.inviteBtn')}
       </button>
-      {msg && <div className={`text-sm mt-3 ${isError ? 'text-mirch' : 'text-dhania'}`}>{msg}</div>}
+      {emailTakenMsg && <div className="text-mirch text-sm mt-3">{emailTakenMsg}</div>}
     </div>
   );
 }

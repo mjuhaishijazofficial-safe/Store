@@ -13,6 +13,7 @@ export const dict = {
   'common.error': { ur: 'Kuch ghalat ho gaya — dobara koshish karein', en: 'Something went wrong — please try again' },
   'common.loadMore': { ur: 'Aur Dikhayein', en: 'Load More' },
   'common.loading': { ur: 'Load ho raha hai...', en: 'Loading...' },
+  'common.exportCsv': { ur: 'CSV Export', en: 'Export CSV' },
 
   // nav / shell
   'nav.overview': { ur: 'Overview', en: 'Overview' },
@@ -90,6 +91,15 @@ export const dict = {
 
   // legal — starting template, not a substitute for real legal review
   'legal.back': { ur: '← Wapas', en: '← Back' },
+
+  'notFound.title': { ur: 'Ye Page Nahi Mila', en: 'Page Not Found' },
+  'notFound.body': { ur: 'Jo page aap dhoond rahe hain wo yahan nahi hai — link galat ho sakta hai ya page hata diya gaya ho.', en: 'The page you’re looking for isn’t here — the link may be wrong, or the page was removed.' },
+  'notFound.home': { ur: 'Home Par Jayein', en: 'Go Home' },
+
+  'errorPage.title': { ur: 'Kuch Ghalat Ho Gaya', en: 'Something Went Wrong' },
+  'errorPage.body': { ur: 'Ek unexpected error aa gaya. Aapka data mehfooz hai — dobara koshish karein, agar masla rahe to hume WhatsApp par batayein.', en: 'An unexpected error occurred. Your data is safe — try again, and let us know on WhatsApp if it keeps happening.' },
+  'errorPage.retry': { ur: 'Dobara Koshish Karein', en: 'Try Again' },
+  'errorPage.home': { ur: 'Home Par Jayein', en: 'Go Home' },
   'legal.lastUpdated': { ur: 'Aakhri update:', en: 'Last updated:' },
 
   'terms.title': { ur: 'Terms of Service', en: 'Terms of Service' },

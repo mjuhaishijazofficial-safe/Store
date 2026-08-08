@@ -5,18 +5,18 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useLang } from '@/lib/i18n-context';
 import { useShop } from '@/lib/shop-context';
+import { useToast } from '@/lib/toast-context';
 
 export default function SettingsPage() {
   const supabase = createClient();
   const router = useRouter();
   const { t } = useLang();
   const { shopId, role } = useShop();
+  const { showToast } = useToast();
   const isOwner = role === 'owner';
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState('');
   const [budget, setBudget] = useState(0);
-  const [saved, setSaved] = useState(false);
-  const [error, setError] = useState('');
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
@@ -36,10 +36,8 @@ export default function SettingsPage() {
 
   async function save() {
     const { error: err } = await supabase.from('shops').update({ name, budget }).eq('id', shopId);
-    if (err) { setError(t('common.error')); return; }
-    setError('');
-    setSaved(true);
-    setTimeout(() => setSaved(false), 1800);
+    if (err) { showToast(t('common.error'), 'error'); return; }
+    showToast(t('settings.saved'), 'success');
   }
 
   async function confirmDelete() {
@@ -80,8 +78,6 @@ export default function SettingsPage() {
       <input type="number" className="input mb-5" value={budget} onChange={e => setBudget(Number(e.target.value))} />
 
       <button onClick={save} className="btn-primary">{t('settings.save')}</button>
-      {saved && <div className="text-dhania text-sm mt-3">{t('settings.saved')}</div>}
-      {error && <div className="text-mirch text-sm mt-3">{error}</div>}
 
       <div className="mt-10 pt-6 border-t border-mirch/30">
         <div className="text-xs text-mirch uppercase tracking-wide font-700 mb-3">{t('settings.dangerZone')}</div>

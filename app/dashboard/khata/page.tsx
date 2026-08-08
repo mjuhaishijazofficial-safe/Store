@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { useLang } from '@/lib/i18n-context';
 import { useShop } from '@/lib/shop-context';
+import { useToast } from '@/lib/toast-context';
+import { downloadCsv } from '@/lib/csv';
 
 type Customer = {
   id: string;
@@ -21,13 +23,13 @@ export default function KhataPage() {
   const supabase = createClient();
   const { t } = useLang();
   const { shopId } = useShop();
+  const { showToast } = useToast();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [balances, setBalances] = useState<Record<string, number>>({});
   const [topCustomers, setTopCustomers] = useState<{ customer_id: string; customer_name: string; total_purchases: number }[]>([]);
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [form, setForm] = useState({ name: '', phone: '', credit_limit: '' });
 
   useEffect(() => { loadAll(); }, [shopId]);
@@ -56,7 +58,6 @@ export default function KhataPage() {
 
   function openAdd() {
     setForm({ name: '', phone: '', credit_limit: '' });
-    setError('');
     setModalOpen(true);
   }
 
@@ -68,7 +69,7 @@ export default function KhataPage() {
       phone: form.phone.trim() || null,
       credit_limit: form.credit_limit ? Number(form.credit_limit) : null
     });
-    if (err) { setError(t('common.error')); return; }
+    if (err) { showToast(t('common.error'), 'error'); return; }
     setModalOpen(false);
     await loadAll();
   }
@@ -77,12 +78,28 @@ export default function KhataPage() {
     .filter(c => c.name.toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) => (balances[b.id] || 0) - (balances[a.id] || 0));
 
+  function exportCsv() {
+    downloadCsv(
+      `khata-${new Date().toISOString().slice(0, 10)}.csv`,
+      customers.map(c => ({
+        name: c.name,
+        phone: c.phone || '',
+        balance: balances[c.id] || 0,
+        credit_limit: c.credit_limit ?? ''
+      }))
+    );
+  }
+
   return (
     <div>
-      <div className="flex gap-2 mb-4">
+      <div className="flex gap-2 mb-2">
         <input className="input flex-1" placeholder={t('khata.search')} value={search} onChange={e => setSearch(e.target.value)} />
         <button onClick={openAdd} className="btn-primary whitespace-nowrap">{t('khata.addCustomer')}</button>
       </div>
+
+      {customers.length > 0 && (
+        <button onClick={exportCsv} className="text-chalkdim text-xs underline mb-4 block">{t('common.exportCsv')}</button>
+      )}
 
       {!loading && topCustomers.length > 0 && (
         <>
@@ -139,7 +156,6 @@ export default function KhataPage() {
         <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50" onClick={() => setModalOpen(false)}>
           <div className="card w-full max-w-md p-5 rounded-b-none sm:rounded-b-2xl" onClick={e => e.stopPropagation()}>
             <div className="font-display text-lg text-haldi font-700 mb-4">{t('khata.newCustomerTitle')}</div>
-            {error && <div className="text-mirch text-sm mb-3 bg-mirch/10 p-3 rounded-lg">{error}</div>}
             <label className="block text-xs text-chalkdim mb-1">{t('khata.name')}</label>
             <input className="input mb-3" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
             <label className="block text-xs text-chalkdim mb-1">{t('khata.phone')}</label>

@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useLang } from '@/lib/i18n-context';
 import { useShop } from '@/lib/shop-context';
+import { useToast } from '@/lib/toast-context';
+import { downloadCsv } from '@/lib/csv';
 import BarcodeScannerModal from '@/components/BarcodeScannerModal';
 
 type Item = {
@@ -26,6 +28,7 @@ export default function InventoryPage() {
   const supabase = createClient();
   const { t } = useLang();
   const { shopId } = useShop();
+  const { showToast } = useToast();
   const [items, setItems] = useState<Item[]>([]);
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
@@ -34,7 +37,6 @@ export default function InventoryPage() {
   const [moveItem, setMoveItem] = useState<Item | null>(null);
   const [moveType, setMoveType] = useState<'purchase' | 'sale'>('purchase');
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [scannerOpen, setScannerOpen] = useState(false);
   const [lookupState, setLookupState] = useState<'idle' | 'loading' | 'found' | 'not_found'>('idle');
 
@@ -65,7 +67,6 @@ export default function InventoryPage() {
   function openAdd(prefillBarcode?: string) {
     setEditing(null);
     setForm({ name: '', category: '', unit: '', stock: 0, min_stock: 0, price: 0, cost_price: 0, barcode: prefillBarcode || '' });
-    setError('');
     setLookupState('idle');
     setModalOpen(true);
   }
@@ -73,7 +74,6 @@ export default function InventoryPage() {
   function openEdit(it: Item) {
     setEditing(it);
     setForm({ name: it.name, category: it.category || '', unit: it.unit || '', stock: it.stock, min_stock: it.min_stock, price: it.price, cost_price: it.cost_price || 0, barcode: it.barcode || '' });
-    setError('');
     setLookupState('idle');
     setModalOpen(true);
   }
@@ -121,7 +121,7 @@ export default function InventoryPage() {
       ? await supabase.from('items').update(payload).eq('id', editing.id)
       : await supabase.from('items').insert({ ...payload, shop_id: shopId });
 
-    if (err) { setError(t('common.error')); return; }
+    if (err) { showToast(t('common.error'), 'error'); return; }
     setModalOpen(false);
     await loadItems();
   }
@@ -129,7 +129,7 @@ export default function InventoryPage() {
   async function deleteItem() {
     if (!editing) return;
     const { error: err } = await supabase.from('items').delete().eq('id', editing.id);
-    if (err) { setError(t('common.error')); return; }
+    if (err) { showToast(t('common.error'), 'error'); return; }
     setModalOpen(false);
     await loadItems();
   }
@@ -143,7 +143,6 @@ export default function InventoryPage() {
     setPiecesPerBox(1);
     setCostPerBox(0);
     setUpdateCostPrice(true);
-    setError('');
     setMoveOpen(true);
   }
 
@@ -168,7 +167,7 @@ export default function InventoryPage() {
       p_amount: amount
     });
 
-    if (err) { setError(t('common.error')); return; }
+    if (err) { showToast(t('common.error'), 'error'); return; }
 
     // Box mode computed a per-piece cost (cost per box / pieces per box)
     // — offer it as the item's new reference cost_price. Not atomic with
@@ -184,13 +183,33 @@ export default function InventoryPage() {
 
   const filtered = items.filter(i => i.name.toLowerCase().includes(search.toLowerCase()));
 
+  function exportCsv() {
+    downloadCsv(
+      `inventory-${new Date().toISOString().slice(0, 10)}.csv`,
+      items.map(it => ({
+        name: it.name,
+        category: it.category || '',
+        stock: it.stock,
+        unit: it.unit || '',
+        min_stock: it.min_stock,
+        selling_price: it.price,
+        cost_price: it.cost_price,
+        barcode: it.barcode || ''
+      }))
+    );
+  }
+
   return (
     <div>
-      <div className="flex gap-2 mb-4">
+      <div className="flex gap-2 mb-2">
         <input className="input flex-1" placeholder={t('inventory.search')} value={search} onChange={e => setSearch(e.target.value)} />
         <button onClick={() => setScannerOpen(true)} className="btn-secondary whitespace-nowrap">{t('inventory.scan')}</button>
         <button onClick={() => openAdd()} className="btn-primary whitespace-nowrap">{t('inventory.addNew')}</button>
       </div>
+
+      {items.length > 0 && (
+        <button onClick={exportCsv} className="text-chalkdim text-xs underline mb-4 block">{t('common.exportCsv')}</button>
+      )}
 
       {loading && <div className="text-chalkdim text-sm text-center py-10">{t('inventory.loading')}</div>}
 
@@ -234,7 +253,6 @@ export default function InventoryPage() {
         <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50" onClick={() => setModalOpen(false)}>
           <div className="card w-full max-w-md p-5 rounded-b-none sm:rounded-b-2xl" onClick={e => e.stopPropagation()}>
             <div className="font-display text-lg text-haldi font-700 mb-4">{editing ? t('inventory.editItemTitle') : t('inventory.newItemTitle')}</div>
-            {error && <div className="text-mirch text-sm mb-3 bg-mirch/10 p-3 rounded-lg">{error}</div>}
             {lookupState === 'loading' && <div className="text-chalkdim text-xs mb-3">{t('inventory.scanLookingUp')}</div>}
             {lookupState === 'found' && <div className="text-dhania text-xs mb-3">{t('inventory.scanFoundHint')}</div>}
             {lookupState === 'not_found' && <div className="text-chalkdim text-xs mb-3">{t('inventory.scanNotFoundHint')}</div>}
@@ -286,7 +304,6 @@ export default function InventoryPage() {
             <div className="font-display text-lg text-haldi font-700 mb-4">
               {moveType === 'purchase' ? t('inventory.newStockTitle') : t('inventory.outStockTitle')}{moveItem.name}
             </div>
-            {error && <div className="text-mirch text-sm mb-3 bg-mirch/10 p-3 rounded-lg">{error}</div>}
 
             {moveType === 'purchase' && (
               <>

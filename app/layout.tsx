@@ -5,6 +5,7 @@ import { LanguageProvider } from '@/lib/i18n-context';
 import { DEFAULT_LANG, Lang, LANG_COOKIE } from '@/lib/i18n';
 import { ThemeProvider } from '@/lib/theme-context';
 import { DEFAULT_THEME, Theme, THEME_COOKIE } from '@/lib/theme';
+import { ToastProvider } from '@/lib/toast-context';
 
 export const metadata: Metadata = {
   title: 'Dukaan ERP — Apni Dukaan Digitalize Karein',
@@ -35,7 +36,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang={initialLang === 'en' ? 'en' : 'ur'} data-theme={initialTheme}>
       <body>
         <ThemeProvider initialTheme={initialTheme}>
-          <LanguageProvider initialLang={initialLang}>{children}</LanguageProvider>
+          <LanguageProvider initialLang={initialLang}>
+            <ToastProvider>{children}</ToastProvider>
+          </LanguageProvider>
         </ThemeProvider>
       </body>
     </html>

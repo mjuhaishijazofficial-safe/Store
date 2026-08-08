@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { useLang } from '@/lib/i18n-context';
 import { useShop } from '@/lib/shop-context';
+import { useToast } from '@/lib/toast-context';
+import { downloadCsv } from '@/lib/csv';
 
 type Supplier = {
   id: string;
@@ -20,12 +22,12 @@ export default function SuppliersPage() {
   const supabase = createClient();
   const { t } = useLang();
   const { shopId } = useShop();
+  const { showToast } = useToast();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [balances, setBalances] = useState<Record<string, number>>({});
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [form, setForm] = useState({ name: '', phone: '' });
 
   useEffect(() => { loadAll(); }, [shopId]);
@@ -50,7 +52,6 @@ export default function SuppliersPage() {
 
   function openAdd() {
     setForm({ name: '', phone: '' });
-    setError('');
     setModalOpen(true);
   }
 
@@ -61,7 +62,7 @@ export default function SuppliersPage() {
       name: form.name.trim(),
       phone: form.phone.trim() || null
     });
-    if (err) { setError(t('common.error')); return; }
+    if (err) { showToast(t('common.error'), 'error'); return; }
     setModalOpen(false);
     await loadAll();
   }
@@ -70,12 +71,27 @@ export default function SuppliersPage() {
     .filter(s => s.name.toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) => (balances[b.id] || 0) - (balances[a.id] || 0));
 
+  function exportCsv() {
+    downloadCsv(
+      `suppliers-${new Date().toISOString().slice(0, 10)}.csv`,
+      suppliers.map(s => ({
+        name: s.name,
+        phone: s.phone || '',
+        you_owe: balances[s.id] || 0
+      }))
+    );
+  }
+
   return (
     <div>
-      <div className="flex gap-2 mb-4">
+      <div className="flex gap-2 mb-2">
         <input className="input flex-1" placeholder={t('suppliers.search')} value={search} onChange={e => setSearch(e.target.value)} />
         <button onClick={openAdd} className="btn-primary whitespace-nowrap">{t('suppliers.addSupplier')}</button>
       </div>
+
+      {suppliers.length > 0 && (
+        <button onClick={exportCsv} className="text-chalkdim text-xs underline mb-4 block">{t('common.exportCsv')}</button>
+      )}
 
       {loading && <div className="text-chalkdim text-sm text-center py-10">{t('suppliers.loading')}</div>}
 
@@ -109,7 +125,6 @@ export default function SuppliersPage() {
         <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50" onClick={() => setModalOpen(false)}>
           <div className="card w-full max-w-md p-5 rounded-b-none sm:rounded-b-2xl" onClick={e => e.stopPropagation()}>
             <div className="font-display text-lg text-haldi font-700 mb-4">{t('suppliers.newSupplierTitle')}</div>
-            {error && <div className="text-mirch text-sm mb-3 bg-mirch/10 p-3 rounded-lg">{error}</div>}
             <label className="block text-xs text-chalkdim mb-1">{t('suppliers.name')}</label>
             <input className="input mb-3" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
             <label className="block text-xs text-chalkdim mb-1">{t('suppliers.phone')}</label>

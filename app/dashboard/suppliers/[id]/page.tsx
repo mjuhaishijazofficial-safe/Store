@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { useLang } from '@/lib/i18n-context';
 import { useShop } from '@/lib/shop-context';
+import { useToast } from '@/lib/toast-context';
 
 type Supplier = {
   id: string;
@@ -35,6 +36,7 @@ export default function SupplierDetailPage() {
   const supabase = createClient();
   const { t } = useLang();
   const { shopId } = useShop();
+  const { showToast } = useToast();
 
   const [supplier, setSupplier] = useState<Supplier | null>(null);
   const [entries, setEntries] = useState<Entry[]>([]);
@@ -42,7 +44,6 @@ export default function SupplierDetailPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
 
   const [modalType, setModalType] = useState<'purchase' | 'payment' | null>(null);
   const [form, setForm] = useState({ item_name: '', qty: '', amount: '', note: '' });
@@ -87,7 +88,6 @@ export default function SupplierDetailPage() {
 
   function openModal(type: 'purchase' | 'payment') {
     setForm({ item_name: '', qty: '', amount: '', note: '' });
-    setError('');
     setModalType(type);
   }
 
@@ -106,14 +106,14 @@ export default function SupplierDetailPage() {
       note: form.note.trim() || null
     });
 
-    if (err) { setError(t('common.error')); return; }
+    if (err) { showToast(t('common.error'), 'error'); return; }
     setModalType(null);
     await loadAll();
   }
 
   async function deleteEntry(id: string) {
     const { error: err } = await supabase.from('supplier_entries').delete().eq('id', id);
-    if (err) { setError(t('common.error')); return; }
+    if (err) { showToast(t('common.error'), 'error'); return; }
     await loadAll();
   }
 
@@ -136,8 +136,6 @@ export default function SupplierDetailPage() {
           <button onClick={() => openModal('payment')} className="flex-1 text-sm py-2.5 rounded-lg border border-dhania text-dhania">{t('suppliersDetail.paymentDi')}</button>
         </div>
       </div>
-
-      {error && <div className="text-mirch text-sm mb-3 bg-mirch/10 p-3 rounded-lg">{error}</div>}
 
       {entries.length === 0 && (
         <div className="text-center py-14 text-chalkdim text-sm">{t('suppliersDetail.empty')}</div>
