@@ -58,6 +58,38 @@ html[data-theme='dark'][data-palette='navy'] {
   --color-dhania: 52 211 153;   /* #34D399 */
 }
 
+/* Premium treatment: derived from --color-haldi via color-mix(), not a
+   second hardcoded gold — so it automatically follows whichever brand
+   color is active (Spice gold or Navy) instead of only looking right
+   under one palette. Real premium/finance brands (banking, hospitality,
+   luxury retail — see ui-ux-pro-max-skill's colors.csv) converge on
+   "rich accent with gradient depth + soft glow," not a flat fill; this
+   is that formula applied to the brand color we already have, not a
+   new color. */
+.gradient-brand {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, rgb(var(--color-haldi)) 100%, white 30%),
+    rgb(var(--color-haldi)) 55%,
+    color-mix(in srgb, rgb(var(--color-haldi)) 100%, black 35%)
+  );
+}
+.shadow-glow {
+  box-shadow: 0 10px 24px -8px rgb(var(--color-haldi) / 0.45);
+}
+.shadow-glow:hover {
+  box-shadow: 0 14px 30px -8px rgb(var(--color-haldi) / 0.55);
+}
+
+@keyframes card-rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-card-rise {
+  opacity: 0;
+  animation: card-rise 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
 body {
   @apply bg-board text-chalk;
   font-family: 'Inter', sans-serif;

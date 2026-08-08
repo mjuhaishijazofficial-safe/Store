@@ -8,10 +8,18 @@ function fmt(n: number) {
   return '₨' + Number(n || 0).toLocaleString('en-IN');
 }
 
-function StatCard({ icon, iconClass, label, value, valueClass = '', href }: { icon: React.ReactNode; iconClass: string; label: string; value: string; valueClass?: string; href?: string }) {
+// premium: the "hero" stat gets the brand gradient + glow instead of a
+// flat tint circle — same formula real finance/luxury brands use (rich
+// accent with gradient depth), applied to whichever brand color is
+// currently active (haldi under Spice, navy under Navy), not a new
+// color. delay staggers the entrance so the row rises in one-by-one
+// instead of popping in as a block.
+function StatCard({
+  icon, iconClass, label, value, valueClass = '', href, premium = false, delay = 0
+}: { icon: React.ReactNode; iconClass: string; label: string; value: string; valueClass?: string; href?: string; premium?: boolean; delay?: number }) {
   const body = (
     <>
-      <div className={`w-9 h-9 rounded-full flex items-center justify-center mb-3 ${iconClass}`}>
+      <div className={`w-9 h-9 rounded-full flex items-center justify-center mb-3 ${premium ? 'gradient-brand shadow-glow text-board' : iconClass}`}>
         {icon}
       </div>
       <div className="text-[11px] text-chalkdim uppercase tracking-wide mb-1">{label}</div>
@@ -19,15 +27,18 @@ function StatCard({ icon, iconClass, label, value, valueClass = '', href }: { ic
     </>
   );
 
+  const cls = 'card p-4 animate-card-rise';
+  const style = { animationDelay: `${delay}ms` };
+
   if (href) {
     return (
-      <Link href={href} className="card p-4 block">
+      <Link href={href} className={`${cls} block`} style={style}>
         {body}
       </Link>
     );
   }
 
-  return <div className="card p-4">{body}</div>;
+  return <div className={cls} style={style}>{body}</div>;
 }
 
 export default async function OverviewPage() {
@@ -158,22 +169,22 @@ export default async function OverviewPage() {
       )}
 
       <div className="grid grid-cols-3 gap-3 mb-4">
-        <StatCard href="/dashboard/settings" icon={<WalletIcon className="w-5 h-5" />} iconClass="bg-haldi/15 text-haldi" label={t('overview.totalBudget')} value={fmt(budget)} />
-        <StatCard href="/dashboard/history" icon={<TrendDownIcon className="w-5 h-5" />} iconClass="bg-mirch/15 text-mirch" label={t('overview.spent')} value={fmt(spent)} valueClass="text-mirch" />
-        <StatCard href="/dashboard/settings" icon={<CashIcon className="w-5 h-5" />} iconClass="bg-dhania/15 text-dhania" label={t('overview.remaining')} value={fmt(budget - spent)} valueClass="text-dhania" />
+        <StatCard href="/dashboard/settings" icon={<WalletIcon className="w-5 h-5" />} iconClass="bg-haldi/15 text-haldi" label={t('overview.totalBudget')} value={fmt(budget)} premium delay={0} />
+        <StatCard href="/dashboard/history" icon={<TrendDownIcon className="w-5 h-5" />} iconClass="bg-mirch/15 text-mirch" label={t('overview.spent')} value={fmt(spent)} valueClass="text-mirch" delay={60} />
+        <StatCard href="/dashboard/settings" icon={<CashIcon className="w-5 h-5" />} iconClass="bg-dhania/15 text-dhania" label={t('overview.remaining')} value={fmt(budget - spent)} valueClass="text-dhania" delay={120} />
       </div>
 
       <div className="grid grid-cols-3 gap-3 mb-8">
-        <StatCard href="/dashboard/reports" icon={<ChartIcon className="w-5 h-5" />} iconClass="bg-haldi/15 text-haldi" label={t('overview.monthlySales')} value={fmt(monthlySales)} />
-        <StatCard href="/dashboard/reports" icon={<TrendUpIcon className="w-5 h-5" />} iconClass="bg-dhania/15 text-dhania" label={t('overview.weeklyProfit')} value={fmt(weeklyProfit)} valueClass={weeklyProfit >= 0 ? 'text-dhania' : 'text-mirch'} />
-        <StatCard href="/dashboard/khata" icon={<ReceiptIcon className="w-5 h-5" />} iconClass="bg-mirch/15 text-mirch" label={t('overview.pendingKhata')} value={fmt(pendingKhata)} valueClass="text-mirch" />
+        <StatCard href="/dashboard/reports" icon={<ChartIcon className="w-5 h-5" />} iconClass="bg-haldi/15 text-haldi" label={t('overview.monthlySales')} value={fmt(monthlySales)} premium delay={180} />
+        <StatCard href="/dashboard/reports" icon={<TrendUpIcon className="w-5 h-5" />} iconClass="bg-dhania/15 text-dhania" label={t('overview.weeklyProfit')} value={fmt(weeklyProfit)} valueClass={weeklyProfit >= 0 ? 'text-dhania' : 'text-mirch'} delay={240} />
+        <StatCard href="/dashboard/khata" icon={<ReceiptIcon className="w-5 h-5" />} iconClass="bg-mirch/15 text-mirch" label={t('overview.pendingKhata')} value={fmt(pendingKhata)} valueClass="text-mirch" delay={300} />
       </div>
 
       <div className="mb-8">
         <h2 className="font-display text-base font-700 mb-3">{t('overview.quickActions')}</h2>
         <div className="grid grid-cols-3 gap-3">
           <Link href="/dashboard/inventory" className="card p-4 flex flex-col items-center text-center gap-2">
-            <div className="w-10 h-10 rounded-full bg-haldi/15 text-haldi flex items-center justify-center">
+            <div className="w-10 h-10 rounded-full gradient-brand shadow-glow text-board flex items-center justify-center">
               <PlusIcon className="w-5 h-5" />
             </div>
             <span className="text-xs font-600">{t('overview.addItem')}</span>
@@ -267,7 +278,7 @@ export default async function OverviewPage() {
       )}
 
       <Link href="/dashboard/reports" className="card p-4 flex items-center gap-4 hover:border-haldi">
-        <div className="w-11 h-11 rounded-full bg-haldi/15 text-haldi flex items-center justify-center shrink-0">
+        <div className="w-11 h-11 rounded-full gradient-brand shadow-glow text-board flex items-center justify-center shrink-0">
           <ChartIcon className="w-5 h-5" />
         </div>
         <div className="flex-1">
