@@ -4,6 +4,6 @@
 // admin page, the activate-payment route, and the nav link can't drift
 // out of sync on what "admin" means.
 export function isAdmin(email: string | null | undefined): boolean {
-  const adminEmail = process.env.ADMIN_EMAIL;
-  return !!adminEmail && !!email && email.toLowerCase() === adminEmail.toLowerCase();
+  const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
+  return !!adminEmail && !!email && email.trim().toLowerCase() === adminEmail;
 }
