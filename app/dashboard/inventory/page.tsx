@@ -36,6 +36,7 @@ export default function InventoryPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [lookupState, setLookupState] = useState<'idle' | 'loading' | 'found' | 'not_found'>('idle');
 
   const [form, setForm] = useState({ name: '', category: '', unit: '', stock: 0, min_stock: 0, price: 0, cost_price: 0, barcode: '' });
   const [moveForm, setMoveForm] = useState({ qty: 0, amount: 0 });
@@ -53,6 +54,7 @@ export default function InventoryPage() {
     setEditing(null);
     setForm({ name: '', category: '', unit: '', stock: 0, min_stock: 0, price: 0, cost_price: 0, barcode: prefillBarcode || '' });
     setError('');
+    setLookupState('idle');
     setModalOpen(true);
   }
 
@@ -60,16 +62,36 @@ export default function InventoryPage() {
     setEditing(it);
     setForm({ name: it.name, category: it.category || '', unit: it.unit || '', stock: it.stock, min_stock: it.min_stock, price: it.price, cost_price: it.cost_price || 0, barcode: it.barcode || '' });
     setError('');
+    setLookupState('idle');
     setModalOpen(true);
   }
 
-  function handleScanned(code: string) {
+  async function handleScanned(code: string) {
     setScannerOpen(false);
     const existing = items.find(i => i.barcode === code);
     if (existing) {
       openEdit(existing);
-    } else {
-      openAdd(code);
+      return;
+    }
+
+    // A barcode is just an ID number — it never carries a name or price
+    // by itself. This is a best-effort lookup against a public product
+    // database (Open Food Facts) so a *known* branded product doesn't
+    // need its name typed by hand; price is never something any such
+    // database can know, that's always the shopkeeper's own to set.
+    openAdd(code);
+    setLookupState('loading');
+    try {
+      const res = await fetch(`/api/products/lookup?barcode=${encodeURIComponent(code)}`);
+      const data = await res.json();
+      if (data.found) {
+        setForm(f => ({ ...f, name: data.name || f.name, category: data.category || f.category }));
+        setLookupState('found');
+      } else {
+        setLookupState('not_found');
+      }
+    } catch {
+      setLookupState('not_found');
     }
   }
 
@@ -180,6 +202,9 @@ export default function InventoryPage() {
           <div className="card w-full max-w-md p-5 rounded-b-none sm:rounded-b-2xl" onClick={e => e.stopPropagation()}>
             <div className="font-display text-lg text-haldi font-700 mb-4">{editing ? t('inventory.editItemTitle') : t('inventory.newItemTitle')}</div>
             {error && <div className="text-mirch text-sm mb-3 bg-mirch/10 p-3 rounded-lg">{error}</div>}
+            {lookupState === 'loading' && <div className="text-chalkdim text-xs mb-3">{t('inventory.scanLookingUp')}</div>}
+            {lookupState === 'found' && <div className="text-dhania text-xs mb-3">{t('inventory.scanFoundHint')}</div>}
+            {lookupState === 'not_found' && <div className="text-chalkdim text-xs mb-3">{t('inventory.scanNotFoundHint')}</div>}
             <label className="block text-xs text-chalkdim mb-1">{t('inventory.name')}</label>
             <input className="input mb-3" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
             <label className="block text-xs text-chalkdim mb-1">{t('inventory.category')}</label>
