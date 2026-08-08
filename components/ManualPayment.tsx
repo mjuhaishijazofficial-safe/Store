@@ -22,27 +22,43 @@ function Row({ label, value }: { label: string; value: string }) {
   const { showToast } = useToast();
   const { t } = useLang();
 
+  function legacyCopy() {
+    // navigator.clipboard is missing (or silently a no-op) on plenty
+    // of in-app browsers — WhatsApp's own webview included — and on
+    // any non-HTTPS context. This textarea+execCommand trick is the
+    // old but still universally supported fallback for those. iOS
+    // Safari specifically ignores a plain .select() on a detached
+    // textarea, so setSelectionRange is needed too, not just select().
+    const el = document.createElement('textarea');
+    el.value = value;
+    el.setAttribute('readonly', '');
+    el.style.position = 'fixed';
+    el.style.top = '0';
+    el.style.left = '0';
+    el.style.opacity = '0';
+    document.body.appendChild(el);
+    el.focus();
+    el.select();
+    el.setSelectionRange(0, value.length);
+    const ok = document.execCommand('copy');
+    document.body.removeChild(el);
+    return ok;
+  }
+
   async function copy() {
     try {
       if (navigator.clipboard && window.isSecureContext) {
         await navigator.clipboard.writeText(value);
-      } else {
-        // navigator.clipboard is missing on plenty of in-app browsers
-        // (WhatsApp's own webview included) and on any non-HTTPS
-        // context — this textarea+execCommand trick is the old but
-        // still universally supported fallback for those.
-        const el = document.createElement('textarea');
-        el.value = value;
-        el.style.position = 'fixed';
-        el.style.opacity = '0';
-        document.body.appendChild(el);
-        el.focus();
-        el.select();
-        document.execCommand('copy');
-        document.body.removeChild(el);
+        showToast(t('billing.copied'), 'success');
+        return;
       }
-      showToast(t('billing.copied'), 'success');
     } catch {
+      // fall through to the legacy method below
+    }
+
+    if (legacyCopy()) {
+      showToast(t('billing.copied'), 'success');
+    } else {
       showToast(t('common.error'), 'error');
     }
   }
