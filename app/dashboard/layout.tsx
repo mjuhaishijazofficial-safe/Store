@@ -1,13 +1,9 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import SignOutButton from '@/components/SignOutButton';
-import LanguageToggle from '@/components/LanguageToggle';
-import ThemeToggle from '@/components/ThemeToggle';
-import DashboardNav from '@/components/DashboardNav';
+import DashboardSidebar from '@/components/DashboardSidebar';
 import ConnectionBanner from '@/components/ConnectionBanner';
 import AppLockGate from '@/components/AppLockGate';
-import { StoreIcon } from '@/components/icons';
 import { getServerT } from '@/lib/i18n-server';
 import { ShopProvider } from '@/lib/shop-context';
 import { isAdmin } from '@/lib/admin';
@@ -94,31 +90,19 @@ export default async function DashboardLayout({ children }: { children: React.Re
     ...(isAdmin(user.email) ? [{ href: '/dashboard/admin', label: t('nav.admin'), badge: adminPendingCount }] : [])
   ];
 
+  const trialLabel = shop?.subscription_status === 'trialing' && !trialExpired ? t('billing.statusTrialing') : undefined;
+
   return (
     <ShopProvider value={{ shopId: profile.shop_id, role: profile.role as 'owner' | 'staff', shopName: shop?.name || '', allowedSections }}>
-      <div className="min-h-screen">
-        <ConnectionBanner />
-        <header className="border-b border-chalk/10 no-print">
-          <div className="max-w-4xl mx-auto px-5 py-4 flex items-center flex-wrap gap-x-3 gap-y-2 justify-between">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-10 h-10 rounded-xl gradient-brand shadow-glow text-board flex items-center justify-center shrink-0">
-                <StoreIcon className="w-6 h-6" />
-              </div>
-              <div className="min-w-0">
-                <div className="font-display text-xl sm:text-2xl font-800 text-haldi leading-tight truncate">{shop?.name || 'Dukaan ERP'}</div>
-                <div className="text-[11px] text-chalkdim tracking-wide mt-0.5 whitespace-nowrap">{t('header.subtitle')}</div>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 shrink-0">
-              <ThemeToggle />
-              <LanguageToggle />
-              <SignOutButton />
-            </div>
-          </div>
-          <DashboardNav items={nav} />
-        </header>
+      <ConnectionBanner />
+      {/* Sidebar + main are flex siblings (not fixed+margin) so the
+          sidebar's own collapse toggle reflows main content with no
+          state syncing between the server-rendered shell and the
+          client-side collapse state living inside DashboardSidebar. */}
+      <div className="lg:flex min-h-screen">
+        <DashboardSidebar items={nav} shopName={shop?.name || ''} trialLabel={trialLabel} />
 
-        <main className="max-w-4xl mx-auto px-5 py-6">
+        <main className="flex-1 min-w-0 px-4 sm:px-6 py-6 max-w-5xl mx-auto w-full">
           {locked && (
             <div className="card p-5 mb-6 border-mirch">
               <div className="font-display text-lg text-mirch font-700 mb-1">{t('lock.title')}</div>
