@@ -401,6 +401,7 @@ export const dict = {
   'suppliersDetail.totalOwed': { ur: 'Aap Par Udhaar', en: 'Total You Owe' },
   'suppliersDetail.maalLiya': { ur: '+ Maal Liya', en: '+ Stock Received' },
   'suppliersDetail.paymentDi': { ur: '+ Payment Di', en: '+ Payment Made' },
+  'suppliersDetail.maalWapas': { ur: 'Maal Wapas Kiya', en: 'Returned Goods' },
   'suppliersDetail.empty': { ur: 'Abhi tak koi entry nahi', en: 'No entries yet' },
   'suppliersDetail.paymentLabel': { ur: 'Payment di', en: 'Payment made' },
   'suppliersDetail.itemDefault': { ur: 'Saman', en: 'Item' },

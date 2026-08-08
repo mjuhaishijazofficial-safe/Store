@@ -104,7 +104,7 @@ create table if not exists supplier_entries (
   id uuid primary key default gen_random_uuid(),
   shop_id uuid not null references shops(id) on delete cascade,
   supplier_id uuid not null references suppliers(id) on delete cascade,
-  type text not null check (type in ('purchase','payment')), -- purchase = maal liya (charhta hai), payment = maine di (utarta hai)
+  type text not null check (type in ('purchase','payment','return')), -- purchase = maal liya (charhta hai), payment = maine di (utarta hai), return = maal wapas kiya (utarta hai, cash nahi)
   item_name text,
   qty numeric,
   amount numeric not null,
@@ -112,6 +112,10 @@ create table if not exists supplier_entries (
   created_by uuid references auth.users(id),
   created_at timestamptz not null default now()
 );
+-- Table pre-dates 'return' — widen the existing constraint for anyone
+-- re-running this on a live database rather than a fresh one.
+alter table supplier_entries drop constraint if exists supplier_entries_type_check;
+alter table supplier_entries add constraint supplier_entries_type_check check (type in ('purchase','payment','return'));
 
 -- 9. EXPENSES (rent, staff salary, utilities, marketing — overhead that
 --    isn't stock purchase. Without this, "profit" only ever subtracted
@@ -311,15 +315,19 @@ as $$
   where customer_id = p_customer_id
 $$;
 
-create or replace function supplier_contact_totals(p_supplier_id uuid)
-returns table(given numeric, paid numeric)
+-- Signature grew a column (returned) — create or replace can't change an
+-- existing function's return type, has to be dropped first.
+drop function if exists supplier_contact_totals(uuid);
+create function supplier_contact_totals(p_supplier_id uuid)
+returns table(given numeric, paid numeric, returned numeric)
 language sql
 security invoker
 stable
 as $$
   select
     coalesce(sum(amount) filter (where type = 'purchase'), 0) as given,
-    coalesce(sum(amount) filter (where type = 'payment'), 0) as paid
+    coalesce(sum(amount) filter (where type = 'payment'), 0) as paid,
+    coalesce(sum(amount) filter (where type = 'return'), 0) as returned
   from supplier_entries
   where supplier_id = p_supplier_id
 $$;

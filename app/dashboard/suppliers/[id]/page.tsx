@@ -15,9 +15,11 @@ type Supplier = {
   phone: string | null;
 };
 
+type EntryType = 'purchase' | 'payment' | 'return';
+
 type Entry = {
   id: string;
-  type: 'purchase' | 'payment';
+  type: EntryType;
   item_name: string | null;
   qty: number | null;
   amount: number;
@@ -47,7 +49,7 @@ export default function SupplierDetailPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  const [modalType, setModalType] = useState<'purchase' | 'payment' | null>(null);
+  const [modalType, setModalType] = useState<EntryType | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [form, setForm] = useState({ item_name: '', qty: '', amount: '', note: '' });
 
@@ -57,9 +59,12 @@ export default function SupplierDetailPage() {
     // See khata_customer_totals in schema.sql for why this is a real SQL
     // function rather than a client-side `.select('amount.sum()')` call
     // — that pattern was silently reading as ₨0 with no error surfaced.
+    // A return reduces what's owed the same direction a cash payment
+    // does, so it comes out of the balance the same way.
     const { data, error: err } = await supabase.rpc('supplier_contact_totals', { p_supplier_id: supplierId }).single();
     if (err) { showToast(t('common.error'), 'error'); return; }
-    setTotal(((data as any)?.given || 0) - ((data as any)?.paid || 0));
+    const d = data as any;
+    setTotal((d?.given || 0) - (d?.paid || 0) - (d?.returned || 0));
   }
 
   async function loadEntries(reset: boolean) {
@@ -90,10 +95,14 @@ export default function SupplierDetailPage() {
     setLoading(false);
   }
 
-  function openModal(type: 'purchase' | 'payment') {
+  function openModal(type: EntryType) {
     setForm({ item_name: '', qty: '', amount: '', note: '' });
     setModalType(type);
   }
+
+  // purchase and return both name a specific item — one arriving, one
+  // going back — payment is just cash, no item involved.
+  const modalNeedsItem = modalType === 'purchase' || modalType === 'return';
 
   async function saveEntry() {
     if (!shopId || !modalType) return;
@@ -104,8 +113,8 @@ export default function SupplierDetailPage() {
       shop_id: shopId,
       supplier_id: supplierId,
       type: modalType,
-      item_name: modalType === 'purchase' ? (form.item_name.trim() || null) : null,
-      qty: modalType === 'purchase' && form.qty ? Number(form.qty) : null,
+      item_name: modalNeedsItem ? (form.item_name.trim() || null) : null,
+      qty: modalNeedsItem && form.qty ? Number(form.qty) : null,
       amount,
       note: form.note.trim() || null
     });
@@ -144,6 +153,7 @@ export default function SupplierDetailPage() {
           <button onClick={() => openModal('purchase')} className="flex-1 text-sm py-2.5 rounded-lg border border-mirch text-mirch">{t('suppliersDetail.maalLiya')}</button>
           <button onClick={() => openModal('payment')} className="flex-1 text-sm py-2.5 rounded-lg border border-dhania text-dhania">{t('suppliersDetail.paymentDi')}</button>
         </div>
+        <button onClick={() => openModal('return')} className="w-full mt-2 text-sm py-2.5 rounded-lg border border-haldi text-haldi">{t('suppliersDetail.maalWapas')}</button>
       </div>
 
       {entries.length === 0 && (
@@ -154,16 +164,24 @@ export default function SupplierDetailPage() {
         {entries.map(e => {
           const d = new Date(e.created_at);
           const when = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + ' • ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+          // Purchase (owe more) is red, payment and return both reduce
+          // what's owed but stay visually distinct from each other —
+          // green for actual cash out, amber for goods sent back, so
+          // "I paid" and "I returned this" never read as the same thing
+          // at a glance.
+          const color = e.type === 'purchase' ? 'text-mirch' : e.type === 'return' ? 'text-haldi' : 'text-dhania';
+          const label =
+            e.type === 'purchase' ? (e.item_name || t('suppliersDetail.itemDefault')) + (e.qty ? ` — ${e.qty}` : '')
+            : e.type === 'return' ? (e.item_name || t('suppliersDetail.itemDefault')) + (e.qty ? ` — ${e.qty}` : '') + ` (${t('suppliersDetail.maalWapas')})`
+            : t('suppliersDetail.paymentLabel');
           return (
             <div key={e.id} className="card p-3 px-4 flex justify-between items-center">
               <div>
-                <div className="font-600 text-sm">
-                  {e.type === 'purchase' ? (e.item_name || t('suppliersDetail.itemDefault')) + (e.qty ? ` — ${e.qty}` : '') : t('suppliersDetail.paymentLabel')}
-                </div>
+                <div className="font-600 text-sm">{label}</div>
                 <div className="text-xs text-chalkdim mt-0.5">{when}{e.note ? ` • ${e.note}` : ''}</div>
               </div>
               <div className="flex items-center gap-3">
-                <div className={`font-mono font-700 text-sm ${e.type === 'purchase' ? 'text-mirch' : 'text-dhania'}`}>
+                <div className={`font-mono font-700 text-sm ${color}`}>
                   {e.type === 'purchase' ? '+' : '−'}{fmt(e.amount)}
                 </div>
                 <button onClick={() => deleteEntry(e.id)} className="text-chalkdim text-xs hover:text-mirch">✕</button>
@@ -184,9 +202,9 @@ export default function SupplierDetailPage() {
         <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50" onClick={() => setModalType(null)}>
           <div className="card w-full max-w-md p-5 rounded-b-none sm:rounded-b-2xl" onClick={e => e.stopPropagation()}>
             <div className="font-display text-lg text-haldi font-700 mb-4">
-              {modalType === 'purchase' ? t('suppliersDetail.maalLiya') : t('suppliersDetail.paymentDi')}
+              {modalType === 'purchase' ? t('suppliersDetail.maalLiya') : modalType === 'return' ? t('suppliersDetail.maalWapas') : t('suppliersDetail.paymentDi')}
             </div>
-            {modalType === 'purchase' && (
+            {modalNeedsItem && (
               <>
                 <label className="block text-xs text-chalkdim mb-1">{t('suppliersDetail.itemName')}</label>
                 <input className="input mb-3" value={form.item_name} onChange={e => setForm({ ...form, item_name: e.target.value })} placeholder={t('suppliersDetail.itemPlaceholder')} />
