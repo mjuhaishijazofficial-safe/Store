@@ -42,7 +42,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const trialExpired =
     shop?.subscription_status === 'trialing' &&
     new Date(shop?.trial_ends_at) < new Date();
-  const locked = shop?.subscription_status === 'canceled' || shop?.subscription_status === 'past_due' || trialExpired;
+  const locked = shop?.subscription_status === 'canceled' || shop?.subscription_status === 'past_due' || shop?.subscription_status === 'suspended' || trialExpired;
 
   const t = await getServerT();
 

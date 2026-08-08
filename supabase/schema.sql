@@ -9,7 +9,7 @@ create table if not exists shops (
   name text not null default 'Meri Dukaan',
   owner_id uuid not null references auth.users(id) on delete cascade,
   plan text not null default 'trial',                 -- trial | monthly | canceled
-  subscription_status text not null default 'trialing', -- trialing | active | past_due | canceled
+  subscription_status text not null default 'trialing', -- trialing | active | past_due | canceled | suspended
   trial_ends_at timestamptz not null default (now() + interval '14 days'),
   stripe_customer_id text,
   stripe_subscription_id text,
@@ -273,6 +273,24 @@ create table if not exists payment_claims (
   created_by uuid references auth.users(id),
   created_at timestamptz not null default now()
 );
+
+-- 11b. ADMIN_ACTIONS — audit trail for manual SaaS-operator actions
+--      (extend trial, override subscription status, suspend/reactivate)
+--      taken from the admin panel. Deliberately no RLS policy at all —
+--      unreachable via the anon/authenticated client roles, same as
+--      every other admin-only write in this app; only the service-role
+--      client (from routes gated by isAdmin()) ever touches it.
+create table if not exists admin_actions (
+  id uuid primary key default gen_random_uuid(),
+  shop_id uuid references shops(id) on delete set null,
+  action text not null,       -- 'extend_trial' | 'set_status' | 'suspend' | 'reactivate'
+  detail text,                -- human-readable summary, e.g. "+7 days" or "active -> suspended"
+  performed_by text,          -- admin's email — not a shop role, so not a profiles/auth.users FK
+  created_at timestamptz not null default now()
+);
+alter table admin_actions enable row level security;
+create index if not exists idx_admin_actions_shop on admin_actions(shop_id, created_at desc);
+create index if not exists idx_admin_actions_created on admin_actions(created_at desc);
 
 -- 12. BANK_RECONCILIATIONS — periodically checking the shop's real bank/
 --     mobile-wallet statement against what the app's own bank-tagged
