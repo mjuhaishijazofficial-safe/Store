@@ -331,47 +331,44 @@ export default function KhataDetailPage() {
       )}
 
       {entries.length > 0 && (
-        <div className="card overflow-hidden">
-          {/* Two-column ledger: udhaar in one column, payments in the
-              other, so a glance down the page separates money out from
-              money in — the whole point of a khata. The old single
-              amount column put both on the same line, which is exactly
-              what made purchases and payments hard to tell apart.
-              Rightmost column is the running balance after that entry. */}
-          <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-x-3 px-4 py-2 bg-board3/60 text-[10px] text-chalkdim uppercase tracking-wide">
-            <div>{t('khataDetail.colDetail')}</div>
-            <div className="text-right">{t('khataDetail.colGiven')}</div>
-            <div className="text-right">{t('khataDetail.colPaid')}</div>
-            <div className="text-right">{t('khataDetail.colBalance')}</div>
-            <div />
-          </div>
-          <div className="divide-y divide-chalk/10">
-            {entries.map((e, i) => {
-              const d = new Date(e.created_at);
-              const when = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + ' • ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-              const bal = balanceAfterEntry[i];
-              return (
-                <div key={e.id} className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-x-3 px-4 py-3 items-center">
-                  <div className="min-w-0">
-                    <div className="font-600 text-sm truncate">
-                      {e.type === 'purchase' ? (e.item_name || t('khataDetail.itemDefault')) + (e.qty ? ` — ${e.qty}` : '') : t('khataDetail.paymentLabel')}
-                    </div>
-                    <div className="text-[11px] text-chalkdim mt-0.5 truncate">{when}{e.note ? ` • ${e.note}` : ''}</div>
-                  </div>
-                  <div className="font-mono text-sm text-mirch text-right tabular-nums">
-                    {e.type === 'purchase' ? fmt(e.amount) : ''}
-                  </div>
-                  <div className="font-mono text-sm text-dhania text-right tabular-nums">
-                    {e.type === 'payment' ? fmt(e.amount) : ''}
-                  </div>
-                  <div className={`font-mono font-700 text-sm text-right tabular-nums ${bal > 0 ? 'text-mirch' : bal < 0 ? 'text-dhania' : 'text-chalkdim'}`}>
-                    {fmt(Math.abs(bal))}
-                  </div>
-                  <button onClick={() => deleteEntry(e.id)} className="text-chalkdim text-xs hover:text-mirch pl-1">✕</button>
+        <div className="card divide-y divide-chalk/10">
+          {/* One amount per row, colored by type (red = udhaar/given,
+              green = payment) with the running balance as a small
+              caption underneath — same pattern Khatabook/OkCredit use.
+              The earlier 4-column table (Given | Paid | Balance) looked
+              right in isolation but each row was its own independent
+              CSS grid, so column widths never matched row to row and
+              numbers didn't actually line up under the headers. A
+              single number per row sidesteps that class of bug
+              entirely — nothing needs to align across rows. */}
+          {entries.map((e, i) => {
+            const d = new Date(e.created_at);
+            const when = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + ' • ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+            const bal = balanceAfterEntry[i];
+            const isPurchase = e.type === 'purchase';
+            return (
+              <div key={e.id} className="p-3 px-4 flex items-center gap-3">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${isPurchase ? 'bg-mirch/15 text-mirch' : 'bg-dhania/15 text-dhania'}`}>
+                  {isPurchase ? <ReceiptIcon className="w-4 h-4" /> : <CashIcon className="w-4 h-4" />}
                 </div>
-              );
-            })}
-          </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-600 text-sm truncate">
+                    {isPurchase ? (e.item_name || t('khataDetail.itemDefault')) + (e.qty ? ` — ${e.qty}` : '') : t('khataDetail.paymentLabel')}
+                  </div>
+                  <div className="text-[11px] text-chalkdim mt-0.5 truncate">{when}{e.note ? ` • ${e.note}` : ''}</div>
+                </div>
+                <div className="text-right shrink-0">
+                  <div className={`font-mono font-700 text-sm tabular-nums ${isPurchase ? 'text-mirch' : 'text-dhania'}`}>
+                    {isPurchase ? '+' : '−'}{fmt(e.amount)}
+                  </div>
+                  <div className="text-[10px] text-chalkdim mt-0.5 tabular-nums">
+                    {t('khataDetail.colBalance')}: {fmt(Math.abs(bal))}
+                  </div>
+                </div>
+                <button onClick={() => deleteEntry(e.id)} className="text-chalkdim text-xs hover:text-mirch shrink-0">✕</button>
+              </div>
+            );
+          })}
         </div>
       )}
 
