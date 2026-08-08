@@ -31,6 +31,7 @@ create table if not exists profiles (
   created_at timestamptz not null default now()
 );
 alter table profiles add column if not exists email text;
+alter table profiles add column if not exists monthly_salary numeric not null default 0;
 
 -- 3. ITEMS (inventory) -----------------------------------------------
 create table if not exists items (
@@ -126,7 +127,23 @@ create table if not exists expenses (
   created_at timestamptz not null default now()
 );
 
--- 10. PAYMENT_CLAIMS (manual EasyPaisa/bank transfer, no payment gateway
+-- 10. STAFF_ATTENDANCE (owner marks each staff member present/absent per
+--     day; profiles.monthly_salary above is the figure this is tracked
+--     against, deliberately not auto-computing prorated pay — half-day
+--     rules, paid vs unpaid leave, etc. vary shop to shop, so this stays
+--     "here's the attendance record," not a payroll engine.) -----------
+create table if not exists staff_attendance (
+  id uuid primary key default gen_random_uuid(),
+  shop_id uuid not null references shops(id) on delete cascade,
+  staff_id uuid not null references profiles(id) on delete cascade,
+  date date not null,
+  status text not null check (status in ('present','absent','half_day','leave')),
+  created_by uuid references auth.users(id),
+  created_at timestamptz not null default now(),
+  unique(staff_id, date)
+);
+
+-- 11. PAYMENT_CLAIMS (manual EasyPaisa/bank transfer, no payment gateway
 --    for Pakistan yet — owner marks "I've paid", we verify the WhatsApp
 --    screenshot by hand and flip shops.subscription_status ourselves) ----
 create table if not exists payment_claims (
@@ -381,6 +398,7 @@ alter table suppliers enable row level security;
 alter table supplier_entries enable row level security;
 alter table payment_claims enable row level security;
 alter table expenses enable row level security;
+alter table staff_attendance enable row level security;
 
 -- shops: a user can only see/update their own shop
 -- Postgres has no "create policy if not exists" — drop-then-create is the
@@ -445,6 +463,17 @@ drop policy if exists "expenses_own_shop" on expenses;
 create policy "expenses_own_shop" on expenses for all
   using (shop_id = my_shop_id())
   with check (shop_id = my_shop_id());
+
+-- staff_attendance: everyone in the shop can see it (a staff member
+-- checking their own record), only the owner can mark/change it —
+-- same owner-only write pattern as shop_update_own.
+drop policy if exists "staff_attendance_select_own_shop" on staff_attendance;
+create policy "staff_attendance_select_own_shop" on staff_attendance for select
+  using (shop_id = my_shop_id());
+drop policy if exists "staff_attendance_write_owner" on staff_attendance;
+create policy "staff_attendance_write_owner" on staff_attendance for all
+  using (shop_id = my_shop_id() and my_role() = 'owner')
+  with check (shop_id = my_shop_id() and my_role() = 'owner');
 
 -- ============================================================
 -- Signup trigger: creates a shop + profile automatically

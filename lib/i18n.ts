@@ -428,6 +428,18 @@ export const dict = {
   'staff.removeTitle': { ur: 'Staff Hatayein?', en: 'Remove Staff Member?' },
   'staff.removeBody': { ur: 'ki is dukaan tak rasai khatam ho jayegi — unka login bhi kaam nahi karega.', en: "will lose access to this shop — their login will stop working too." },
   'staff.removeConfirm': { ur: 'Haan, Hatayein', en: 'Yes, Remove' },
+
+  'staffDetail.back': { ur: '← Sab Staff', en: '← All Staff' },
+  'staffDetail.monthlySalary': { ur: 'Monthly Salary (₨)', en: 'Monthly Salary (₨)' },
+
+  'attendance.markToday': { ur: 'Aaj Ki Attendance', en: "Today's Attendance" },
+  'attendance.thisMonth': { ur: 'Is Mahine', en: 'This Month' },
+  'attendance.present': { ur: 'Hazir', en: 'Present' },
+  'attendance.absent': { ur: 'Ghair Hazir', en: 'Absent' },
+  'attendance.halfDay': { ur: 'Aadha Din', en: 'Half Day' },
+  'attendance.leave': { ur: 'Chutti', en: 'Leave' },
+  'attendance.marked': { ur: 'Attendance mark ho gayi ✓', en: 'Attendance marked ✓' },
+  'attendance.empty': { ur: 'Is mahine abhi tak koi attendance mark nahi hui', en: 'No attendance marked yet this month' },
   'staff.ownerOnly': { ur: 'Ye page sirf owner dekh sakte hain.', en: 'Only the shop owner can view this page.' },
   'staff.emailTaken': {
     ur: 'Ye email pehle se kisi (shayad kisi aur dukaan ke) account se juda hua hai — is dukaan ke Staff list mein na dikhne ka matlab hai wo account kahin aur bana tha. Koi doosra email try karein, ya Supabase dashboard mein us purane account ko dekh/hata kar dobara try karein.',
@@ -474,6 +486,7 @@ export const dict = {
   'settings.appearance': { ur: 'Rang Palette', en: 'Appearance' },
   'settings.appearanceHint': { ur: 'App ke brand color choose karein', en: 'Choose the app\'s brand color' },
   'settings.saved': { ur: 'Save ho gaya ✓', en: 'Saved ✓' },
+  'settings.saving': { ur: 'Save ho raha hai...', en: 'Saving...' },
   'settings.dangerZone': { ur: 'Danger Zone', en: 'Danger Zone' },
   'settings.deleteAccountTitle': { ur: 'Account Delete Karein', en: 'Delete Account' },
   'settings.deleteAccountBody': { ur: 'Ye poori dukaan aur uska saara data (inventory, khata, suppliers, staff, sab kuch) hamesha ke liye delete kar dega. Ye wapas nahi ho sakta.', en: 'This permanently deletes the whole shop and all its data (inventory, khata, suppliers, staff, everything). This cannot be undone.' },

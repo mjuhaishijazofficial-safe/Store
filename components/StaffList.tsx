@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useLang } from '@/lib/i18n-context';
 import { useToast } from '@/lib/toast-context';
 
@@ -32,25 +33,43 @@ export default function StaffList({ staff }: { staff: StaffRow[] }) {
   return (
     <>
       <div className="space-y-2 mb-6">
-        {staff.map(s => (
-          <div key={s.id} className="card p-3 px-4 flex justify-between items-center">
-            <div>
-              <div className="font-600 text-sm">{s.full_name || s.email || '—'}</div>
-              {s.full_name && <div className="text-xs text-chalkdim">{s.email}</div>}
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="text-xs px-2 py-1 rounded-full bg-board3 text-chalkdim">
-                {s.role === 'owner' ? t('staff.roleOwner') : t('staff.roleStaff')}
+        {staff.map(s => {
+          // Owner rows aren't linked — attendance/salary tracking is a
+          // staff concept, an owner doesn't clock in against themselves,
+          // and (same reasoning as the missing remove button) Settings >
+          // Delete Account is the deliberate path for anything owner-level.
+          const body = (
+            <>
+              <div>
+                <div className="font-600 text-sm">{s.full_name || s.email || '—'}</div>
+                {s.full_name && <div className="text-xs text-chalkdim">{s.email}</div>}
               </div>
-              {/* Owner row has no remove — that's what Settings > Delete
-                  Account is for, a deliberate whole-shop action, not a
-                  click on a list row. */}
-              {s.role === 'staff' && (
-                <button onClick={() => setConfirming(s)} className="text-chalkdim text-xs hover:text-mirch">✕</button>
-              )}
+              <div className="flex items-center gap-2">
+                <div className="text-xs px-2 py-1 rounded-full bg-board3 text-chalkdim">
+                  {s.role === 'owner' ? t('staff.roleOwner') : t('staff.roleStaff')}
+                </div>
+                {s.role === 'staff' && (
+                  <button
+                    onClick={e => { e.preventDefault(); setConfirming(s); }}
+                    className="text-chalkdim text-xs hover:text-mirch"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            </>
+          );
+
+          return s.role === 'staff' ? (
+            <Link key={s.id} href={`/dashboard/staff/${s.id}`} className="card p-3 px-4 flex justify-between items-center">
+              {body}
+            </Link>
+          ) : (
+            <div key={s.id} className="card p-3 px-4 flex justify-between items-center">
+              {body}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {confirming && (
