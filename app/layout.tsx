@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { cookies } from 'next/headers';
 import { LanguageProvider } from '@/lib/i18n-context';
@@ -56,7 +56,21 @@ export const metadata: Metadata = {
     index: true,
     follow: true,
     googleBot: { index: true, follow: true, 'max-image-preview': 'large', 'max-snippet': -1 }
+  },
+  // iOS Safari's "Add to Home Screen" ignores app/manifest.ts entirely
+  // (that's Android/Chrome's install path) — these are the tags it
+  // actually reads, so the two need to agree (theme color, standalone
+  // display) or the app looks different depending which platform
+  // "installed" it.
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'Dukaan ERP'
   }
+};
+
+export const viewport: Viewport = {
+  themeColor: '#B8791A'
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {

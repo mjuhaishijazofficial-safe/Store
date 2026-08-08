@@ -350,6 +350,9 @@ export const dict = {
   'receipt.thanks': { ur: 'Shukriya! Dobara Tashreef Layein', en: 'Thank you! Please visit again' },
   'receipt.print': { ur: 'Receipt Print Karein', en: 'Print Receipt' },
 
+  'offline.banner': { ur: '⚠ Internet nahi hai — data purana ho sakta hai, connection wapas aate hi khud update ho jayega', en: '⚠ No internet — data may be stale, will update automatically once connection returns' },
+  'offline.stale': { ur: 'Purana data dikha rahe hain (connection nahi mila)', en: 'Showing last saved data (couldn\'t reach the server)' },
+
   'khataDetail.fromInventory': { ur: 'Inventory se', en: 'From inventory' },
   'khataDetail.totalGiven': { ur: 'Kul Saman Diya', en: 'Total Given' },
   'khataDetail.totalPaid': { ur: 'Kul Payment Mili', en: 'Total Paid' },

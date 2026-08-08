@@ -7,6 +7,7 @@ import { useLang } from '@/lib/i18n-context';
 import { useShop } from '@/lib/shop-context';
 import { useToast } from '@/lib/toast-context';
 import { downloadCsv } from '@/lib/csv';
+import { saveCache, loadCache } from '@/lib/offline-cache';
 
 type Customer = {
   id: string;
@@ -30,9 +31,13 @@ export default function KhataPage() {
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [showingStale, setShowingStale] = useState(false);
   const [form, setForm] = useState({ name: '', phone: '', credit_limit: '' });
 
   useEffect(() => { loadAll(); }, [shopId]);
+
+  const cacheKey = `khata:${shopId}`;
+  type CachedKhata = { customers: Customer[]; balances: Record<string, number>; topCustomers: typeof topCustomers };
 
   async function loadAll() {
     setLoading(true);
@@ -41,11 +46,27 @@ export default function KhataPage() {
     // pulling every ledger row across every customer to sum in JS —
     // this is what keeps the list fast no matter how many customers or
     // how much history a shop has.
-    const [{ data: custs }, { data: bals }, { data: top }] = await Promise.all([
+    const [{ data: custs, error: custErr }, { data: bals, error: balErr }, { data: top }] = await Promise.all([
       supabase.from('customers').select('*').eq('shop_id', shopId).order('name'),
       supabase.rpc('khata_balances', { p_shop_id: shopId }),
       supabase.rpc('khata_top_customers', { p_shop_id: shopId, p_limit: 5 })
     ]);
+
+    // Treated as one unit: a partial failure (e.g. balances loaded but
+    // customers didn't) would leave the list showing names with no
+    // amounts, which is worse than just falling back to the last known
+    // full snapshot of both together.
+    if (custErr || balErr) {
+      const cached = loadCache<CachedKhata>(cacheKey);
+      if (cached) {
+        setCustomers(cached.customers);
+        setBalances(cached.balances);
+        setTopCustomers(cached.topCustomers);
+        setShowingStale(true);
+      }
+      setLoading(false);
+      return;
+    }
 
     const balMap: Record<string, number> = {};
     (bals || []).forEach((r: any) => { balMap[r.customer_id] = r.balance; });
@@ -53,6 +74,8 @@ export default function KhataPage() {
     setCustomers(custs || []);
     setBalances(balMap);
     setTopCustomers(top || []);
+    setShowingStale(false);
+    saveCache(cacheKey, { customers: custs || [], balances: balMap, topCustomers: top || [] });
     setLoading(false);
   }
 
@@ -121,6 +144,8 @@ export default function KhataPage() {
         </div>
         </>
       )}
+
+      {showingStale && <div className="text-haldi text-xs mb-3">{t('offline.stale')}</div>}
 
       {loading && <div className="text-chalkdim text-sm text-center py-10">{t('khata.loading')}</div>}
 

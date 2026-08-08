@@ -5,6 +5,7 @@ import SignOutButton from '@/components/SignOutButton';
 import LanguageToggle from '@/components/LanguageToggle';
 import ThemeToggle from '@/components/ThemeToggle';
 import DashboardNav from '@/components/DashboardNav';
+import ConnectionBanner from '@/components/ConnectionBanner';
 import { StoreIcon } from '@/components/icons';
 import { getServerT } from '@/lib/i18n-server';
 import { ShopProvider } from '@/lib/shop-context';
@@ -81,6 +82,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   return (
     <ShopProvider value={{ shopId: profile.shop_id, role: profile.role as 'owner' | 'staff', shopName: shop?.name || '' }}>
       <div className="min-h-screen">
+        <ConnectionBanner />
         <header className="border-b border-chalk/10 no-print">
           <div className="max-w-4xl mx-auto px-5 py-4 flex items-center flex-wrap gap-x-3 gap-y-2 justify-between">
             <div className="flex items-center gap-2.5 min-w-0">

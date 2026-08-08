@@ -8,6 +8,7 @@ import { useToast } from '@/lib/toast-context';
 import { downloadCsv, parseCsv } from '@/lib/csv';
 import BarcodeScannerModal from '@/components/BarcodeScannerModal';
 import SaleReceiptModal from '@/components/SaleReceiptModal';
+import { saveCache, loadCache } from '@/lib/offline-cache';
 
 type Item = {
   id: string;
@@ -41,6 +42,7 @@ export default function InventoryPage() {
   const [loading, setLoading] = useState(true);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [showingStale, setShowingStale] = useState(false);
   const [receiptTxn, setReceiptTxn] = useState<{ item_name: string; qty: number; unit: string | null; amount: number; created_at: string } | null>(null);
   const [lookupState, setLookupState] = useState<'idle' | 'loading' | 'found' | 'not_found'>('idle');
 
@@ -61,10 +63,25 @@ export default function InventoryPage() {
 
   useEffect(() => { loadItems(); }, [shopId]);
 
+  const cacheKey = `items:${shopId}`;
+
   async function loadItems() {
     setLoading(true);
-    const { data } = await supabase.from('items').select('*').eq('shop_id', shopId).order('name');
-    setItems(data || []);
+    // resilientFetch (wired into the client in lib/supabase/client.ts)
+    // already retries a request that never reached the server, so an
+    // `error` here means those retries were exhausted too — worth
+    // falling back to whatever was on screen last, rather than an empty
+    // "no items" state that looks like the inventory got wiped.
+    const { data, error: err } = await supabase.from('items').select('*').eq('shop_id', shopId).order('name');
+    if (err) {
+      const cached = loadCache<Item[]>(cacheKey);
+      if (cached) { setItems(cached); setShowingStale(true); }
+      // else: leave whatever was already on screen alone
+    } else {
+      setItems(data || []);
+      setShowingStale(false);
+      saveCache(cacheKey, data || []);
+    }
     setLoading(false);
   }
 
@@ -291,6 +308,8 @@ export default function InventoryPage() {
           <input type="file" accept=".csv" className="hidden" onChange={handleImportFile} disabled={importing} />
         </label>
       </div>
+
+      {showingStale && <div className="text-haldi text-xs mb-3">{t('offline.stale')}</div>}
 
       {loading && <div className="text-chalkdim text-sm text-center py-10">{t('inventory.loading')}</div>}
 
