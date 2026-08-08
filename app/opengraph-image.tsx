@@ -19,8 +19,8 @@ export default async function Image() {
           flexDirection: 'column',
           justifyContent: 'center',
           padding: '0 90px',
-          background: '#F7F2E7',
-          color: '#1F2B24'
+          background: '#F4F6F8',
+          color: '#0F2A4A'
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 22, marginBottom: 40 }}>
@@ -29,13 +29,13 @@ export default async function Image() {
               width: 84,
               height: 84,
               borderRadius: 20,
-              background: '#1F2B24',
+              background: '#0F2A4A',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               fontSize: 40,
               fontWeight: 800,
-              color: '#E0A32E'
+              color: '#C9A24B'
             }}
           >
             {/* Plain latin only — Satori has no glyph for ₨ in the
@@ -43,14 +43,14 @@ export default async function Image() {
                 time, which would render an empty tofu box on the card. */}
             Rs
           </div>
-          <div style={{ fontSize: 52, fontWeight: 800, color: '#B8791A' }}>Dukaan ERP</div>
+          <div style={{ fontSize: 52, fontWeight: 800, color: '#0F2A4A' }}>Dukaan ERP</div>
         </div>
 
         <div style={{ fontSize: 62, fontWeight: 700, lineHeight: 1.15, maxWidth: 900 }}>
           Apni dukaan ka hisaab, phone par
         </div>
 
-        <div style={{ fontSize: 30, color: '#6F6555', marginTop: 26, maxWidth: 880 }}>
+        <div style={{ fontSize: 30, color: '#5A7089', marginTop: 26, maxWidth: 880 }}>
           Khata · Inventory · Suppliers · Staff · Reports — sab ek jagah
         </div>
 
@@ -63,8 +63,8 @@ export default async function Image() {
                 padding: '11px 24px',
                 borderRadius: 999,
                 background: '#FFFFFF',
-                border: '1px solid #1F2B2422',
-                color: '#4A4235'
+                border: '1px solid #0F2A4A22',
+                color: '#3D5670'
               }}
             >
               {chip}

@@ -70,7 +70,10 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: '#B8791A'
+  // Matches manifest.ts's theme_color — see the note there on why this
+  // is fixed to the default "Ledger Trust" palette rather than tracking
+  // whichever palette a returning user last picked.
+  themeColor: '#0F2A4A'
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {

@@ -13,8 +13,14 @@ export default function manifest(): MetadataRoute.Manifest {
     description: 'Khata, inventory, suppliers aur reports — sab ek app mein.',
     start_url: '/dashboard',
     display: 'standalone',
-    background_color: '#F7F2E7',
-    theme_color: '#B8791A',
+    // Matches the "Ledger Trust" palette that's now the default brand
+    // (see lib/palette.ts) — these only drive the splash screen shown
+    // before the app's own CSS paints, so they're fixed to the default
+    // palette's light-mode values rather than trying to track whichever
+    // palette/theme a returning user last picked (which the manifest,
+    // fetched once at install time, has no way to know anyway).
+    background_color: '#F4F6F8',
+    theme_color: '#0F2A4A',
     icons: [
       // SVG-only: modern Chrome/Edge (Android install prompt) accept an
       // SVG manifest icon directly, no PNG generation pipeline needed.
