@@ -9,10 +9,13 @@ import { useShop } from '@/lib/shop-context';
 import { useToast } from '@/lib/toast-context';
 import { startOfTodayPKT, startOfMonthPKT } from '@/lib/pkt-time';
 import { ALL_SECTIONS, Section } from '@/lib/permissions';
+import ConfirmDeleteButton from '@/components/ConfirmDeleteButton';
 
 type StaffProfile = { id: string; full_name: string | null; email: string | null; role: string; monthly_salary: number; allowed_sections: string[] | null };
 type AttendanceRow = { id: string; date: string; status: 'present' | 'absent' | 'half_day' | 'leave' };
 type Status = AttendanceRow['status'];
+type AdjustmentType = 'bonus' | 'overtime' | 'deduction';
+type Adjustment = { id: string; type: AdjustmentType; amount: number; note: string | null; created_at: string };
 
 function fmt(n: number) {
   return '₨' + Number(n || 0).toLocaleString('en-IN');
@@ -40,6 +43,9 @@ export default function StaffDetailPage() {
   // see lib/permissions.ts.
   const [allowedSections, setAllowedSections] = useState<string[] | null>(null);
   const [savingPerms, setSavingPerms] = useState(false);
+  const [adjustments, setAdjustments] = useState<Adjustment[]>([]);
+  const [adjForm, setAdjForm] = useState<{ type: AdjustmentType; amount: string; note: string }>({ type: 'bonus', amount: '', note: '' });
+  const [savingAdj, setSavingAdj] = useState(false);
 
   const isOwner = myRole === 'owner';
 
@@ -55,24 +61,36 @@ export default function StaffDetailPage() {
     half_day: 'text-haldi',
     leave: 'text-chalkdim'
   };
+  const adjTypeLabels: Record<AdjustmentType, string> = {
+    bonus: t('staffDetail.bonus'),
+    overtime: t('staffDetail.overtime'),
+    deduction: t('staffDetail.deduction')
+  };
 
   useEffect(() => { if (isOwner) loadAll(); }, [staffId, isOwner]);
 
   async function loadAll() {
     setLoading(true);
-    const [{ data: prof }, { data: att }] = await Promise.all([
+    const [{ data: prof }, { data: att }, { data: adj }] = await Promise.all([
       supabase.from('profiles').select('id, full_name, email, role, monthly_salary, allowed_sections').eq('id', staffId).single(),
       supabase
         .from('staff_attendance')
         .select('id, date, status')
         .eq('staff_id', staffId)
         .gte('date', startOfMonthPKT().toISOString().slice(0, 10))
-        .order('date', { ascending: false })
+        .order('date', { ascending: false }),
+      supabase
+        .from('salary_adjustments')
+        .select('id, type, amount, note, created_at')
+        .eq('staff_id', staffId)
+        .gte('created_at', startOfMonthPKT().toISOString())
+        .order('created_at', { ascending: false })
     ]);
     setStaff(prof || null);
     setSalaryInput(prof ? String(prof.monthly_salary || 0) : '');
     setAllowedSections(prof ? (prof.allowed_sections as string[] | null) : null);
     setAttendance(att || []);
+    setAdjustments(adj || []);
     setLoading(false);
   }
 
@@ -112,6 +130,31 @@ export default function StaffDetailPage() {
     showToast(t('staffDetail.permissionsSaved'), 'success');
   }
 
+  async function addAdjustment() {
+    const amount = Number(adjForm.amount);
+    if (!amount || amount <= 0 || !shopId) return;
+    setSavingAdj(true);
+    const { error: err } = await supabase.from('salary_adjustments').insert({
+      shop_id: shopId,
+      staff_id: staffId,
+      type: adjForm.type,
+      amount,
+      note: adjForm.note.trim() || null
+    });
+    setSavingAdj(false);
+    if (err) { showToast(t('common.error'), 'error'); return; }
+    setAdjForm({ type: 'bonus', amount: '', note: '' });
+    await loadAll();
+  }
+
+  // Ledger-style entry, same convention as expenses/khata/supplier
+  // entries — delete + re-add, no in-place edit.
+  async function removeAdjustment(id: string) {
+    const { error: err } = await supabase.from('salary_adjustments').delete().eq('id', id);
+    if (err) { showToast(t('common.error'), 'error'); return; }
+    await loadAll();
+  }
+
   async function markToday(status: Status) {
     setMarkingStatus(status);
     const { error: err } = await supabase
@@ -143,6 +186,13 @@ export default function StaffDetailPage() {
   );
   const todayEntry = attendance.find(a => a.date === todayStr);
 
+  // Additive to monthly_salary only — deliberately not folding attendance
+  // in (see the comment on salary_adjustments in schema.sql).
+  const bonusTotal = adjustments.filter(a => a.type === 'bonus').reduce((s, a) => s + a.amount, 0);
+  const overtimeTotal = adjustments.filter(a => a.type === 'overtime').reduce((s, a) => s + a.amount, 0);
+  const deductionTotal = adjustments.filter(a => a.type === 'deduction').reduce((s, a) => s + a.amount, 0);
+  const netPay = (staff.monthly_salary || 0) + bonusTotal + overtimeTotal - deductionTotal;
+
   return (
     <div className="max-w-sm">
       <Link href="/dashboard/staff" className="text-xs text-chalkdim hover:text-haldi">{t('staffDetail.back')}</Link>
@@ -158,6 +208,47 @@ export default function StaffDetailPage() {
             {savingSalary ? t('settings.saving') : t('contact.save')}
           </button>
         </div>
+      </div>
+
+      <div className="card p-5 mb-4">
+        <div className="text-xs text-chalkdim uppercase tracking-wide mb-1">{t('staffDetail.netPayThisMonth')}</div>
+        <div className="font-mono font-800 text-2xl text-dhania mb-3">{fmt(netPay)}</div>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-chalkdim mb-4">
+          <div className="flex justify-between"><span>{t('staffDetail.baseSalary')}</span><span className="font-mono">{fmt(staff.monthly_salary || 0)}</span></div>
+          <div className="flex justify-between"><span>{t('staffDetail.overtime')}</span><span className="font-mono text-dhania">+{fmt(overtimeTotal)}</span></div>
+          <div className="flex justify-between"><span>{t('staffDetail.bonus')}</span><span className="font-mono text-dhania">+{fmt(bonusTotal)}</span></div>
+          <div className="flex justify-between"><span>{t('staffDetail.deduction')}</span><span className="font-mono text-mirch">−{fmt(deductionTotal)}</span></div>
+        </div>
+
+        {adjustments.length > 0 && (
+          <div className="space-y-1.5 mb-4">
+            {adjustments.map(a => (
+              <div key={a.id} className="flex justify-between items-center text-xs">
+                <div>
+                  <span className={a.type === 'deduction' ? 'text-mirch' : 'text-dhania'}>{adjTypeLabels[a.type]}</span>
+                  {a.note && <span className="text-chalkdim"> — {a.note}</span>}
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono">{a.type === 'deduction' ? '−' : '+'}{fmt(a.amount)}</span>
+                  <ConfirmDeleteButton onConfirm={() => removeAdjustment(a.id)} />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="grid grid-cols-3 gap-2 mb-2">
+          <select className="input py-1.5 text-sm col-span-1" value={adjForm.type} onChange={e => setAdjForm({ ...adjForm, type: e.target.value as AdjustmentType })}>
+            <option value="bonus">{adjTypeLabels.bonus}</option>
+            <option value="overtime">{adjTypeLabels.overtime}</option>
+            <option value="deduction">{adjTypeLabels.deduction}</option>
+          </select>
+          <input type="number" inputMode="decimal" className="input py-1.5 text-sm col-span-2" placeholder={t('staffDetail.adjustmentAmount')} value={adjForm.amount} onChange={e => setAdjForm({ ...adjForm, amount: e.target.value })} />
+        </div>
+        <input className="input py-1.5 text-sm mb-2" placeholder={t('khataDetail.noteOptional')} value={adjForm.note} onChange={e => setAdjForm({ ...adjForm, note: e.target.value })} />
+        <button onClick={addAdjustment} disabled={savingAdj || !adjForm.amount} className="btn-secondary w-full text-sm">
+          {savingAdj ? t('settings.saving') : t('staffDetail.addAdjustment')}
+        </button>
       </div>
 
       <div className="card p-5 mb-4">

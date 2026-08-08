@@ -194,6 +194,26 @@ create table if not exists staff_attendance (
   unique(staff_id, date)
 );
 
+-- 10b. SALARY_ADJUSTMENTS (bonus / overtime pay / deduction, logged as
+--      they happen — same ledger-style, created_at-based month grouping
+--      as expenses, not tied to a separate "pay period" record). Stays
+--      deliberately additive to profiles.monthly_salary rather than
+--      folding attendance into an auto-computed net pay — see the
+--      comment on staff_attendance above for why proration is out of
+--      scope (paid vs unpaid leave, half-day rules, etc. vary shop to
+--      shop); this is "here's this month's adjustments," the owner
+--      still does the final arithmetic when they actually pay.
+create table if not exists salary_adjustments (
+  id uuid primary key default gen_random_uuid(),
+  shop_id uuid not null references shops(id) on delete cascade,
+  staff_id uuid not null references profiles(id) on delete cascade,
+  type text not null check (type in ('bonus','overtime','deduction')),
+  amount numeric not null,
+  note text,
+  created_by uuid references auth.users(id),
+  created_at timestamptz not null default now()
+);
+
 -- 11. PAYMENT_CLAIMS (manual EasyPaisa/bank transfer, no payment gateway
 --    for Pakistan yet — owner marks "I've paid", we verify the WhatsApp
 --    screenshot by hand and flip shops.subscription_status ourselves) ----
@@ -630,6 +650,17 @@ create policy "staff_attendance_write_owner" on staff_attendance for all
   using (shop_id = my_shop_id() and my_role() = 'owner')
   with check (shop_id = my_shop_id() and my_role() = 'owner');
 
+-- salary_adjustments: same shape as staff_attendance — a staff member
+-- can see their own bonus/deduction history, only the owner records one.
+alter table salary_adjustments enable row level security;
+drop policy if exists "salary_adjustments_select_own_shop" on salary_adjustments;
+create policy "salary_adjustments_select_own_shop" on salary_adjustments for select
+  using (shop_id = my_shop_id());
+drop policy if exists "salary_adjustments_write_owner" on salary_adjustments;
+create policy "salary_adjustments_write_owner" on salary_adjustments for all
+  using (shop_id = my_shop_id() and my_role() = 'owner')
+  with check (shop_id = my_shop_id() and my_role() = 'owner');
+
 -- ============================================================
 -- Signup trigger: creates a shop + profile automatically
 -- when a new auth user signs up
@@ -688,6 +719,7 @@ create index if not exists idx_supplier_entries_shop on supplier_entries(shop_id
 create index if not exists idx_purchase_orders_shop on purchase_orders(shop_id, created_at desc);
 create index if not exists idx_purchase_orders_supplier on purchase_orders(supplier_id, created_at desc);
 create index if not exists idx_po_items_po on purchase_order_items(purchase_order_id);
+create index if not exists idx_salary_adjustments_staff on salary_adjustments(staff_id, created_at desc);
 create unique index if not exists idx_items_shop_barcode on items(shop_id, barcode) where barcode is not null;
 
 -- ============================================================

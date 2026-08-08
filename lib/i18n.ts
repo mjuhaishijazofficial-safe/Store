@@ -478,6 +478,13 @@ export const dict = {
   'staffDetail.permissionsHint': { ur: 'Sab select ka matlab hai poori app khuli hai. Kam select karke sirf zaroori sections dein.', en: 'All selected means full access. Uncheck to restrict this staff member to specific sections.' },
   'staffDetail.allSections': { ur: 'Sab Sections (Unrestricted)', en: 'All Sections (Unrestricted)' },
   'staffDetail.permissionsSaved': { ur: 'Permissions save ho gayi', en: 'Permissions saved' },
+  'staffDetail.netPayThisMonth': { ur: 'Is Mahine Ki Net Salary', en: 'Net Pay This Month' },
+  'staffDetail.baseSalary': { ur: 'Base Salary', en: 'Base Salary' },
+  'staffDetail.overtime': { ur: 'Overtime', en: 'Overtime' },
+  'staffDetail.bonus': { ur: 'Bonus', en: 'Bonus' },
+  'staffDetail.deduction': { ur: 'Katouti', en: 'Deduction' },
+  'staffDetail.adjustmentAmount': { ur: 'Amount (₨)', en: 'Amount (₨)' },
+  'staffDetail.addAdjustment': { ur: '+ Add Karein', en: '+ Add' },
 
   'attendance.markToday': { ur: 'Aaj Ki Attendance', en: "Today's Attendance" },
   'attendance.thisMonth': { ur: 'Is Mahine', en: 'This Month' },
