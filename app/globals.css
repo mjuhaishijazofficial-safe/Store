@@ -38,6 +38,26 @@ html[data-theme='dark'] {
   --color-dhania: 34 197 94;     /* #22C55E payments/positive */
 }
 
+/* Palette toggle — independent of the light/dark theme toggle above, and
+   unrelated to it despite the naming coincidence (dark MODE happens to use
+   a navy background; this "Navy" PALETTE is a different thing — a second,
+   cooler brand-accent option users can pick in either light or dark mode).
+   Only the three accent roles (brand/negative/positive) change; board/chalk
+   stay exactly as the light/dark theme above already defines them, so this
+   never has to duplicate the background system. Default palette is "spice"
+   (no override block needed — it's just the :root/dark values above). */
+:root[data-palette='navy'] {
+  --color-haldi: 30 58 95;      /* #1E3A5F ledger navy — brand/emphasis */
+  --color-mirch: 178 58 46;     /* #B23A2E debt/negative */
+  --color-dhania: 47 125 79;    /* #2F7D4F payments/positive */
+}
+html[data-theme='dark'][data-palette='navy'] {
+  --color-haldi: 122 165 214;   /* #7AA5D6 lighter steel-blue — #1E3A5F is too dark to clear
+                                    contrast on a near-black background */
+  --color-mirch: 248 113 113;   /* #F87171 */
+  --color-dhania: 52 211 153;   /* #34D399 */
+}
+
 body {
   @apply bg-board text-chalk;
   font-family: 'Inter', sans-serif;

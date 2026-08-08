@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import LanguageToggle from '@/components/LanguageToggle';
 import ThemeToggle from '@/components/ThemeToggle';
+import PaletteToggle from '@/components/PaletteToggle';
 import WhatsAppFloatingButton from '@/components/WhatsAppFloatingButton';
 import { StoreIcon, WalletIcon, TrendDownIcon, CashIcon, WhatsAppIcon } from '@/components/icons';
 import { getServerT } from '@/lib/i18n-server';
@@ -45,6 +46,7 @@ export default async function Home() {
           </div>
           <div className="flex items-center gap-3">
             <ThemeToggle />
+            <PaletteToggle />
             <LanguageToggle />
             <Link href="/login" className="btn-secondary text-sm">{t('landing.login')}</Link>
             <Link href="/signup" className="btn-primary text-sm">{t('landing.freeTrialNav')}</Link>

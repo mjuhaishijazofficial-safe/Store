@@ -5,6 +5,8 @@ import { LanguageProvider } from '@/lib/i18n-context';
 import { DEFAULT_LANG, Lang, LANG_COOKIE } from '@/lib/i18n';
 import { ThemeProvider } from '@/lib/theme-context';
 import { DEFAULT_THEME, Theme, THEME_COOKIE } from '@/lib/theme';
+import { PaletteProvider } from '@/lib/palette-context';
+import { DEFAULT_PALETTE, Palette, PALETTE_COOKIE } from '@/lib/palette';
 import { ToastProvider } from '@/lib/toast-context';
 
 export const metadata: Metadata = {
@@ -32,13 +34,18 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const cookieTheme = cookieStore.get(THEME_COOKIE)?.value;
   const initialTheme: Theme = cookieTheme === 'dark' || cookieTheme === 'light' ? cookieTheme : DEFAULT_THEME;
 
+  const cookiePalette = cookieStore.get(PALETTE_COOKIE)?.value;
+  const initialPalette: Palette = cookiePalette === 'navy' || cookiePalette === 'spice' ? cookiePalette : DEFAULT_PALETTE;
+
   return (
-    <html lang={initialLang === 'en' ? 'en' : 'ur'} data-theme={initialTheme}>
+    <html lang={initialLang === 'en' ? 'en' : 'ur'} data-theme={initialTheme} data-palette={initialPalette}>
       <body>
         <ThemeProvider initialTheme={initialTheme}>
-          <LanguageProvider initialLang={initialLang}>
-            <ToastProvider>{children}</ToastProvider>
-          </LanguageProvider>
+          <PaletteProvider initialPalette={initialPalette}>
+            <LanguageProvider initialLang={initialLang}>
+              <ToastProvider>{children}</ToastProvider>
+            </LanguageProvider>
+          </PaletteProvider>
         </ThemeProvider>
       </body>
     </html>
