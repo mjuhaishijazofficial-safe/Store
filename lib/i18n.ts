@@ -403,6 +403,7 @@ export const dict = {
 
   // suppliers (reverse khata)
   'nav.suppliers': { ur: 'Supplier', en: 'Suppliers' },
+  'nav.purchaseOrders': { ur: 'Purchase Orders', en: 'Purchase Orders' },
   'suppliers.search': { ur: 'Supplier dhoondein...', en: 'Search suppliers...' },
   'suppliers.addSupplier': { ur: '+ Naya Supplier', en: '+ New Supplier' },
   'suppliers.loading': { ur: 'Load ho raha hai...', en: 'Loading...' },
@@ -431,6 +432,30 @@ export const dict = {
   'suppliersDetail.noteOptional': { ur: 'Note — optional', en: 'Note — optional' },
   'suppliersDetail.cancel': { ur: 'Cancel', en: 'Cancel' },
   'suppliersDetail.save': { ur: 'Save', en: 'Save' },
+
+  // purchase orders
+  'po.title': { ur: 'Purchase Orders', en: 'Purchase Orders' },
+  'po.subtitle': { ur: 'Supplier ko order dein, maal aane par ek tap se receive karein', en: 'Order from a supplier, receive the goods in one tap when they arrive' },
+  'po.newTitle': { ur: 'Naya Purchase Order', en: 'New Purchase Order' },
+  'po.supplier': { ur: 'Supplier', en: 'Supplier' },
+  'po.searchItem': { ur: 'Item Talash Karein', en: 'Search Item' },
+  'po.manualItemPlaceholder': { ur: 'Naya item ka naam (inventory mein nahi hai)', en: 'New item name (not in inventory yet)' },
+  'po.addManual': { ur: '+ Add', en: '+ Add' },
+  'po.costPrice': { ur: 'Cost Price', en: 'Cost Price' },
+  'po.create': { ur: 'PO Banayein', en: 'Create PO' },
+  'po.needSupplierFirst': { ur: 'Pehle ek supplier add karein —', en: 'Add a supplier first —' },
+  'po.empty': { ur: 'Abhi tak koi purchase order nahi', en: 'No purchase orders yet' },
+  'po.items': { ur: 'items', en: 'items' },
+  'po.statusDraft': { ur: 'Draft', en: 'Draft' },
+  'po.statusSent': { ur: 'Bheja Gaya', en: 'Sent' },
+  'po.statusReceived': { ur: 'Mil Gaya', en: 'Received' },
+  'po.statusCancelled': { ur: 'Cancel Kiya', en: 'Cancelled' },
+  'po.back': { ur: '← Sab Purchase Orders', en: '← All Purchase Orders' },
+  'po.receivedOn': { ur: 'Mila:', en: 'Received:' },
+  'po.markReceived': { ur: '✓ Maal Mil Gaya — Receive Karein', en: '✓ Mark as Received' },
+  'po.markSent': { ur: 'Supplier ko Bhej Diya', en: 'Mark as Sent' },
+  'po.cancel': { ur: 'PO Cancel Karein', en: 'Cancel PO' },
+  'po.receivedToast': { ur: 'Stock update ho gaya aur supplier ledger mein add ho gaya ✓', en: 'Stock updated and added to the supplier ledger ✓' },
 
   // staff / multi-shop access
   'nav.staff': { ur: 'Staff', en: 'Staff' },

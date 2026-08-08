@@ -71,7 +71,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
     ...(hasSection(profile.role, allowedSections, 'inventory') ? [{ href: '/dashboard/inventory', label: t('nav.inventory') }] : []),
     ...(hasSection(profile.role, allowedSections, 'reorder') ? [{ href: '/dashboard/reorder', label: t('nav.reorder') }] : []),
     ...(hasSection(profile.role, allowedSections, 'khata') ? [{ href: '/dashboard/khata', label: t('nav.khata') }] : []),
-    ...(hasSection(profile.role, allowedSections, 'suppliers') ? [{ href: '/dashboard/suppliers', label: t('nav.suppliers') }] : []),
+    ...(hasSection(profile.role, allowedSections, 'suppliers') ? [
+      { href: '/dashboard/suppliers', label: t('nav.suppliers') },
+      { href: '/dashboard/purchase-orders', label: t('nav.purchaseOrders') }
+    ] : []),
     ...(hasSection(profile.role, allowedSections, 'history') ? [{ href: '/dashboard/history', label: t('nav.history') }] : []),
     ...(hasSection(profile.role, allowedSections, 'expenses') ? [{ href: '/dashboard/expenses', label: t('nav.expenses') }] : []),
     // billing/settings/staff are owner-only — staff never even see the tabs

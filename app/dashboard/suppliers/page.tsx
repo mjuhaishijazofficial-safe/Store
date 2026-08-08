@@ -91,9 +91,12 @@ export default function SuppliersPage() {
         <button onClick={openAdd} className="btn-primary whitespace-nowrap">{t('suppliers.addSupplier')}</button>
       </div>
 
-      {suppliers.length > 0 && (
-        <button onClick={exportCsv} className="text-chalkdim text-xs underline mb-4 block">{t('common.exportCsv')}</button>
-      )}
+      <div className="flex items-center gap-4 mb-4">
+        {suppliers.length > 0 && (
+          <button onClick={exportCsv} className="text-chalkdim text-xs underline">{t('common.exportCsv')}</button>
+        )}
+        <Link href="/dashboard/purchase-orders" className="text-chalkdim text-xs underline">{t('nav.purchaseOrders')}</Link>
+      </div>
 
       {loading && <div className="text-chalkdim text-sm text-center py-10">{t('suppliers.loading')}</div>}
 

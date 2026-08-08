@@ -129,6 +129,41 @@ create table if not exists supplier_entries (
 alter table supplier_entries drop constraint if exists supplier_entries_type_check;
 alter table supplier_entries add constraint supplier_entries_type_check check (type in ('purchase','payment','return'));
 
+-- 8b. PURCHASE_ORDERS — a document raised BEFORE goods arrive ("I'm
+--     ordering these from supplier X"), separate from supplier_entries
+--     (which only records what already happened: goods received / paid
+--     for / returned). draft = still editable, sent = communicated to
+--     the supplier and locked, received = mark_po_received() below has
+--     already applied its stock + ledger effects, cancelled = never
+--     fulfilled. Every status transition is one-way in the UI (no
+--     un-cancelling, no un-receiving) — same "ledger, not undo" stance
+--     as the rest of the app.
+create table if not exists purchase_orders (
+  id uuid primary key default gen_random_uuid(),
+  shop_id uuid not null references shops(id) on delete cascade,
+  supplier_id uuid not null references suppliers(id) on delete cascade,
+  status text not null default 'draft' check (status in ('draft','sent','received','cancelled')),
+  note text,
+  created_by uuid references auth.users(id),
+  created_at timestamptz not null default now(),
+  received_at timestamptz
+);
+
+-- shop_id is denormalized here (not just derived via purchase_order_id ->
+-- purchase_orders.shop_id) so its RLS policy can stay the same simple
+-- `shop_id = my_shop_id()` shape every other table in this file uses,
+-- instead of a subquery-based policy that's easy to get subtly wrong.
+create table if not exists purchase_order_items (
+  id uuid primary key default gen_random_uuid(),
+  shop_id uuid not null references shops(id) on delete cascade,
+  purchase_order_id uuid not null references purchase_orders(id) on delete cascade,
+  item_id uuid references items(id) on delete set null,
+  item_name text not null,
+  qty numeric not null,
+  cost_price numeric not null default 0,
+  created_at timestamptz not null default now()
+);
+
 -- 9. EXPENSES (rent, staff salary, utilities, marketing — overhead that
 --    isn't stock purchase. Without this, "profit" only ever subtracted
 --    cost of goods sold, never the shop's actual running costs, which
@@ -385,6 +420,93 @@ as $$
   group by supplier_id
 $$;
 
+-- Creates a draft PO and all its line items in one transaction — a plain
+-- two-step client call (insert po, then insert items) could leave a
+-- PO with zero items if the second call failed partway through.
+-- p_items is a jsonb array of {item_id, item_name, qty, cost_price}.
+create or replace function create_purchase_order(p_supplier_id uuid, p_items jsonb, p_note text default null)
+returns uuid
+language plpgsql
+security invoker
+as $$
+declare
+  v_shop_id uuid := my_shop_id();
+  v_po_id uuid;
+  v_line jsonb;
+begin
+  if jsonb_array_length(p_items) = 0 then
+    raise exception 'at least one item is required';
+  end if;
+
+  insert into purchase_orders (shop_id, supplier_id, note, created_by)
+  values (v_shop_id, p_supplier_id, p_note, auth.uid())
+  returning id into v_po_id;
+
+  for v_line in select * from jsonb_array_elements(p_items) loop
+    insert into purchase_order_items (shop_id, purchase_order_id, item_id, item_name, qty, cost_price)
+    values (
+      v_shop_id,
+      v_po_id,
+      nullif(v_line->>'item_id', '')::uuid,
+      v_line->>'item_name',
+      (v_line->>'qty')::numeric,
+      coalesce((v_line->>'cost_price')::numeric, 0)
+    );
+  end loop;
+
+  return v_po_id;
+end;
+$$;
+
+-- Marking a PO received is the moment it actually affects the shop: every
+-- line with a linked item_id restocks inventory (logged the same way a
+-- manual Stock In is, so History/Reports don't need to know POs exist),
+-- and one supplier_entries 'purchase' row records the total against what
+-- the shop owes that supplier. All atomic, and only valid from
+-- draft/sent — calling it twice on an already-received PO is a no-op
+-- guard, not a double-restock.
+create or replace function mark_po_received(p_po_id uuid)
+returns void
+language plpgsql
+security invoker
+as $$
+declare
+  v_shop_id uuid := my_shop_id();
+  v_supplier_id uuid;
+  v_status text;
+  v_total numeric := 0;
+  v_line record;
+begin
+  select supplier_id, status into v_supplier_id, v_status
+  from purchase_orders where id = p_po_id and shop_id = v_shop_id;
+
+  if v_supplier_id is null then
+    raise exception 'purchase order not found';
+  end if;
+  if v_status not in ('draft', 'sent') then
+    raise exception 'only a draft or sent purchase order can be received';
+  end if;
+
+  for v_line in select * from purchase_order_items where purchase_order_id = p_po_id loop
+    v_total := v_total + (v_line.qty * v_line.cost_price);
+
+    if v_line.item_id is not null then
+      update items set stock = stock + v_line.qty where id = v_line.item_id;
+      insert into transactions (shop_id, item_id, item_name, type, qty, unit, amount, created_by)
+      select v_shop_id, v_line.item_id, v_line.item_name, 'purchase', v_line.qty, unit, v_line.qty * v_line.cost_price, auth.uid()
+      from items where id = v_line.item_id;
+    end if;
+  end loop;
+
+  if v_total > 0 then
+    insert into supplier_entries (shop_id, supplier_id, type, item_name, amount, note, created_by)
+    values (v_shop_id, v_supplier_id, 'purchase', 'Purchase Order', v_total, 'PO #' || left(p_po_id::text, 8), auth.uid());
+  end if;
+
+  update purchase_orders set status = 'received', received_at = now() where id = p_po_id;
+end;
+$$;
+
 -- ============================================================
 -- Helper: current user's shop_id
 -- ============================================================
@@ -478,6 +600,18 @@ create policy "supplier_entries_own_shop" on supplier_entries for all
   using (shop_id = my_shop_id())
   with check (shop_id = my_shop_id());
 
+alter table purchase_orders enable row level security;
+drop policy if exists "purchase_orders_own_shop" on purchase_orders;
+create policy "purchase_orders_own_shop" on purchase_orders for all
+  using (shop_id = my_shop_id())
+  with check (shop_id = my_shop_id());
+
+alter table purchase_order_items enable row level security;
+drop policy if exists "purchase_order_items_own_shop" on purchase_order_items;
+create policy "purchase_order_items_own_shop" on purchase_order_items for all
+  using (shop_id = my_shop_id())
+  with check (shop_id = my_shop_id());
+
 -- expenses: fully scoped to shop_id, same openness as customers/suppliers
 -- (staff can log a utility bill payment same as they'd log a khata entry)
 drop policy if exists "expenses_own_shop" on expenses;
@@ -551,6 +685,9 @@ create index if not exists idx_khata_shop on khata_entries(shop_id);
 create index if not exists idx_suppliers_shop on suppliers(shop_id);
 create index if not exists idx_supplier_entries_supplier on supplier_entries(supplier_id, created_at desc);
 create index if not exists idx_supplier_entries_shop on supplier_entries(shop_id);
+create index if not exists idx_purchase_orders_shop on purchase_orders(shop_id, created_at desc);
+create index if not exists idx_purchase_orders_supplier on purchase_orders(supplier_id, created_at desc);
+create index if not exists idx_po_items_po on purchase_order_items(purchase_order_id);
 create unique index if not exists idx_items_shop_barcode on items(shop_id, barcode) where barcode is not null;
 
 -- ============================================================
