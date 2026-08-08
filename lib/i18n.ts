@@ -368,6 +368,9 @@ export const dict = {
   'receipt.total': { ur: 'Total', en: 'Total' },
   'receipt.thanks': { ur: 'Shukriya! Dobara Tashreef Layein', en: 'Thank you! Please visit again' },
   'receipt.print': { ur: 'Receipt Print Karein', en: 'Print Receipt' },
+  'receipt.bluetoothPrint': { ur: '🖨 Bluetooth Printer', en: '🖨 Bluetooth Printer' },
+  'receipt.bluetoothSent': { ur: 'Printer ko bhej diya ✓', en: 'Sent to printer ✓' },
+  'receipt.bluetoothFailed': { ur: 'Printer se connect nahi ho saka', en: 'Could not connect to the printer' },
 
   'statement.title': { ur: 'Khata Statement', en: 'Khata Statement' },
   'statement.date': { ur: 'Date', en: 'Date' },

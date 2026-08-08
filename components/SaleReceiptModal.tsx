@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { useLang } from '@/lib/i18n-context';
+import ThermalPrintButton from './ThermalPrintButton';
 
 type ReceiptTxn = {
   item_name: string;
@@ -50,9 +51,12 @@ export default function SaleReceiptModal({ shopName, txn, onClose }: { shopName:
           <div className="text-center text-[11px] text-chalkdim mt-5">{t('receipt.thanks')}</div>
         </div>
 
-        <div className="no-print flex gap-2 p-4 pt-0">
-          <button onClick={onClose} className="btn-secondary flex-1">{t('contact.cancel')}</button>
-          <button onClick={() => window.print()} className="btn-primary flex-1">{t('receipt.print')}</button>
+        <div className="no-print flex flex-col gap-2 p-4 pt-0">
+          <div className="flex gap-2">
+            <button onClick={onClose} className="btn-secondary flex-1">{t('contact.cancel')}</button>
+            <button onClick={() => window.print()} className="btn-primary flex-1">{t('receipt.print')}</button>
+          </div>
+          <ThermalPrintButton shopName={shopName} lines={[{ name: txn.item_name, qty: txn.qty, unit: txn.unit, amount: txn.amount }]} when={when} />
         </div>
       </div>
     </div>
