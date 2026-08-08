@@ -22,6 +22,7 @@ export const dict = {
   'nav.khata': { ur: 'Khata', en: 'Khata' },
   'nav.history': { ur: 'History', en: 'History' },
   'nav.billing': { ur: 'Billing', en: 'Billing' },
+  'nav.admin': { ur: 'Admin', en: 'Admin' },
   'nav.settings': { ur: 'Settings', en: 'Settings' },
   'nav.signout': { ur: 'Sign Out', en: 'Sign Out' },
 

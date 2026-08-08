@@ -7,6 +7,7 @@ import ThemeToggle from '@/components/ThemeToggle';
 import { StoreIcon } from '@/components/icons';
 import { getServerT } from '@/lib/i18n-server';
 import { ShopProvider } from '@/lib/shop-context';
+import { isAdmin } from '@/lib/admin';
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
@@ -45,7 +46,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
       { href: '/dashboard/staff', label: t('nav.staff') },
       { href: '/dashboard/billing', label: t('nav.billing') },
       { href: '/dashboard/settings', label: t('nav.settings') }
-    ] : [])
+    ] : []),
+    // Not a shop role — this is the one link only the SaaS operator
+    // (matched by ADMIN_EMAIL) ever sees, regardless of which shop
+    // they're logged into or what role they hold in it.
+    ...(isAdmin(user.email) ? [{ href: '/dashboard/admin', label: t('nav.admin') }] : [])
   ];
 
   return (
