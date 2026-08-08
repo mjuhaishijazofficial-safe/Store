@@ -3,6 +3,7 @@ import { getServerT } from '@/lib/i18n-server';
 import { startOfMonthPKT, daysAgoPKT } from '@/lib/pkt-time';
 import Link from 'next/link';
 import { WalletIcon, TrendDownIcon, CashIcon, ChartIcon, TrendUpIcon, ReceiptIcon, FireIcon, WarningIcon, ArrowRightIcon, PlusIcon, CartIcon, ClockIcon } from '@/components/icons';
+import AnimatedNumber from '@/components/AnimatedNumber';
 
 function fmt(n: number) {
   return '₨' + Number(n || 0).toLocaleString('en-IN');
@@ -15,15 +16,20 @@ function fmt(n: number) {
 // color. delay staggers the entrance so the row rises in one-by-one
 // instead of popping in as a block.
 function StatCard({
-  icon, iconClass, label, value, valueClass = '', href, premium = false, delay = 0
-}: { icon: React.ReactNode; iconClass: string; label: string; value: string; valueClass?: string; href?: string; premium?: boolean; delay?: number }) {
+  icon, iconClass, label, value, amount, valueClass = '', href, premium = false, delay = 0
+}: { icon: React.ReactNode; iconClass: string; label: string; value: string; amount?: number; valueClass?: string; href?: string; premium?: boolean; delay?: number }) {
   const body = (
     <>
       <div className={`w-9 h-9 rounded-full flex items-center justify-center mb-3 ${premium ? 'gradient-brand shadow-glow text-board' : iconClass}`}>
         {icon}
       </div>
       <div className="text-[11px] text-chalkdim uppercase tracking-wide mb-1">{label}</div>
-      <div className={`font-mono font-700 text-base sm:text-lg truncate ${valueClass}`}>{value}</div>
+      <div className={`font-mono font-700 text-base sm:text-lg truncate ${valueClass}`}>
+        {/* Counts up from 0 on every load when a raw amount is given —
+            the actual "alive" moment on a numbers dashboard, not the
+            one-time card fade-in which is easy to miss entirely. */}
+        {amount !== undefined ? <AnimatedNumber value={amount} prefix="₨" /> : value}
+      </div>
     </>
   );
 
@@ -169,15 +175,15 @@ export default async function OverviewPage() {
       )}
 
       <div className="grid grid-cols-3 gap-3 mb-4">
-        <StatCard href="/dashboard/settings" icon={<WalletIcon className="w-5 h-5" />} iconClass="bg-haldi/15 text-haldi" label={t('overview.totalBudget')} value={fmt(budget)} premium delay={0} />
-        <StatCard href="/dashboard/history" icon={<TrendDownIcon className="w-5 h-5" />} iconClass="bg-mirch/15 text-mirch" label={t('overview.spent')} value={fmt(spent)} valueClass="text-mirch" delay={60} />
-        <StatCard href="/dashboard/settings" icon={<CashIcon className="w-5 h-5" />} iconClass="bg-dhania/15 text-dhania" label={t('overview.remaining')} value={fmt(budget - spent)} valueClass="text-dhania" delay={120} />
+        <StatCard href="/dashboard/settings" icon={<WalletIcon className="w-5 h-5" />} iconClass="bg-haldi/15 text-haldi" label={t('overview.totalBudget')} value={fmt(budget)} amount={budget} premium delay={0} />
+        <StatCard href="/dashboard/history" icon={<TrendDownIcon className="w-5 h-5" />} iconClass="bg-mirch/15 text-mirch" label={t('overview.spent')} value={fmt(spent)} amount={spent} valueClass="text-mirch" delay={60} />
+        <StatCard href="/dashboard/settings" icon={<CashIcon className="w-5 h-5" />} iconClass="bg-dhania/15 text-dhania" label={t('overview.remaining')} value={fmt(budget - spent)} amount={budget - spent} valueClass="text-dhania" delay={120} />
       </div>
 
       <div className="grid grid-cols-3 gap-3 mb-8">
-        <StatCard href="/dashboard/reports" icon={<ChartIcon className="w-5 h-5" />} iconClass="bg-haldi/15 text-haldi" label={t('overview.monthlySales')} value={fmt(monthlySales)} premium delay={180} />
-        <StatCard href="/dashboard/reports" icon={<TrendUpIcon className="w-5 h-5" />} iconClass="bg-dhania/15 text-dhania" label={t('overview.weeklyProfit')} value={fmt(weeklyProfit)} valueClass={weeklyProfit >= 0 ? 'text-dhania' : 'text-mirch'} delay={240} />
-        <StatCard href="/dashboard/khata" icon={<ReceiptIcon className="w-5 h-5" />} iconClass="bg-mirch/15 text-mirch" label={t('overview.pendingKhata')} value={fmt(pendingKhata)} valueClass="text-mirch" delay={300} />
+        <StatCard href="/dashboard/reports" icon={<ChartIcon className="w-5 h-5" />} iconClass="bg-haldi/15 text-haldi" label={t('overview.monthlySales')} value={fmt(monthlySales)} amount={monthlySales} premium delay={180} />
+        <StatCard href="/dashboard/reports" icon={<TrendUpIcon className="w-5 h-5" />} iconClass="bg-dhania/15 text-dhania" label={t('overview.weeklyProfit')} value={fmt(weeklyProfit)} amount={weeklyProfit} valueClass={weeklyProfit >= 0 ? 'text-dhania' : 'text-mirch'} delay={240} />
+        <StatCard href="/dashboard/khata" icon={<ReceiptIcon className="w-5 h-5" />} iconClass="bg-mirch/15 text-mirch" label={t('overview.pendingKhata')} value={fmt(pendingKhata)} amount={pendingKhata} valueClass="text-mirch" delay={300} />
       </div>
 
       <div className="mb-8">

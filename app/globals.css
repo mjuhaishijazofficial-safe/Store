@@ -67,6 +67,8 @@ html[data-theme='dark'][data-palette='navy'] {
    is that formula applied to the brand color we already have, not a
    new color. */
 .gradient-brand {
+  position: relative;
+  overflow: hidden;
   background: linear-gradient(
     135deg,
     color-mix(in srgb, rgb(var(--color-haldi)) 100%, white 30%),
@@ -74,20 +76,54 @@ html[data-theme='dark'][data-palette='navy'] {
     color-mix(in srgb, rgb(var(--color-haldi)) 100%, black 35%)
   );
 }
+/* Continuous diagonal light sweep — a one-time entrance is easy to miss
+   entirely if you glance at the screen a second late; this keeps a
+   little motion alive on the gradient elements permanently, the same
+   glossy-sweep premium apps and card UIs use on hero surfaces. */
+.gradient-brand::after {
+  content: '';
+  position: absolute;
+  inset: -50%;
+  background: linear-gradient(
+    75deg,
+    transparent 40%,
+    rgb(255 255 255 / 0.35) 50%,
+    transparent 60%
+  );
+  animation: shimmer-sweep 3.2s ease-in-out infinite;
+}
+@keyframes shimmer-sweep {
+  0% { transform: translateX(-60%); }
+  50% { transform: translateX(60%); }
+  100% { transform: translateX(-60%); }
+}
+
 .shadow-glow {
   box-shadow: 0 10px 24px -8px rgb(var(--color-haldi) / 0.45);
+  animation: glow-pulse 2.6s ease-in-out infinite;
 }
 .shadow-glow:hover {
   box-shadow: 0 14px 30px -8px rgb(var(--color-haldi) / 0.55);
 }
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 10px 24px -8px rgb(var(--color-haldi) / 0.40); }
+  50% { box-shadow: 0 12px 28px -6px rgb(var(--color-haldi) / 0.65); }
+}
 
 @keyframes card-rise {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateY(22px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 .animate-card-rise {
   opacity: 0;
-  animation: card-rise 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  animation: card-rise 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gradient-brand::after, .shadow-glow, .animate-card-rise {
+    animation: none;
+  }
+  .animate-card-rise { opacity: 1; transform: none; }
 }
 
 body {
