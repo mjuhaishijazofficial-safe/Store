@@ -44,8 +44,8 @@ export default async function OverviewPage() {
     { data: shop },
     { data: items },
     { count: itemCount },
-    { data: spentRow },
-    { data: monthSalesRow },
+    { data: spentValue },
+    { data: monthSalesValue },
     { data: weekSales },
     { data: balances },
     { data: topSelling },
@@ -58,8 +58,13 @@ export default async function OverviewPage() {
     supabase.from('items').select('*', { count: 'exact', head: true }).eq('shop_id', shopId),
     // spent is computed from the transactions log, not stored on shops —
     // same "never store a running balance" rule as khata/supplier ledgers.
-    supabase.from('transactions').select('amount.sum()').eq('shop_id', shopId).eq('type', 'purchase').single(),
-    supabase.from('transactions').select('amount.sum()').eq('shop_id', shopId).eq('type', 'sale').gte('created_at', monthStartIso).single(),
+    // A real RPC (transactions_sum), not a client-side
+    // `.select('amount.sum()')` call — that PostgREST embedded-aggregate
+    // syntax was silently returning nothing with no error checked on
+    // the response, which is exactly why these two cards could sit at
+    // ₨0 regardless of actual sales. See schema.sql for the fuller note.
+    supabase.rpc('transactions_sum', { p_shop_id: shopId, p_type: 'purchase' }),
+    supabase.rpc('transactions_sum', { p_shop_id: shopId, p_type: 'sale', p_since: monthStartIso }),
     supabase.from('transactions').select('qty, amount, items(cost_price)').eq('shop_id', shopId).eq('type', 'sale').gte('created_at', weekStartIso),
     supabase.rpc('khata_balances', { p_shop_id: shopId }),
     supabase.rpc('top_selling_items', { p_shop_id: shopId, p_days: 30, p_limit: 5 }),
@@ -73,8 +78,8 @@ export default async function OverviewPage() {
 
   const lowStockItems = (items || []).filter((i: any) => i.stock <= i.min_stock);
   const budget = shop?.budget || 0;
-  const spent = (spentRow as any)?.sum || 0;
-  const monthlySales = (monthSalesRow as any)?.sum || 0;
+  const spent = spentValue || 0;
+  const monthlySales = monthSalesValue || 0;
 
   const weeklyProfit = (weekSales || []).reduce((s: number, r: any) => {
     const costPrice = r.items?.cost_price || 0;

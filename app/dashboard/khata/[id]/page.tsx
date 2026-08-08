@@ -83,12 +83,10 @@ export default function KhataDetailPage() {
   // Returns the value (not just setting state) so callers can compare
   // before/after and catch the moment the advance runs out.
   async function loadBalance(): Promise<number> {
-    const [{ data: pSum }, { data: nSum }] = await Promise.all([
-      supabase.from('khata_entries').select('amount.sum()').eq('customer_id', customerId).eq('type', 'purchase').single(),
-      supabase.from('khata_entries').select('amount.sum()').eq('customer_id', customerId).eq('type', 'payment').single()
-    ]);
-    const given = (pSum as any)?.sum || 0;
-    const paid = (nSum as any)?.sum || 0;
+    const { data, error: err } = await supabase.rpc('khata_customer_totals', { p_customer_id: customerId }).single();
+    if (err) { showToast(t('common.error'), 'error'); return total; }
+    const given = (data as any)?.given || 0;
+    const paid = (data as any)?.paid || 0;
     const newTotal = given - paid;
     setTotalGiven(given);
     setTotalPaid(paid);

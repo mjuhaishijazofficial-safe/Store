@@ -257,6 +257,58 @@ as $$
   group by customer_id
 $$;
 
+-- Per-contact totals for the Khata/Supplier detail pages — replaces the
+-- client-side `.select('amount.sum()')` PostgREST embedded-aggregate
+-- calls those pages used to make directly. That syntax depends on a
+-- project-level PostgREST setting (aggregate functions in select) that
+-- isn't reliably on, and worse, the calling code never checked for an
+-- `error` on the response — a failed query silently became `?.sum || 0`,
+-- so Total Given/Total Paid (and the balance derived from them) just
+-- read as ₨0 with no visible sign anything had gone wrong. A real SQL
+-- function sidesteps the PostgREST feature entirely, same as
+-- khata_balances below already does for the list page.
+create or replace function khata_customer_totals(p_customer_id uuid)
+returns table(given numeric, paid numeric)
+language sql
+security invoker
+stable
+as $$
+  select
+    coalesce(sum(amount) filter (where type = 'purchase'), 0) as given,
+    coalesce(sum(amount) filter (where type = 'payment'), 0) as paid
+  from khata_entries
+  where customer_id = p_customer_id
+$$;
+
+create or replace function supplier_contact_totals(p_supplier_id uuid)
+returns table(given numeric, paid numeric)
+language sql
+security invoker
+stable
+as $$
+  select
+    coalesce(sum(amount) filter (where type = 'purchase'), 0) as given,
+    coalesce(sum(amount) filter (where type = 'payment'), 0) as paid
+  from supplier_entries
+  where supplier_id = p_supplier_id
+$$;
+
+-- Same reasoning, for the Overview dashboard's Spent / Monthly Sales
+-- cards (app/dashboard/page.tsx), which made the identical kind of
+-- fragile call against `transactions`.
+create or replace function transactions_sum(p_shop_id uuid, p_type text, p_since timestamptz default null)
+returns numeric
+language sql
+security invoker
+stable
+as $$
+  select coalesce(sum(amount), 0)
+  from transactions
+  where shop_id = p_shop_id
+    and type = p_type
+    and (p_since is null or created_at >= p_since)
+$$;
+
 create or replace function supplier_balances(p_shop_id uuid)
 returns table(supplier_id uuid, balance numeric)
 language sql

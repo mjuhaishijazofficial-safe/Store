@@ -54,11 +54,12 @@ export default function SupplierDetailPage() {
   useEffect(() => { loadAll(); }, [supplierId, shopId]);
 
   async function loadBalance() {
-    const [{ data: pSum }, { data: nSum }] = await Promise.all([
-      supabase.from('supplier_entries').select('amount.sum()').eq('supplier_id', supplierId).eq('type', 'purchase').single(),
-      supabase.from('supplier_entries').select('amount.sum()').eq('supplier_id', supplierId).eq('type', 'payment').single()
-    ]);
-    setTotal(((pSum as any)?.sum || 0) - ((nSum as any)?.sum || 0));
+    // See khata_customer_totals in schema.sql for why this is a real SQL
+    // function rather than a client-side `.select('amount.sum()')` call
+    // — that pattern was silently reading as ₨0 with no error surfaced.
+    const { data, error: err } = await supabase.rpc('supplier_contact_totals', { p_supplier_id: supplierId }).single();
+    if (err) { showToast(t('common.error'), 'error'); return; }
+    setTotal(((data as any)?.given || 0) - ((data as any)?.paid || 0));
   }
 
   async function loadEntries(reset: boolean) {
