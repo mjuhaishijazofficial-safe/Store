@@ -41,6 +41,18 @@ export default function InventoryPage() {
   const [form, setForm] = useState({ name: '', category: '', unit: '', stock: 0, min_stock: 0, price: 0, cost_price: 0, barcode: '' });
   const [moveForm, setMoveForm] = useState({ qty: 0, amount: 0 });
 
+  // Box/carton -> pieces helper: stock is always tracked in the item's
+  // sellable unit (a "piece"), but stock often arrives in cartons — this
+  // is a pure data-entry calculator that fills the same qty/amount
+  // fields above, not a separate storage concept, so nothing downstream
+  // (record_stock_move, reports, reorder predictions) needs to know
+  // boxes exist at all.
+  const [boxMode, setBoxMode] = useState(false);
+  const [boxCount, setBoxCount] = useState(0);
+  const [piecesPerBox, setPiecesPerBox] = useState(1);
+  const [costPerBox, setCostPerBox] = useState(0);
+  const [updateCostPrice, setUpdateCostPrice] = useState(true);
+
   useEffect(() => { loadItems(); }, [shopId]);
 
   async function loadItems() {
@@ -70,7 +82,11 @@ export default function InventoryPage() {
     setScannerOpen(false);
     const existing = items.find(i => i.barcode === code);
     if (existing) {
-      openEdit(existing);
+      // Scanning at the counter is almost always "I'm selling this",
+      // not "I want to edit its details" — jump straight to Stock Out
+      // with quantity ready to type. Edit is one link away inside that
+      // modal for the rarer case.
+      openMove(existing, 'sale');
       return;
     }
 
@@ -122,8 +138,17 @@ export default function InventoryPage() {
     setMoveItem(it);
     setMoveType(type);
     setMoveForm({ qty: 0, amount: 0 });
+    setBoxMode(false);
+    setBoxCount(0);
+    setPiecesPerBox(1);
+    setCostPerBox(0);
+    setUpdateCostPrice(true);
     setError('');
     setMoveOpen(true);
+  }
+
+  function recalcFromBox(nextBoxCount: number, nextPiecesPerBox: number, nextCostPerBox: number) {
+    setMoveForm({ qty: nextBoxCount * nextPiecesPerBox, amount: nextBoxCount * nextCostPerBox });
   }
 
   async function confirmMove() {
@@ -144,6 +169,14 @@ export default function InventoryPage() {
     });
 
     if (err) { setError(t('common.error')); return; }
+
+    // Box mode computed a per-piece cost (cost per box / pieces per box)
+    // — offer it as the item's new reference cost_price. Not atomic with
+    // the stock move above (it's a secondary reference field, not core
+    // ledger data), so a failure here doesn't need to roll anything back.
+    if (moveType === 'purchase' && boxMode && updateCostPrice && piecesPerBox > 0) {
+      await supabase.from('items').update({ cost_price: costPerBox / piecesPerBox }).eq('id', moveItem.id);
+    }
 
     setMoveOpen(false);
     await loadItems();
@@ -254,6 +287,55 @@ export default function InventoryPage() {
               {moveType === 'purchase' ? t('inventory.newStockTitle') : t('inventory.outStockTitle')}{moveItem.name}
             </div>
             {error && <div className="text-mirch text-sm mb-3 bg-mirch/10 p-3 rounded-lg">{error}</div>}
+
+            {moveType === 'purchase' && (
+              <>
+                <label className="flex items-center gap-2 text-xs text-chalkdim mb-3">
+                  <input type="checkbox" checked={boxMode} onChange={e => setBoxMode(e.target.checked)} />
+                  {t('inventory.boxMode')}
+                </label>
+
+                {boxMode && (
+                  <div className="card p-3 mb-3 bg-board3">
+                    <div className="grid grid-cols-2 gap-3 mb-2">
+                      <div>
+                        <label className="block text-[11px] text-chalkdim mb-1">{t('inventory.boxCount')}</label>
+                        <input
+                          type="number"
+                          className="input"
+                          value={boxCount}
+                          onChange={e => { const v = Number(e.target.value); setBoxCount(v); recalcFromBox(v, piecesPerBox, costPerBox); }}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] text-chalkdim mb-1">{t('inventory.piecesPerBox')}</label>
+                        <input
+                          type="number"
+                          className="input"
+                          value={piecesPerBox}
+                          onChange={e => { const v = Number(e.target.value); setPiecesPerBox(v); recalcFromBox(boxCount, v, costPerBox); }}
+                        />
+                      </div>
+                    </div>
+                    <label className="block text-[11px] text-chalkdim mb-1">{t('inventory.costPerBox')}</label>
+                    <input
+                      type="number"
+                      className="input mb-2"
+                      value={costPerBox}
+                      onChange={e => { const v = Number(e.target.value); setCostPerBox(v); recalcFromBox(boxCount, piecesPerBox, v); }}
+                    />
+                    {piecesPerBox > 0 && costPerBox > 0 && (
+                      <div className="text-[11px] text-dhania mb-2">{t('inventory.costPerPieceCalc')} {fmt(costPerBox / piecesPerBox)}</div>
+                    )}
+                    <label className="flex items-center gap-2 text-[11px] text-chalkdim">
+                      <input type="checkbox" checked={updateCostPrice} onChange={e => setUpdateCostPrice(e.target.checked)} />
+                      {t('inventory.updateCostPrice')}
+                    </label>
+                  </div>
+                )}
+              </>
+            )}
+
             <label className="block text-xs text-chalkdim mb-1">{t('inventory.quantity')} ({moveItem.unit})</label>
             <input type="number" className="input mb-3" value={moveForm.qty} onChange={e => setMoveForm({ ...moveForm, qty: Number(e.target.value) })} />
             {moveType === 'purchase' && (
@@ -266,6 +348,13 @@ export default function InventoryPage() {
               <button onClick={() => setMoveOpen(false)} className="btn-secondary flex-1">{t('inventory.cancel')}</button>
               <button onClick={confirmMove} className="btn-primary flex-1">{t('inventory.confirm')}</button>
             </div>
+            <button
+              type="button"
+              onClick={() => { setMoveOpen(false); openEdit(moveItem); }}
+              className="text-chalkdim text-xs underline mt-3 block text-center w-full"
+            >
+              {t('inventory.editInstead')}
+            </button>
           </div>
         </div>
       )}
