@@ -112,7 +112,21 @@ create table if not exists supplier_entries (
   created_at timestamptz not null default now()
 );
 
--- 9. PAYMENT_CLAIMS (manual EasyPaisa/bank transfer, no payment gateway
+-- 9. EXPENSES (rent, staff salary, utilities, marketing — overhead that
+--    isn't stock purchase. Without this, "profit" only ever subtracted
+--    cost of goods sold, never the shop's actual running costs, which
+--    overstates it every single day.) ------------------------------------
+create table if not exists expenses (
+  id uuid primary key default gen_random_uuid(),
+  shop_id uuid not null references shops(id) on delete cascade,
+  category text not null check (category in ('rent','salary','utility','marketing','other')),
+  amount numeric not null,
+  note text,
+  created_by uuid references auth.users(id),
+  created_at timestamptz not null default now()
+);
+
+-- 10. PAYMENT_CLAIMS (manual EasyPaisa/bank transfer, no payment gateway
 --    for Pakistan yet — owner marks "I've paid", we verify the WhatsApp
 --    screenshot by hand and flip shops.subscription_status ourselves) ----
 create table if not exists payment_claims (
@@ -309,6 +323,18 @@ as $$
     and (p_since is null or created_at >= p_since)
 $$;
 
+create or replace function expenses_sum(p_shop_id uuid, p_since timestamptz default null)
+returns numeric
+language sql
+security invoker
+stable
+as $$
+  select coalesce(sum(amount), 0)
+  from expenses
+  where shop_id = p_shop_id
+    and (p_since is null or created_at >= p_since)
+$$;
+
 create or replace function supplier_balances(p_shop_id uuid)
 returns table(supplier_id uuid, balance numeric)
 language sql
@@ -354,6 +380,7 @@ alter table khata_entries enable row level security;
 alter table suppliers enable row level security;
 alter table supplier_entries enable row level security;
 alter table payment_claims enable row level security;
+alter table expenses enable row level security;
 
 -- shops: a user can only see/update their own shop
 -- Postgres has no "create policy if not exists" — drop-then-create is the
@@ -409,6 +436,13 @@ create policy "payment_claims_own_shop" on payment_claims for all
 
 drop policy if exists "supplier_entries_own_shop" on supplier_entries;
 create policy "supplier_entries_own_shop" on supplier_entries for all
+  using (shop_id = my_shop_id())
+  with check (shop_id = my_shop_id());
+
+-- expenses: fully scoped to shop_id, same openness as customers/suppliers
+-- (staff can log a utility bill payment same as they'd log a khata entry)
+drop policy if exists "expenses_own_shop" on expenses;
+create policy "expenses_own_shop" on expenses for all
   using (shop_id = my_shop_id())
   with check (shop_id = my_shop_id());
 

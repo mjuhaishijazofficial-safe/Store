@@ -30,6 +30,7 @@ export const dict = {
   'nav.history': { ur: 'History', en: 'History' },
   'nav.billing': { ur: 'Billing', en: 'Billing' },
   'nav.admin': { ur: 'Admin', en: 'Admin' },
+  'nav.expenses': { ur: 'Kharche', en: 'Expenses' },
   'nav.settings': { ur: 'Settings', en: 'Settings' },
   'nav.signout': { ur: 'Sign Out', en: 'Sign Out' },
 
@@ -204,7 +205,8 @@ export const dict = {
   'reports.udhaarDiya': { ur: 'Udhaar Diya', en: 'Credit Given' },
   'reports.paymentMila': { ur: 'Payment Mila', en: 'Payments Received' },
   'reports.profit': { ur: 'Aaj ka Profit', en: "Today's Profit" },
-  'reports.profitNote': { ur: 'Sirf becha hua saman — cost price se hisaab', en: 'From items sold only — based on cost price' },
+  'reports.profitNote': { ur: 'Bikri ka munafa minus aaj ke kharche (kiraya/tankhwah/bijli)', en: 'Sales margin minus today\'s expenses (rent/salary/utilities)' },
+  'reports.expenses': { ur: 'Aaj Ke Kharche', en: "Today's Expenses" },
   'reports.shareWhatsapp': { ur: 'WhatsApp Par Share Karein', en: 'Share on WhatsApp' },
   'reports.print': { ur: 'Print / PDF Save Karein', en: 'Print / Save as PDF' },
   'reports.summaryMsg': {
@@ -354,6 +356,20 @@ export const dict = {
   'offline.stale': { ur: 'Purana data dikha rahe hain (connection nahi mila)', en: 'Showing last saved data (couldn\'t reach the server)' },
 
   'khataDetail.fromInventory': { ur: 'Inventory se', en: 'From inventory' },
+
+  'expenses.title': { ur: 'Kharche', en: 'Expenses' },
+  'expenses.subtitle': { ur: 'Kiraya, tankhwah, bijli — dukaan ka overhead', en: 'Rent, salaries, utilities — the shop\'s overhead' },
+  'expenses.thisMonth': { ur: 'Is Mahine Ke Kharche', en: 'This Month\'s Expenses' },
+  'expenses.add': { ur: '+ Kharcha Add Karein', en: '+ Add Expense' },
+  'expenses.addTitle': { ur: 'Naya Kharcha', en: 'New Expense' },
+  'expenses.empty': { ur: 'Abhi tak koi kharcha record nahi', en: 'No expenses recorded yet' },
+  'expenses.category': { ur: 'Category', en: 'Category' },
+  'expenses.amount': { ur: 'Amount (₨)', en: 'Amount (₨)' },
+  'expenses.catRent': { ur: 'Kiraya', en: 'Rent' },
+  'expenses.catSalary': { ur: 'Tankhwah', en: 'Salary' },
+  'expenses.catUtility': { ur: 'Bijli/Gas/Paani', en: 'Utilities' },
+  'expenses.catMarketing': { ur: 'Marketing', en: 'Marketing' },
+  'expenses.catOther': { ur: 'Doosra', en: 'Other' },
   'khataDetail.totalGiven': { ur: 'Kul Saman Diya', en: 'Total Given' },
   'khataDetail.totalPaid': { ur: 'Kul Payment Mili', en: 'Total Paid' },
   'khataDetail.lastPayment': { ur: 'Aakhri Payment', en: 'Last Payment' },

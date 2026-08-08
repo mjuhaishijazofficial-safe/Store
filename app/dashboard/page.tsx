@@ -51,7 +51,8 @@ export default async function OverviewPage() {
     { data: topSelling },
     { data: recentTxns },
     { data: recentPayments },
-    { count: customerCount }
+    { count: customerCount },
+    { data: weekExpensesValue }
   ] = await Promise.all([
     supabase.from('shops').select('budget').eq('id', shopId).single(),
     supabase.from('items').select('id, stock, min_stock').eq('shop_id', shopId),
@@ -73,7 +74,8 @@ export default async function OverviewPage() {
     // instead of one, same tradeoff as the balance-aggregate RPCs above.
     supabase.from('transactions').select('id, item_name, type, qty, unit, amount, created_at').eq('shop_id', shopId).order('created_at', { ascending: false }).limit(5),
     supabase.from('khata_entries').select('id, amount, created_at, customers(name)').eq('shop_id', shopId).eq('type', 'payment').order('created_at', { ascending: false }).limit(5),
-    supabase.from('customers').select('*', { count: 'exact', head: true }).eq('shop_id', shopId)
+    supabase.from('customers').select('*', { count: 'exact', head: true }).eq('shop_id', shopId),
+    supabase.rpc('expenses_sum', { p_shop_id: shopId, p_since: weekStartIso })
   ]);
 
   const lowStockItems = (items || []).filter((i: any) => i.stock <= i.min_stock);
@@ -81,10 +83,15 @@ export default async function OverviewPage() {
   const spent = spentValue || 0;
   const monthlySales = monthSalesValue || 0;
 
-  const weeklyProfit = (weekSales || []).reduce((s: number, r: any) => {
+  // Sales margin minus the week's overhead (rent/salary/utility/etc.)
+  // — without expenses this card was gross margin labeled "profit,"
+  // overstating the real number every week regardless of how much the
+  // shop actually spent to stay open.
+  const weekGrossMargin = (weekSales || []).reduce((s: number, r: any) => {
     const costPrice = r.items?.cost_price || 0;
     return s + (r.amount || 0) - (r.qty || 0) * costPrice;
   }, 0);
+  const weeklyProfit = weekGrossMargin - (weekExpensesValue || 0);
 
   const pendingKhata = (balances || []).reduce((s: number, r: any) => s + Math.max(0, r.balance), 0);
 

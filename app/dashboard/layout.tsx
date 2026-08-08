@@ -67,6 +67,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
     { href: '/dashboard/khata', label: t('nav.khata') },
     { href: '/dashboard/suppliers', label: t('nav.suppliers') },
     { href: '/dashboard/history', label: t('nav.history') },
+    { href: '/dashboard/expenses', label: t('nav.expenses') },
     // billing/settings/staff are owner-only — staff never even see the tabs
     ...(isOwner ? [
       { href: '/dashboard/staff', label: t('nav.staff') },
