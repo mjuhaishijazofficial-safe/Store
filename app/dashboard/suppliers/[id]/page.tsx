@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import ContactEditModal from '@/components/ContactEditModal';
 import ConfirmDeleteButton from '@/components/ConfirmDeleteButton';
+import { useSectionGuard } from '@/lib/use-section-guard';
 import { createClient } from '@/lib/supabase/client';
 import { useLang } from '@/lib/i18n-context';
 import { useShop } from '@/lib/shop-context';
@@ -42,6 +43,7 @@ export default function SupplierDetailPage() {
   const { t } = useLang();
   const { shopId } = useShop();
   const { showToast } = useToast();
+  useSectionGuard('suppliers');
 
   const [supplier, setSupplier] = useState<Supplier | null>(null);
   const [entries, setEntries] = useState<Entry[]>([]);

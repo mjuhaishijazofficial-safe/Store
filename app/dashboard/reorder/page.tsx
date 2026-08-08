@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
+import { redirect } from 'next/navigation';
 import { getServerT } from '@/lib/i18n-server';
+import { hasSection } from '@/lib/permissions';
 
 const SMART_THRESHOLD_DAYS = 7;
 const EXPIRY_WARNING_DAYS = 30;
@@ -12,8 +14,9 @@ export default async function ReorderPage() {
   const supabase = await createClient();
   const t = await getServerT();
   const { data: { user } } = await supabase.auth.getUser();
-  const { data: profile } = await supabase.from('profiles').select('shop_id').eq('id', user!.id).single();
+  const { data: profile } = await supabase.from('profiles').select('shop_id, role, allowed_sections').eq('id', user!.id).single();
   const shopId = profile?.shop_id;
+  if (profile && !hasSection(profile.role as 'owner' | 'staff', profile.allowed_sections as string[] | null, 'reorder')) redirect('/dashboard');
 
   const [{ data: items }, { data: predictions }] = await Promise.all([
     supabase.from('items').select('*').eq('shop_id', shopId).order('name'),

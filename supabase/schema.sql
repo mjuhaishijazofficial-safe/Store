@@ -32,6 +32,12 @@ create table if not exists profiles (
 );
 alter table profiles add column if not exists email text;
 alter table profiles add column if not exists monthly_salary numeric not null default 0;
+-- null = unrestricted (every staff member today, and every new invite
+-- going forward, until an owner deliberately narrows one down) — a
+-- populated array is a whitelist of section keys (see lib/permissions.ts).
+-- Owner-only sections (Staff/Billing/Settings/Admin) aren't in this list
+-- at all; they're gated on role, not on this column, in every case.
+alter table profiles add column if not exists allowed_sections text[];
 
 -- 3. ITEMS (inventory) -----------------------------------------------
 create table if not exists items (

@@ -12,6 +12,7 @@ import BarcodeSvg from '@/components/BarcodeSvg';
 import PrintBarcodeLabelModal from '@/components/PrintBarcodeLabelModal';
 import { saveCache, loadCache } from '@/lib/offline-cache';
 import { generateInternalBarcode, isValidEan13 } from '@/lib/barcode';
+import { useSectionGuard } from '@/lib/use-section-guard';
 
 type Item = {
   id: string;
@@ -34,6 +35,7 @@ export default function InventoryPage() {
   const supabase = createClient();
   const { t } = useLang();
   const { shopId, shopName } = useShop();
+  useSectionGuard('inventory');
   const { showToast } = useToast();
   const [items, setItems] = useState<Item[]>([]);
   const [search, setSearch] = useState('');

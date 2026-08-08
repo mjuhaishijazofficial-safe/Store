@@ -8,6 +8,7 @@ import { useShop } from '@/lib/shop-context';
 import { useToast } from '@/lib/toast-context';
 import { downloadCsv } from '@/lib/csv';
 import { saveCache, loadCache } from '@/lib/offline-cache';
+import { useSectionGuard } from '@/lib/use-section-guard';
 
 type Customer = {
   id: string;
@@ -25,6 +26,7 @@ export default function KhataPage() {
   const { t } = useLang();
   const { shopId } = useShop();
   const { showToast } = useToast();
+  useSectionGuard('khata');
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [balances, setBalances] = useState<Record<string, number>>({});
   const [topCustomers, setTopCustomers] = useState<{ customer_id: string; customer_name: string; total_purchases: number }[]>([]);

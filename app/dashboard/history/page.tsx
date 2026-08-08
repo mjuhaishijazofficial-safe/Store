@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useLang } from '@/lib/i18n-context';
 import { useShop } from '@/lib/shop-context';
 import SaleReceiptModal from '@/components/SaleReceiptModal';
+import { useSectionGuard } from '@/lib/use-section-guard';
 
 type Log = {
   id: string;
@@ -26,6 +27,7 @@ export default function HistoryPage() {
   const supabase = createClient();
   const { t } = useLang();
   const { shopId, shopName } = useShop();
+  useSectionGuard('history');
   const [logs, setLogs] = useState<Log[]>([]);
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);

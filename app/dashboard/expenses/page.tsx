@@ -7,6 +7,7 @@ import { useShop } from '@/lib/shop-context';
 import { useToast } from '@/lib/toast-context';
 import { startOfMonthPKT } from '@/lib/pkt-time';
 import ConfirmDeleteButton from '@/components/ConfirmDeleteButton';
+import { useSectionGuard } from '@/lib/use-section-guard';
 
 type Category = 'rent' | 'salary' | 'utility' | 'marketing' | 'other';
 
@@ -29,6 +30,7 @@ export default function ExpensesPage() {
   const { t } = useLang();
   const { shopId } = useShop();
   const { showToast } = useToast();
+  useSectionGuard('expenses');
 
   const categoryLabels: Record<Category, string> = {
     rent: t('expenses.catRent'),

@@ -4,6 +4,7 @@ import { startOfMonthPKT, daysAgoPKT } from '@/lib/pkt-time';
 import Link from 'next/link';
 import { WalletIcon, TrendDownIcon, CashIcon, ChartIcon, TrendUpIcon, ReceiptIcon, FireIcon, WarningIcon, ArrowRightIcon, PlusIcon, CartIcon, ClockIcon } from '@/components/icons';
 import AnimatedNumber from '@/components/AnimatedNumber';
+import { hasSection } from '@/lib/permissions';
 
 function fmt(n: number) {
   return '₨' + Number(n || 0).toLocaleString('en-IN');
@@ -51,8 +52,14 @@ export default async function OverviewPage() {
   const supabase = await createClient();
   const t = await getServerT();
   const { data: { user } } = await supabase.auth.getUser();
-  const { data: profile } = await supabase.from('profiles').select('shop_id').eq('id', user!.id).single();
+  const { data: profile } = await supabase.from('profiles').select('shop_id, role, allowed_sections').eq('id', user!.id).single();
   const shopId = profile?.shop_id;
+  const role = (profile?.role as 'owner' | 'staff') || 'staff';
+  const allowedSections = (profile?.allowed_sections as string[] | null) ?? null;
+  // Overview itself has no gate — everyone lands here — but its cards
+  // and shortcuts shouldn't route a restricted staff member somewhere
+  // they'll just get bounced right back out of.
+  const can = (s: Parameters<typeof hasSection>[2]) => hasSection(role, allowedSections, s);
 
   const monthStartIso = startOfMonthPKT().toISOString();
   const weekStartIso = daysAgoPKT(7).toISOString();
@@ -175,53 +182,67 @@ export default async function OverviewPage() {
       )}
 
       <div className="grid grid-cols-3 gap-3 mb-4">
-        <StatCard href="/dashboard/settings" icon={<WalletIcon className="w-5 h-5" />} iconClass="bg-haldi/15 text-haldi" label={t('overview.totalBudget')} value={fmt(budget)} amount={budget} premium delay={0} />
-        <StatCard href="/dashboard/history" icon={<TrendDownIcon className="w-5 h-5" />} iconClass="bg-mirch/15 text-mirch" label={t('overview.spent')} value={fmt(spent)} amount={spent} valueClass="text-mirch" delay={60} />
-        <StatCard href="/dashboard/settings" icon={<CashIcon className="w-5 h-5" />} iconClass="bg-dhania/15 text-dhania" label={t('overview.remaining')} value={fmt(budget - spent)} amount={budget - spent} valueClass="text-dhania" delay={120} />
+        <StatCard href={role === 'owner' ? '/dashboard/settings' : undefined} icon={<WalletIcon className="w-5 h-5" />} iconClass="bg-haldi/15 text-haldi" label={t('overview.totalBudget')} value={fmt(budget)} amount={budget} premium delay={0} />
+        <StatCard href={can('history') ? '/dashboard/history' : undefined} icon={<TrendDownIcon className="w-5 h-5" />} iconClass="bg-mirch/15 text-mirch" label={t('overview.spent')} value={fmt(spent)} amount={spent} valueClass="text-mirch" delay={60} />
+        <StatCard href={role === 'owner' ? '/dashboard/settings' : undefined} icon={<CashIcon className="w-5 h-5" />} iconClass="bg-dhania/15 text-dhania" label={t('overview.remaining')} value={fmt(budget - spent)} amount={budget - spent} valueClass="text-dhania" delay={120} />
       </div>
 
       <div className="grid grid-cols-3 gap-3 mb-8">
-        <StatCard href="/dashboard/reports" icon={<ChartIcon className="w-5 h-5" />} iconClass="bg-haldi/15 text-haldi" label={t('overview.monthlySales')} value={fmt(monthlySales)} amount={monthlySales} premium delay={180} />
-        <StatCard href="/dashboard/reports" icon={<TrendUpIcon className="w-5 h-5" />} iconClass="bg-dhania/15 text-dhania" label={t('overview.weeklyProfit')} value={fmt(weeklyProfit)} amount={weeklyProfit} valueClass={weeklyProfit >= 0 ? 'text-dhania' : 'text-mirch'} delay={240} />
-        <StatCard href="/dashboard/khata" icon={<ReceiptIcon className="w-5 h-5" />} iconClass="bg-mirch/15 text-mirch" label={t('overview.pendingKhata')} value={fmt(pendingKhata)} amount={pendingKhata} valueClass="text-mirch" delay={300} />
+        <StatCard href={can('reports') ? '/dashboard/reports' : undefined} icon={<ChartIcon className="w-5 h-5" />} iconClass="bg-haldi/15 text-haldi" label={t('overview.monthlySales')} value={fmt(monthlySales)} amount={monthlySales} premium delay={180} />
+        <StatCard href={can('reports') ? '/dashboard/reports' : undefined} icon={<TrendUpIcon className="w-5 h-5" />} iconClass="bg-dhania/15 text-dhania" label={t('overview.weeklyProfit')} value={fmt(weeklyProfit)} amount={weeklyProfit} valueClass={weeklyProfit >= 0 ? 'text-dhania' : 'text-mirch'} delay={240} />
+        <StatCard href={can('khata') ? '/dashboard/khata' : undefined} icon={<ReceiptIcon className="w-5 h-5" />} iconClass="bg-mirch/15 text-mirch" label={t('overview.pendingKhata')} value={fmt(pendingKhata)} amount={pendingKhata} valueClass="text-mirch" delay={300} />
       </div>
 
-      <div className="mb-8">
-        <h2 className="font-display text-base font-700 mb-3">{t('overview.quickActions')}</h2>
-        <div className="grid grid-cols-3 gap-3">
-          <Link href="/dashboard/inventory" className="card p-4 flex flex-col items-center text-center gap-2">
-            <div className="w-10 h-10 rounded-full gradient-brand shadow-glow text-board flex items-center justify-center">
-              <PlusIcon className="w-5 h-5" />
-            </div>
-            <span className="text-xs font-600">{t('overview.addItem')}</span>
-          </Link>
-          <Link href="/dashboard/khata" className="card p-4 flex flex-col items-center text-center gap-2">
-            <div className="w-10 h-10 rounded-full bg-mirch/15 text-mirch flex items-center justify-center">
-              <ReceiptIcon className="w-5 h-5" />
-            </div>
-            <span className="text-xs font-600">{t('overview.khataEntry')}</span>
-          </Link>
-          <Link href="/dashboard/suppliers" className="card p-4 flex flex-col items-center text-center gap-2">
-            <div className="w-10 h-10 rounded-full bg-dhania/15 text-dhania flex items-center justify-center">
-              <CartIcon className="w-5 h-5" />
-            </div>
-            <span className="text-xs font-600">{t('overview.recordPurchase')}</span>
-          </Link>
+      {(can('inventory') || can('khata') || can('suppliers')) && (
+        <div className="mb-8">
+          <h2 className="font-display text-base font-700 mb-3">{t('overview.quickActions')}</h2>
+          <div className="grid grid-cols-3 gap-3">
+            {can('inventory') && (
+              <Link href="/dashboard/inventory" className="card p-4 flex flex-col items-center text-center gap-2">
+                <div className="w-10 h-10 rounded-full gradient-brand shadow-glow text-board flex items-center justify-center">
+                  <PlusIcon className="w-5 h-5" />
+                </div>
+                <span className="text-xs font-600">{t('overview.addItem')}</span>
+              </Link>
+            )}
+            {can('khata') && (
+              <Link href="/dashboard/khata" className="card p-4 flex flex-col items-center text-center gap-2">
+                <div className="w-10 h-10 rounded-full bg-mirch/15 text-mirch flex items-center justify-center">
+                  <ReceiptIcon className="w-5 h-5" />
+                </div>
+                <span className="text-xs font-600">{t('overview.khataEntry')}</span>
+              </Link>
+            )}
+            {can('suppliers') && (
+              <Link href="/dashboard/suppliers" className="card p-4 flex flex-col items-center text-center gap-2">
+                <div className="w-10 h-10 rounded-full bg-dhania/15 text-dhania flex items-center justify-center">
+                  <CartIcon className="w-5 h-5" />
+                </div>
+                <span className="text-xs font-600">{t('overview.recordPurchase')}</span>
+              </Link>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
-      <div className="grid grid-cols-2 gap-3 mb-8">
-        <Link href="/dashboard/inventory" className="card p-5 block">
-          <div className="text-3xl font-mono font-700 text-haldi">{itemCount || 0}</div>
-          <div className="text-sm text-chalkdim mt-1">{t('overview.totalItems')}</div>
-        </Link>
-        <Link href="/dashboard/reorder" className="card p-5 block">
-          <div className="text-3xl font-mono font-700 text-mirch">{lowStockItems.length}</div>
-          <div className="text-sm text-chalkdim mt-1">{t('overview.itemsToReorder')}</div>
-        </Link>
-      </div>
+      {(can('inventory') || can('reorder')) && (
+        <div className="grid grid-cols-2 gap-3 mb-8">
+          {can('inventory') && (
+            <Link href="/dashboard/inventory" className="card p-5 block">
+              <div className="text-3xl font-mono font-700 text-haldi">{itemCount || 0}</div>
+              <div className="text-sm text-chalkdim mt-1">{t('overview.totalItems')}</div>
+            </Link>
+          )}
+          {can('reorder') && (
+            <Link href="/dashboard/reorder" className="card p-5 block">
+              <div className="text-3xl font-mono font-700 text-mirch">{lowStockItems.length}</div>
+              <div className="text-sm text-chalkdim mt-1">{t('overview.itemsToReorder')}</div>
+            </Link>
+          )}
+        </div>
+      )}
 
-      {topSelling && topSelling.length > 0 && (
+      {can('inventory') && topSelling && topSelling.length > 0 && (
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-3">
             <FireIcon className="w-4 h-4 text-haldi" />
@@ -244,7 +265,7 @@ export default async function OverviewPage() {
         </div>
       )}
 
-      {lowStockItems.length > 0 && (
+      {can('reorder') && lowStockItems.length > 0 && (
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-3">
             <WarningIcon className="w-4 h-4 text-mirch" />
@@ -283,16 +304,18 @@ export default async function OverviewPage() {
         </div>
       )}
 
-      <Link href="/dashboard/reports" className="card p-4 flex items-center gap-4 hover:border-haldi">
-        <div className="w-11 h-11 rounded-full gradient-brand shadow-glow text-board flex items-center justify-center shrink-0">
-          <ChartIcon className="w-5 h-5" />
-        </div>
-        <div className="flex-1">
-          <div className="font-display font-700 text-haldi">{t('overview.dailyReport')}</div>
-          <div className="text-xs text-chalkdim">{t('overview.dailyReportSub')}</div>
-        </div>
-        <ArrowRightIcon className="w-5 h-5 text-haldi shrink-0" />
-      </Link>
+      {can('reports') && (
+        <Link href="/dashboard/reports" className="card p-4 flex items-center gap-4 hover:border-haldi">
+          <div className="w-11 h-11 rounded-full gradient-brand shadow-glow text-board flex items-center justify-center shrink-0">
+            <ChartIcon className="w-5 h-5" />
+          </div>
+          <div className="flex-1">
+            <div className="font-display font-700 text-haldi">{t('overview.dailyReport')}</div>
+            <div className="text-xs text-chalkdim">{t('overview.dailyReportSub')}</div>
+          </div>
+          <ArrowRightIcon className="w-5 h-5 text-haldi shrink-0" />
+        </Link>
+      )}
     </div>
   );
 }

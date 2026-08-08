@@ -8,8 +8,9 @@ import { useLang } from '@/lib/i18n-context';
 import { useShop } from '@/lib/shop-context';
 import { useToast } from '@/lib/toast-context';
 import { startOfTodayPKT, startOfMonthPKT } from '@/lib/pkt-time';
+import { ALL_SECTIONS, Section } from '@/lib/permissions';
 
-type StaffProfile = { id: string; full_name: string | null; email: string | null; role: string; monthly_salary: number };
+type StaffProfile = { id: string; full_name: string | null; email: string | null; role: string; monthly_salary: number; allowed_sections: string[] | null };
 type AttendanceRow = { id: string; date: string; status: 'present' | 'absent' | 'half_day' | 'leave' };
 type Status = AttendanceRow['status'];
 
@@ -34,6 +35,11 @@ export default function StaffDetailPage() {
   const [salaryInput, setSalaryInput] = useState('');
   const [savingSalary, setSavingSalary] = useState(false);
   const [markingStatus, setMarkingStatus] = useState<Status | null>(null);
+  // null = unrestricted (owner sees every section). A selected set means
+  // "only these" — mirrors the allowed_sections column semantics exactly,
+  // see lib/permissions.ts.
+  const [allowedSections, setAllowedSections] = useState<string[] | null>(null);
+  const [savingPerms, setSavingPerms] = useState(false);
 
   const isOwner = myRole === 'owner';
 
@@ -55,7 +61,7 @@ export default function StaffDetailPage() {
   async function loadAll() {
     setLoading(true);
     const [{ data: prof }, { data: att }] = await Promise.all([
-      supabase.from('profiles').select('id, full_name, email, role, monthly_salary').eq('id', staffId).single(),
+      supabase.from('profiles').select('id, full_name, email, role, monthly_salary, allowed_sections').eq('id', staffId).single(),
       supabase
         .from('staff_attendance')
         .select('id, date, status')
@@ -65,6 +71,7 @@ export default function StaffDetailPage() {
     ]);
     setStaff(prof || null);
     setSalaryInput(prof ? String(prof.monthly_salary || 0) : '');
+    setAllowedSections(prof ? (prof.allowed_sections as string[] | null) : null);
     setAttendance(att || []);
     setLoading(false);
   }
@@ -81,6 +88,28 @@ export default function StaffDetailPage() {
     setSavingSalary(false);
     if (!res.ok) { showToast(t('common.error'), 'error'); return; }
     showToast(t('settings.saved'), 'success');
+  }
+
+  function toggleSection(section: Section) {
+    setAllowedSections(prev => {
+      // Starting from "unrestricted" (null) and unchecking one box means
+      // "everything except this" — materialize the full list minus the
+      // toggled key rather than trying to represent that as null.
+      const base = prev === null ? ALL_SECTIONS.map(s => s.key) : prev;
+      return base.includes(section) ? base.filter(s => s !== section) : [...base, section];
+    });
+  }
+
+  async function savePermissions() {
+    setSavingPerms(true);
+    const res = await fetch('/api/staff/set-permissions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ staffId, allowedSections })
+    });
+    setSavingPerms(false);
+    if (!res.ok) { showToast(t('common.error'), 'error'); return; }
+    showToast(t('staffDetail.permissionsSaved'), 'success');
   }
 
   async function markToday(status: Status) {
@@ -129,6 +158,37 @@ export default function StaffDetailPage() {
             {savingSalary ? t('settings.saving') : t('contact.save')}
           </button>
         </div>
+      </div>
+
+      <div className="card p-5 mb-4">
+        <div className="text-xs text-chalkdim uppercase tracking-wide mb-1">{t('staffDetail.permissions')}</div>
+        <p className="text-[11px] text-chalkdim mb-3">{t('staffDetail.permissionsHint')}</p>
+
+        <label className="flex items-center gap-2 text-sm mb-3 pb-3 border-b border-chalk/10">
+          <input
+            type="checkbox"
+            checked={allowedSections === null}
+            onChange={e => setAllowedSections(e.target.checked ? null : [])}
+          />
+          <span className="font-600">{t('staffDetail.allSections')}</span>
+        </label>
+
+        <div className="grid grid-cols-2 gap-2 mb-4">
+          {ALL_SECTIONS.map(s => (
+            <label key={s.key} className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={allowedSections === null || allowedSections.includes(s.key)}
+                onChange={() => toggleSection(s.key)}
+              />
+              <span>{t(s.labelKey)}</span>
+            </label>
+          ))}
+        </div>
+
+        <button onClick={savePermissions} disabled={savingPerms} className="btn-primary w-full">
+          {savingPerms ? t('settings.saving') : t('contact.save')}
+        </button>
       </div>
 
       <div className="card p-5 mb-4">

@@ -14,6 +14,7 @@ export type ShopInfo = {
   shopId: string;
   role: 'owner' | 'staff';
   shopName: string;
+  allowedSections: string[] | null;
 };
 
 const ShopContext = createContext<ShopInfo | null>(null);

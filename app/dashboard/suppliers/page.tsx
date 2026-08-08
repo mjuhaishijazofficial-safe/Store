@@ -7,6 +7,7 @@ import { useLang } from '@/lib/i18n-context';
 import { useShop } from '@/lib/shop-context';
 import { useToast } from '@/lib/toast-context';
 import { downloadCsv } from '@/lib/csv';
+import { useSectionGuard } from '@/lib/use-section-guard';
 
 type Supplier = {
   id: string;
@@ -23,6 +24,7 @@ export default function SuppliersPage() {
   const { t } = useLang();
   const { shopId } = useShop();
   const { showToast } = useToast();
+  useSectionGuard('suppliers');
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [balances, setBalances] = useState<Record<string, number>>({});
   const [search, setSearch] = useState('');

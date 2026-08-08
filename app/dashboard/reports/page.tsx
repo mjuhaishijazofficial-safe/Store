@@ -1,8 +1,10 @@
 import { createClient } from '@/lib/supabase/server';
+import { redirect } from 'next/navigation';
 import { getServerT } from '@/lib/i18n-server';
 import { startOfTodayPKT } from '@/lib/pkt-time';
 import ShareWhatsAppButton from '@/components/ShareWhatsAppButton';
 import PrintButton from '@/components/PrintButton';
+import { hasSection } from '@/lib/permissions';
 
 function fmt(n: number) {
   return '₨' + Number(n || 0).toLocaleString('en-IN');
@@ -12,8 +14,9 @@ export default async function ReportsPage() {
   const supabase = await createClient();
   const t = await getServerT();
   const { data: { user } } = await supabase.auth.getUser();
-  const { data: profile } = await supabase.from('profiles').select('shop_id').eq('id', user!.id).single();
+  const { data: profile } = await supabase.from('profiles').select('shop_id, role, allowed_sections').eq('id', user!.id).single();
   const shopId = profile?.shop_id;
+  if (profile && !hasSection(profile.role as 'owner' | 'staff', profile.allowed_sections as string[] | null, 'reports')) redirect('/dashboard');
   const { data: shop } = await supabase.from('shops').select('name').eq('id', shopId).single();
 
   const startIso = startOfTodayPKT().toISOString();

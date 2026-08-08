@@ -11,6 +11,7 @@ import { ReceiptIcon, CashIcon } from '@/components/icons';
 import ContactEditModal from '@/components/ContactEditModal';
 import CustomerStatementModal from '@/components/CustomerStatementModal';
 import ConfirmDeleteButton from '@/components/ConfirmDeleteButton';
+import { useSectionGuard } from '@/lib/use-section-guard';
 
 type Customer = {
   id: string;
@@ -45,6 +46,7 @@ export default function KhataDetailPage() {
   const { t } = useLang();
   const { shopId, shopName } = useShop();
   const { showToast } = useToast();
+  useSectionGuard('khata');
 
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [entries, setEntries] = useState<Entry[]>([]);

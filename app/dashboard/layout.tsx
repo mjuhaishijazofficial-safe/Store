@@ -10,6 +10,7 @@ import { StoreIcon } from '@/components/icons';
 import { getServerT } from '@/lib/i18n-server';
 import { ShopProvider } from '@/lib/shop-context';
 import { isAdmin } from '@/lib/admin';
+import { hasSection } from '@/lib/permissions';
 import type { Metadata } from 'next';
 
 // robots.txt already disallows /dashboard, but that only asks crawlers
@@ -27,7 +28,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('shop_id, full_name, role, shops(name, subscription_status, trial_ends_at)')
+    .select('shop_id, full_name, role, allowed_sections, shops(name, subscription_status, trial_ends_at)')
     .eq('id', user.id)
     .single();
 
@@ -38,6 +39,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   const shop: any = profile.shops;
   const isOwner = profile.role === 'owner';
+  const allowedSections = (profile.allowed_sections as string[] | null) ?? null;
   const trialExpired =
     shop?.subscription_status === 'trialing' &&
     new Date(shop?.trial_ends_at) < new Date();
@@ -60,14 +62,17 @@ export default async function DashboardLayout({ children }: { children: React.Re
     adminPendingCount = count || 0;
   }
 
+  // Sections a staff member hasn't been granted don't even appear in the
+  // nav — see lib/permissions.ts for what this does and doesn't defend
+  // against (UI/workflow gating, not an RLS-level restriction).
   const nav = [
     { href: '/dashboard', label: t('nav.overview') },
-    { href: '/dashboard/inventory', label: t('nav.inventory') },
-    { href: '/dashboard/reorder', label: t('nav.reorder') },
-    { href: '/dashboard/khata', label: t('nav.khata') },
-    { href: '/dashboard/suppliers', label: t('nav.suppliers') },
-    { href: '/dashboard/history', label: t('nav.history') },
-    { href: '/dashboard/expenses', label: t('nav.expenses') },
+    ...(hasSection(profile.role, allowedSections, 'inventory') ? [{ href: '/dashboard/inventory', label: t('nav.inventory') }] : []),
+    ...(hasSection(profile.role, allowedSections, 'reorder') ? [{ href: '/dashboard/reorder', label: t('nav.reorder') }] : []),
+    ...(hasSection(profile.role, allowedSections, 'khata') ? [{ href: '/dashboard/khata', label: t('nav.khata') }] : []),
+    ...(hasSection(profile.role, allowedSections, 'suppliers') ? [{ href: '/dashboard/suppliers', label: t('nav.suppliers') }] : []),
+    ...(hasSection(profile.role, allowedSections, 'history') ? [{ href: '/dashboard/history', label: t('nav.history') }] : []),
+    ...(hasSection(profile.role, allowedSections, 'expenses') ? [{ href: '/dashboard/expenses', label: t('nav.expenses') }] : []),
     // billing/settings/staff are owner-only — staff never even see the tabs
     ...(isOwner ? [
       { href: '/dashboard/staff', label: t('nav.staff') },
@@ -81,7 +86,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   ];
 
   return (
-    <ShopProvider value={{ shopId: profile.shop_id, role: profile.role as 'owner' | 'staff', shopName: shop?.name || '' }}>
+    <ShopProvider value={{ shopId: profile.shop_id, role: profile.role as 'owner' | 'staff', shopName: shop?.name || '', allowedSections }}>
       <div className="min-h-screen">
         <ConnectionBanner />
         <header className="border-b border-chalk/10 no-print">

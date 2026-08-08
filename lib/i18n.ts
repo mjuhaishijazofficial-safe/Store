@@ -435,6 +435,10 @@ export const dict = {
 
   'staffDetail.back': { ur: '← Sab Staff', en: '← All Staff' },
   'staffDetail.monthlySalary': { ur: 'Monthly Salary (₨)', en: 'Monthly Salary (₨)' },
+  'staffDetail.permissions': { ur: 'Kaun se Sections Khol sakta hai', en: 'Section Permissions' },
+  'staffDetail.permissionsHint': { ur: 'Sab select ka matlab hai poori app khuli hai. Kam select karke sirf zaroori sections dein.', en: 'All selected means full access. Uncheck to restrict this staff member to specific sections.' },
+  'staffDetail.allSections': { ur: 'Sab Sections (Unrestricted)', en: 'All Sections (Unrestricted)' },
+  'staffDetail.permissionsSaved': { ur: 'Permissions save ho gayi', en: 'Permissions saved' },
 
   'attendance.markToday': { ur: 'Aaj Ki Attendance', en: "Today's Attendance" },
   'attendance.thisMonth': { ur: 'Is Mahine', en: 'This Month' },
