@@ -1,5 +1,12 @@
 import Link from 'next/link';
+import type { Metadata } from 'next';
 import { getServerT } from '@/lib/i18n-server';
+
+export const metadata: Metadata = {
+  title: 'Terms of Service',
+  description: 'Dukaan ERP istemaal karne ki shara-it, subscription, payment aur account se mutalliq maloomat.',
+  alternates: { canonical: '/terms' }
+};
 
 export default async function TermsPage() {
   const t = await getServerT();
@@ -28,6 +35,12 @@ export default async function TermsPage() {
       </div>
 
       <div className="card p-4 mt-10 text-xs text-chalkdim">{t('terms.disclaimer')}</div>
+
+      <nav className="flex flex-wrap gap-4 mt-8 pt-6 border-t border-chalk/10 text-xs text-chalkdim">
+        <Link href="/privacy" className="hover:text-haldi">{t('landing.footerPrivacy')}</Link>
+        <Link href="/signup" className="hover:text-haldi">{t('landing.freeTrialNav')}</Link>
+        <Link href="/login" className="hover:text-haldi">{t('landing.login')}</Link>
+      </nav>
     </main>
   );
 }

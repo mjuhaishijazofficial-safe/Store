@@ -1,7 +1,8 @@
 import type { MetadataRoute } from 'next';
+import { SITE_URL } from '@/lib/seo';
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const base = process.env.NEXT_PUBLIC_APP_URL || 'https://dukaanerp.vercel.app';
+  const base = SITE_URL;
   const now = new Date();
 
   // Only the public pages — the dashboard is behind auth and every route

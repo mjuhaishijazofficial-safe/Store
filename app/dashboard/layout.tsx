@@ -9,6 +9,15 @@ import { StoreIcon } from '@/components/icons';
 import { getServerT } from '@/lib/i18n-server';
 import { ShopProvider } from '@/lib/shop-context';
 import { isAdmin } from '@/lib/admin';
+import type { Metadata } from 'next';
+
+// robots.txt already disallows /dashboard, but that only asks crawlers
+// not to fetch it — a URL discovered elsewhere can still end up indexed
+// as a bare link. This header is the part that actually keeps every
+// shop's private pages out of search results.
+export const metadata: Metadata = {
+  robots: { index: false, follow: false }
+};
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();

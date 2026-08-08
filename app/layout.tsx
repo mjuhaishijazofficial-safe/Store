@@ -8,20 +8,54 @@ import { DEFAULT_THEME, Theme, THEME_COOKIE } from '@/lib/theme';
 import { PaletteProvider } from '@/lib/palette-context';
 import { DEFAULT_PALETTE, Palette, PALETTE_COOKIE } from '@/lib/palette';
 import { ToastProvider } from '@/lib/toast-context';
+import { SITE_NAME, SITE_URL } from '@/lib/seo';
+
+const DESCRIPTION =
+  'Kiryana store ke liye Urdu mein POS aur khata app — udhaar ka hisaab, inventory, supplier, staff aur daily report ek hi jagah. 14 din free trial, card ki zaroorat nahi.';
 
 export const metadata: Metadata = {
-  title: 'Dukaan ERP — Apni Dukaan Digitalize Karein',
-  description: 'Inventory + Khata + Suppliers + Staff + Reports — sab ek jagah, kiryana dukaanon ke liye.',
+  // Without metadataBase, every og:image/canonical Next generates stays
+  // relative — crawlers and WhatsApp/Facebook can't resolve those, which
+  // is why a site can look fine in a browser and still never index or
+  // render a share card.
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: 'Dukaan ERP — Kiryana Store ka Hisaab Kitab, Phone Par',
+    // Child pages set just their own name; this keeps the brand in the
+    // tab and the search result without repeating it in every file.
+    template: `%s — ${SITE_NAME}`
+  },
+  description: DESCRIPTION,
+  applicationName: SITE_NAME,
+  keywords: [
+    'kiryana store software',
+    'dukaan app',
+    'khata app',
+    'udhaar khata',
+    'POS Pakistan',
+    'inventory management Pakistan',
+    'general store software',
+    'kirana billing app',
+    'dukaan ka hisaab'
+  ],
+  alternates: { canonical: '/' },
   openGraph: {
-    title: 'Dukaan ERP — Apni Dukaan Digitalize Karein',
-    description: 'Inventory + Khata + Suppliers + Staff + Reports — sab ek jagah, kiryana dukaanon ke liye.',
+    title: 'Dukaan ERP — Kiryana Store ka Hisaab Kitab, Phone Par',
+    description: DESCRIPTION,
+    url: SITE_URL,
+    siteName: SITE_NAME,
     type: 'website',
     locale: 'ur_PK'
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Dukaan ERP',
-    description: 'Inventory + Khata + Suppliers + Staff + Reports — sab ek jagah, kiryana dukaanon ke liye.'
+    title: 'Dukaan ERP — Kiryana Store ka Hisaab Kitab, Phone Par',
+    description: DESCRIPTION
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true, 'max-image-preview': 'large', 'max-snippet': -1 }
   }
 };
 

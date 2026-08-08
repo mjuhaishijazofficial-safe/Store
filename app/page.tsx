@@ -5,6 +5,7 @@ import WhatsAppFloatingButton from '@/components/WhatsAppFloatingButton';
 import { StoreIcon, WalletIcon, TrendDownIcon, CashIcon, WhatsAppIcon } from '@/components/icons';
 import { getServerT } from '@/lib/i18n-server';
 import { SUPPORT_WHATSAPP_NUMBER } from '@/lib/constants';
+import { SITE_NAME, SITE_URL } from '@/lib/seo';
 
 export default async function Home() {
   const t = await getServerT();
@@ -33,8 +34,50 @@ export default async function Home() {
     { q: t('landing.faq6Q'), a: t('landing.faq6A') }
   ];
 
+  // Structured data. The FAQPage block is the one with a visible payoff:
+  // Google can render these questions as an expandable block under the
+  // result. Both are built from the same t() calls the page renders, so
+  // the markup can never describe something different from the page —
+  // which is exactly what gets structured data penalised.
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'SoftwareApplication',
+        '@id': `${SITE_URL}/#app`,
+        name: SITE_NAME,
+        applicationCategory: 'BusinessApplication',
+        operatingSystem: 'Web, Android, iOS',
+        url: SITE_URL,
+        inLanguage: ['ur', 'en'],
+        description: t('landing.heroBody'),
+        offers: {
+          '@type': 'Offer',
+          price: '999',
+          priceCurrency: 'PKR',
+          category: 'subscription',
+          availability: 'https://schema.org/InStock',
+          url: `${SITE_URL}/signup`
+        },
+        featureList: features.map(f => f.title),
+        audience: { '@type': 'Audience', audienceType: 'Kiryana and general store owners in Pakistan' }
+      },
+      {
+        '@type': 'FAQPage',
+        '@id': `${SITE_URL}/#faq`,
+        mainEntity: faqs.map(f => ({
+          '@type': 'Question',
+          name: f.q,
+          acceptedAnswer: { '@type': 'Answer', text: f.a }
+        }))
+      }
+    ]
+  };
+
   return (
     <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+
       <main className="max-w-5xl mx-auto px-6 py-16">
         <div className="flex items-center justify-between mb-16 gap-3">
           <div className="flex items-center gap-2.5">

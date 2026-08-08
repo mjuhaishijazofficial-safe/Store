@@ -1,5 +1,12 @@
 import Link from 'next/link';
+import type { Metadata } from 'next';
 import { getServerT } from '@/lib/i18n-server';
+
+export const metadata: Metadata = {
+  title: 'Privacy Policy',
+  description: 'Dukaan ERP aap ka data kaise mehfooz rakhta hai, kya store karta hai, aur delete karne ka tareeqa.',
+  alternates: { canonical: '/privacy' }
+};
 
 export default async function PrivacyPage() {
   const t = await getServerT();
@@ -27,6 +34,15 @@ export default async function PrivacyPage() {
       </div>
 
       <div className="card p-4 mt-10 text-xs text-chalkdim">{t('privacy.disclaimer')}</div>
+
+      {/* The legal pages were only ever linked from the landing footer,
+          leaving them as near-dead ends. Linking them to each other and
+          back to signup keeps crawl paths (and readers) moving. */}
+      <nav className="flex flex-wrap gap-4 mt-8 pt-6 border-t border-chalk/10 text-xs text-chalkdim">
+        <Link href="/terms" className="hover:text-haldi">{t('landing.footerTerms')}</Link>
+        <Link href="/signup" className="hover:text-haldi">{t('landing.freeTrialNav')}</Link>
+        <Link href="/login" className="hover:text-haldi">{t('landing.login')}</Link>
+      </nav>
     </main>
   );
 }
