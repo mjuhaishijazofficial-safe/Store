@@ -55,7 +55,18 @@ export async function POST(req: Request) {
     redirectTo: `${requireEnv('NEXT_PUBLIC_APP_URL')}/reset-password`
   });
 
-  if (sendErr) return NextResponse.json({ error: sendErr.message }, { status: 400 });
+  if (sendErr) {
+    // The user row above was already created — left as-is, that's a
+    // real account with no invite email ever delivered, and worse, an
+    // unretryable dead end: trying again just fails with "already
+    // exists" since createUser() now sees it, with no way for the
+    // owner to know the first attempt silently died on the email step.
+    // Deleting it here makes the whole operation atomic from the
+    // caller's side — either both steps land, or neither does, and a
+    // retry (e.g. once an email-rate-limit clears) starts clean.
+    await admin.auth.admin.deleteUser(created.user.id).catch(() => {});
+    return NextResponse.json({ error: sendErr.message }, { status: 400 });
+  }
 
   return NextResponse.json({ ok: true });
 }
