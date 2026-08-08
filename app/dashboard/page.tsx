@@ -50,7 +50,8 @@ export default async function OverviewPage() {
     { data: balances },
     { data: topSelling },
     { data: recentTxns },
-    { data: recentPayments }
+    { data: recentPayments },
+    { count: customerCount }
   ] = await Promise.all([
     supabase.from('shops').select('budget').eq('id', shopId).single(),
     supabase.from('items').select('id, stock, min_stock').eq('shop_id', shopId),
@@ -66,7 +67,8 @@ export default async function OverviewPage() {
     // khata collections are separate tables, so it's two small queries
     // instead of one, same tradeoff as the balance-aggregate RPCs above.
     supabase.from('transactions').select('id, item_name, type, qty, unit, amount, created_at').eq('shop_id', shopId).order('created_at', { ascending: false }).limit(5),
-    supabase.from('khata_entries').select('id, amount, created_at, customers(name)').eq('shop_id', shopId).eq('type', 'payment').order('created_at', { ascending: false }).limit(5)
+    supabase.from('khata_entries').select('id, amount, created_at, customers(name)').eq('shop_id', shopId).eq('type', 'payment').order('created_at', { ascending: false }).limit(5),
+    supabase.from('customers').select('*', { count: 'exact', head: true }).eq('shop_id', shopId)
   ]);
 
   const lowStockItems = (items || []).filter((i: any) => i.stock <= i.min_stock);
@@ -98,9 +100,50 @@ export default async function OverviewPage() {
     }))
   ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 6);
 
+  // Setup checklist, shown only while a shop is genuinely still empty.
+  // A brand-new account otherwise opens on a wall of ₨0 with no hint of
+  // what to do first — the numbers are correct but useless as a start.
+  const steps = [
+    { done: budget > 0, label: t('onboard.setBudget'), href: '/dashboard/settings' },
+    { done: (itemCount || 0) > 0, label: t('onboard.addItem'), href: '/dashboard/inventory' },
+    { done: (customerCount || 0) > 0, label: t('onboard.addCustomer'), href: '/dashboard/khata' },
+    { done: (recentTxns || []).length > 0, label: t('onboard.recordSale'), href: '/dashboard/inventory' }
+  ];
+  const stepsDone = steps.filter(s => s.done).length;
+  const showOnboarding = stepsDone < steps.length;
+
   return (
     <div>
       <h1 className="font-display text-xl font-700 mb-5">{t('overview.title')}</h1>
+
+      {showOnboarding && (
+        <div className="card p-5 mb-8 border-haldi/40">
+          <div className="flex items-baseline justify-between gap-3 mb-1">
+            <h2 className="font-display text-base font-700 text-haldi">{t('onboard.title')}</h2>
+            <span className="text-xs text-chalkdim font-mono shrink-0">{stepsDone}/{steps.length}</span>
+          </div>
+          <p className="text-chalkdim text-xs mb-4">{t('onboard.subtitle')}</p>
+          <div className="h-1.5 rounded-full bg-board3 overflow-hidden mb-4">
+            <div className="h-full rounded-full bg-haldi" style={{ width: `${(stepsDone / steps.length) * 100}%` }} />
+          </div>
+          <div className="space-y-1.5">
+            {steps.map(s => (
+              <Link
+                key={s.label}
+                href={s.href}
+                className={`flex items-center gap-2.5 text-sm py-1 ${s.done ? 'text-chalkdim' : ''}`}
+              >
+                <span className={`w-5 h-5 rounded-full border flex items-center justify-center text-[11px] shrink-0 ${
+                  s.done ? 'bg-dhania border-dhania text-board' : 'border-chalk/25'
+                }`}>
+                  {s.done ? '✓' : ''}
+                </span>
+                <span className={s.done ? 'line-through' : 'font-600'}>{s.label}</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-3 gap-3 mb-4">
         <StatCard href="/dashboard/settings" icon={<WalletIcon className="w-5 h-5" />} iconClass="bg-haldi/15 text-haldi" label={t('overview.totalBudget')} value={fmt(budget)} />

@@ -153,3 +153,36 @@ a.card:active, button.card:active {
 .btn-secondary:disabled {
   opacity: 0.55;
 }
+
+/* Print — for the daily report a shopkeeper hands over or files. The
+   app's chrome (nav, toggles, action buttons) carries no information on
+   paper, and the dark theme would burn through a cartridge, so print
+   always renders as black-on-white regardless of the active theme. */
+@media print {
+  .no-print { display: none !important; }
+
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  .card {
+    border: 1px solid #ccc !important;
+    box-shadow: none !important;
+    break-inside: avoid;
+  }
+
+  /* The theme tokens drive every text color through Tailwind classes;
+     overriding them here is what makes the whole subtree print legibly
+     instead of chasing each .text-* class individually. */
+  :root, html[data-theme='dark'] {
+    --color-board: 255 255 255;
+    --color-board2: 255 255 255;
+    --color-board3: 245 245 245;
+    --color-chalk: 0 0 0;
+    --color-chalkdim: 90 90 90;
+    --color-haldi: 120 80 10;
+    --color-mirch: 150 30 20;
+    --color-dhania: 30 90 30;
+  }
+}

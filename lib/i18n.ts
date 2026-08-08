@@ -174,6 +174,12 @@ export const dict = {
   'overview.pendingKhata': { ur: 'Kul Bakaya Khata', en: 'Pending Khata' },
   'overview.topSelling': { ur: 'Sabse Zyada Bikne Wale', en: 'Top Selling Products' },
   'overview.noSalesYet': { ur: 'Abhi tak koi bikri nahi', en: 'No sales yet' },
+  'onboard.title': { ur: 'Shuruaat Karein', en: 'Get Started' },
+  'onboard.subtitle': { ur: 'Ye 4 kaam kar lein, phir app poori tarah kaam karega', en: 'Finish these 4 steps and the app is fully set up' },
+  'onboard.setBudget': { ur: 'Dukaan ka budget set karein', en: 'Set your shop budget' },
+  'onboard.addItem': { ur: 'Pehla item inventory mein add karein', en: 'Add your first inventory item' },
+  'onboard.addCustomer': { ur: 'Pehla khata customer add karein', en: 'Add your first khata customer' },
+  'onboard.recordSale': { ur: 'Pehli bikri record karein', en: 'Record your first sale' },
   'overview.quickActions': { ur: 'Jaldi Karein', en: 'Quick Actions' },
   'overview.addItem': { ur: 'Item Add Karein', en: 'Add Item' },
   'overview.khataEntry': { ur: 'Khata Entry', en: 'Khata Entry' },
@@ -194,6 +200,7 @@ export const dict = {
   'reports.profit': { ur: 'Aaj ka Profit', en: "Today's Profit" },
   'reports.profitNote': { ur: 'Sirf becha hua saman — cost price se hisaab', en: 'From items sold only — based on cost price' },
   'reports.shareWhatsapp': { ur: 'WhatsApp Par Share Karein', en: 'Share on WhatsApp' },
+  'reports.print': { ur: 'Print / PDF Save Karein', en: 'Print / Save as PDF' },
   'reports.summaryMsg': {
     ur: '{shop} — Aaj ka Hisaab\nBikri: Rs. {sales}\nUdhaar diya: Rs. {given}\nPayment mila: Rs. {received}\nNaya maal: Rs. {stock}',
     en: '{shop} — Today’s Summary\nSales: Rs. {sales}\nCredit given: Rs. {given}\nPayments received: Rs. {received}\nStock purchased: Rs. {stock}'

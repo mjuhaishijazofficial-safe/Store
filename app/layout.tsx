@@ -19,7 +19,7 @@ export const metadata: Metadata = {
     locale: 'ur_PK'
   },
   twitter: {
-    card: 'summary',
+    card: 'summary_large_image',
     title: 'Dukaan ERP',
     description: 'Inventory + Khata + Suppliers + Staff + Reports — sab ek jagah, kiryana dukaanon ke liye.'
   }

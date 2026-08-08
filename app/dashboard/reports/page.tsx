@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getServerT } from '@/lib/i18n-server';
 import { startOfTodayPKT } from '@/lib/pkt-time';
 import ShareWhatsAppButton from '@/components/ShareWhatsAppButton';
+import PrintButton from '@/components/PrintButton';
 
 function fmt(n: number) {
   return '₨' + Number(n || 0).toLocaleString('en-IN');
@@ -49,8 +50,17 @@ export default async function ReportsPage() {
 
   return (
     <div className="max-w-md">
-      <h1 className="font-display text-xl font-700 mb-1">{t('reports.title')}</h1>
-      <p className="text-chalkdim text-sm mb-5">{t('reports.subtitle')}</p>
+      {/* Shop name + date only matter on paper — on screen both are
+          already in the header and implied by "today". */}
+      <div className="hidden print:block mb-5">
+        <div className="font-display text-2xl font-800">{shop?.name || 'Dukaan'}</div>
+        <div className="text-sm text-chalkdim">
+          {t('reports.title')} — {new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
+        </div>
+      </div>
+
+      <h1 className="font-display text-xl font-700 mb-1 no-print">{t('reports.title')}</h1>
+      <p className="text-chalkdim text-sm mb-5 no-print">{t('reports.subtitle')}</p>
 
       <div className="card p-5 mb-5">
         <div className="text-xs text-chalkdim uppercase tracking-wide mb-1">{t('reports.profit')}</div>
@@ -77,7 +87,10 @@ export default async function ReportsPage() {
         </div>
       </div>
 
-      <ShareWhatsAppButton text={shareText} label={t('reports.shareWhatsapp')} />
+      <div className="flex flex-col gap-2 no-print">
+        <ShareWhatsAppButton text={shareText} label={t('reports.shareWhatsapp')} />
+        <PrintButton label={t('reports.print')} />
+      </div>
     </div>
   );
 }

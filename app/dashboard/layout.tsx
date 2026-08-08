@@ -72,7 +72,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   return (
     <ShopProvider value={{ shopId: profile.shop_id, role: profile.role as 'owner' | 'staff', shopName: shop?.name || '' }}>
       <div className="min-h-screen">
-        <header className="border-b border-chalk/10">
+        <header className="border-b border-chalk/10 no-print">
           <div className="max-w-4xl mx-auto px-5 py-4 flex items-center flex-wrap gap-x-3 gap-y-2 justify-between">
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="w-10 h-10 rounded-xl bg-haldi/15 text-haldi flex items-center justify-center shrink-0">
