@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import ContactEditModal from '@/components/ContactEditModal';
 import { createClient } from '@/lib/supabase/client';
 import { useLang } from '@/lib/i18n-context';
 import { useShop } from '@/lib/shop-context';
@@ -32,6 +33,7 @@ function fmt(n: number) {
 
 export default function SupplierDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const supplierId = params.id as string;
   const supabase = createClient();
   const { t } = useLang();
@@ -46,6 +48,7 @@ export default function SupplierDetailPage() {
   const [loading, setLoading] = useState(true);
 
   const [modalType, setModalType] = useState<'purchase' | 'payment' | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
   const [form, setForm] = useState({ item_name: '', qty: '', amount: '', note: '' });
 
   useEffect(() => { loadAll(); }, [supplierId, shopId]);
@@ -125,8 +128,13 @@ export default function SupplierDetailPage() {
       <Link href="/dashboard/suppliers" className="text-xs text-chalkdim hover:text-haldi">{t('suppliersDetail.back')}</Link>
 
       <div className="card p-5 mt-3 mb-4">
-        <div className="font-display text-lg font-700">{supplier.name}</div>
-        <div className="text-xs text-chalkdim mb-4">{supplier.phone || '—'}</div>
+        <div className="flex justify-between items-start mb-4">
+          <div>
+            <div className="font-display text-lg font-700">{supplier.name}</div>
+            <div className="text-xs text-chalkdim">{supplier.phone || '—'}</div>
+          </div>
+          <button onClick={() => setEditOpen(true)} className="text-xs text-chalkdim hover:text-haldi shrink-0">{t('contact.edit')}</button>
+        </div>
 
         <div className="text-xs text-chalkdim">{t('suppliersDetail.totalOwed')}</div>
         <div className={`font-mono font-800 text-3xl ${total > 0 ? 'text-mirch' : 'text-dhania'}`}>{fmt(total)}</div>
@@ -195,6 +203,17 @@ export default function SupplierDetailPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {editOpen && (
+        <ContactEditModal
+          kind="supplier"
+          contact={supplier}
+          balance={total}
+          onClose={() => setEditOpen(false)}
+          onSaved={() => { setEditOpen(false); loadAll(); }}
+          onDeleted={() => router.push('/dashboard/suppliers')}
+        />
       )}
     </div>
   );

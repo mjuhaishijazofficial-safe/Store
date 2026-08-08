@@ -1,13 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { useLang } from '@/lib/i18n-context';
 import { useShop } from '@/lib/shop-context';
 import { useToast } from '@/lib/toast-context';
 import { ReceiptIcon, CashIcon } from '@/components/icons';
+import ContactEditModal from '@/components/ContactEditModal';
 
 type Customer = {
   id: string;
@@ -36,6 +37,7 @@ function fmt(n: number) {
 
 export default function KhataDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const customerId = params.id as string;
   const supabase = createClient();
   const { t } = useLang();
@@ -57,6 +59,7 @@ export default function KhataDetailPage() {
   const [advanceDepletedNotice, setAdvanceDepletedNotice] = useState(false);
 
   const [modalType, setModalType] = useState<'purchase' | 'payment' | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
   const [form, setForm] = useState({ item_name: '', qty: '', amount: '', note: '' });
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -248,7 +251,10 @@ export default function KhataDetailPage() {
           </div>
           <div className="min-w-0 flex-1">
             <div className="font-display text-lg font-700 leading-tight">{customer.name}</div>
-            <div className="text-xs text-chalkdim">{customer.phone || '—'}</div>
+            <div className="text-xs text-chalkdim">
+              {customer.phone || '—'}
+              <button onClick={() => setEditOpen(true)} className="ml-2 text-chalkdim hover:text-haldi underline">{t('contact.edit')}</button>
+            </div>
           </div>
           <div className="text-right shrink-0">
             <div className="text-[10px] text-chalkdim uppercase tracking-wide">{total < 0 ? t('khataDetail.advanceBalance') : t('khataDetail.totalUdhaar')}</div>
@@ -427,6 +433,17 @@ export default function KhataDetailPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {editOpen && (
+        <ContactEditModal
+          kind="customer"
+          contact={customer}
+          balance={total}
+          onClose={() => setEditOpen(false)}
+          onSaved={() => { setEditOpen(false); loadAll(); }}
+          onDeleted={() => router.push('/dashboard/khata')}
+        />
       )}
     </div>
   );
