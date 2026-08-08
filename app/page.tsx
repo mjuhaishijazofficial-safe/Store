@@ -78,7 +78,7 @@ export default async function Home() {
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
-      <main className="max-w-5xl mx-auto px-6 py-16">
+      <main className="max-w-[1440px] mx-auto px-6 sm:px-10 lg:px-16 py-16">
         <div className="flex items-center justify-between mb-16 gap-3">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-lg bg-haldi/15 text-haldi flex items-center justify-center shrink-0">
@@ -94,63 +94,70 @@ export default async function Home() {
           </div>
         </div>
 
-        {/* Hero */}
-        <section className="text-center mb-16">
-          <div className="inline-block bg-haldi/10 text-haldi text-xs font-600 px-3 py-1.5 rounded-full mb-6 max-w-md">
-            {t('landing.usp')}
+        {/* Hero + product preview, side by side on desktop — text takes
+            the left column and gets to breathe at this container width
+            instead of squeezing into a centered narrow column with the
+            preview stacked underneath. Mobile/tablet keep the original
+            centered single-column stack (order-first via source order,
+            no lg: prefix needed there). */}
+        <section className="lg:grid lg:grid-cols-2 lg:gap-16 lg:items-center mb-20">
+          <div className="text-center lg:text-left">
+            <div className="inline-block bg-haldi/10 text-haldi text-xs font-600 px-3 py-1.5 rounded-full mb-6 max-w-md">
+              {t('landing.usp')}
+            </div>
+            <h1 className="font-display text-5xl font-800 leading-tight mb-6">
+              {t('landing.heroLine1')} <span className="text-haldi">{t('landing.heroLine1Highlight')}</span><br />{t('landing.heroLine2')}
+            </h1>
+            <p className="text-chalkdim text-lg max-w-xl mx-auto lg:mx-0 mb-8">
+              {t('landing.heroBody')}
+            </p>
+            <Link href="/signup" className="btn-primary text-base inline-block">{t('landing.heroCta')}</Link>
           </div>
-          <h1 className="font-display text-5xl font-800 leading-tight mb-6">
-            {t('landing.heroLine1')} <span className="text-haldi">{t('landing.heroLine1Highlight')}</span><br />{t('landing.heroLine2')}
-          </h1>
-          <p className="text-chalkdim text-lg max-w-xl mx-auto mb-8">
-            {t('landing.heroBody')}
-          </p>
-          <Link href="/signup" className="btn-primary text-base inline-block">{t('landing.heroCta')}</Link>
-        </section>
 
-        {/* Product preview — an illustration built from the app's own
-            design tokens, not a claimed screenshot, since sample data
-            shouldn't be presented as if it were a real shop's data. */}
-        <section className="mb-20">
-          <div className="text-center text-xs text-chalkdim uppercase tracking-wide mb-3">{t('landing.previewLabel')}</div>
-          <div className="card p-2 max-w-xl mx-auto overflow-hidden">
-            <div className="bg-board3 rounded-xl p-5">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-7 h-7 rounded-md bg-haldi/20 text-haldi flex items-center justify-center">
-                  <StoreIcon className="w-4 h-4" />
-                </div>
-                <div className="font-display font-700 text-sm">Meri Dukaan</div>
-              </div>
-              <div className="grid grid-cols-3 gap-2.5">
-                <div className="card p-3">
-                  <div className="w-7 h-7 rounded-full bg-haldi/15 text-haldi flex items-center justify-center mb-2">
-                    <WalletIcon className="w-4 h-4" />
+          {/* Product preview — an illustration built from the app's own
+              design tokens, not a claimed screenshot, since sample data
+              shouldn't be presented as if it were a real shop's data. */}
+          <div className="mt-16 lg:mt-0">
+            <div className="text-center lg:text-left text-xs text-chalkdim uppercase tracking-wide mb-3">{t('landing.previewLabel')}</div>
+            <div className="card p-2 max-w-xl lg:max-w-none mx-auto overflow-hidden">
+              <div className="bg-board3 rounded-xl p-5">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-7 h-7 rounded-md bg-haldi/20 text-haldi flex items-center justify-center">
+                    <StoreIcon className="w-4 h-4" />
                   </div>
-                  <div className="text-[10px] text-chalkdim uppercase tracking-wide">{t('overview.totalBudget')}</div>
-                  <div className="font-mono font-700 text-sm">₨50,000</div>
+                  <div className="font-display font-700 text-sm">Meri Dukaan</div>
                 </div>
-                <div className="card p-3">
-                  <div className="w-7 h-7 rounded-full bg-mirch/15 text-mirch flex items-center justify-center mb-2">
-                    <TrendDownIcon className="w-4 h-4" />
+                <div className="grid grid-cols-3 gap-2.5">
+                  <div className="card p-3">
+                    <div className="w-7 h-7 rounded-full bg-haldi/15 text-haldi flex items-center justify-center mb-2">
+                      <WalletIcon className="w-4 h-4" />
+                    </div>
+                    <div className="text-[10px] text-chalkdim uppercase tracking-wide">{t('overview.totalBudget')}</div>
+                    <div className="font-mono font-700 text-sm">₨50,000</div>
                   </div>
-                  <div className="text-[10px] text-chalkdim uppercase tracking-wide">{t('overview.spent')}</div>
-                  <div className="font-mono font-700 text-sm text-mirch">₨18,400</div>
-                </div>
-                <div className="card p-3">
-                  <div className="w-7 h-7 rounded-full bg-dhania/15 text-dhania flex items-center justify-center mb-2">
-                    <CashIcon className="w-4 h-4" />
+                  <div className="card p-3">
+                    <div className="w-7 h-7 rounded-full bg-mirch/15 text-mirch flex items-center justify-center mb-2">
+                      <TrendDownIcon className="w-4 h-4" />
+                    </div>
+                    <div className="text-[10px] text-chalkdim uppercase tracking-wide">{t('overview.spent')}</div>
+                    <div className="font-mono font-700 text-sm text-mirch">₨18,400</div>
                   </div>
-                  <div className="text-[10px] text-chalkdim uppercase tracking-wide">{t('overview.remaining')}</div>
-                  <div className="font-mono font-700 text-sm text-dhania">₨31,600</div>
+                  <div className="card p-3">
+                    <div className="w-7 h-7 rounded-full bg-dhania/15 text-dhania flex items-center justify-center mb-2">
+                      <CashIcon className="w-4 h-4" />
+                    </div>
+                    <div className="text-[10px] text-chalkdim uppercase tracking-wide">{t('overview.remaining')}</div>
+                    <div className="font-mono font-700 text-sm text-dhania">₨31,600</div>
+                  </div>
                 </div>
               </div>
             </div>
+            <div className="text-center lg:text-left text-[11px] text-chalkdim mt-2">{t('landing.previewNote')}</div>
           </div>
-          <div className="text-center text-[11px] text-chalkdim mt-2">{t('landing.previewNote')}</div>
         </section>
 
         {/* Features */}
-        <section className="grid md:grid-cols-3 gap-6 mb-20">
+        <section className="grid md:grid-cols-3 gap-8 mb-20">
           {features.map(f => (
             <div key={f.title} className="card p-6">
               <div className="font-display text-lg font-700 text-haldi mb-2">{f.title}</div>
@@ -159,16 +166,21 @@ export default async function Home() {
           ))}
         </section>
 
-        {/* Trust */}
-        <section className="mb-20">
-          <h2 className="font-display text-2xl font-800 text-center mb-8">{t('landing.trustTitle')}</h2>
-          <div className="grid md:grid-cols-3 gap-6">
-            {trust.map(item => (
-              <div key={item.title} className="text-center">
-                <div className="font-display text-base font-700 text-haldi mb-1">{item.title}</div>
-                <div className="text-chalkdim text-sm">{item.body}</div>
-              </div>
-            ))}
+        {/* Trust — a full-bleed band (negative margin cancels this
+            page's own container padding, so the tinted background runs
+            edge to edge) to break the visual rhythm of card-on-page
+            sections repeating one after another. */}
+        <section className="-mx-6 sm:-mx-10 lg:-mx-16 px-6 sm:px-10 lg:px-16 py-16 bg-board3 mb-20">
+          <div className="max-w-[1440px] mx-auto">
+            <h2 className="font-display text-2xl font-800 text-center mb-8">{t('landing.trustTitle')}</h2>
+            <div className="grid md:grid-cols-3 gap-8">
+              {trust.map(item => (
+                <div key={item.title} className="text-center">
+                  <div className="font-display text-base font-700 text-haldi mb-1">{item.title}</div>
+                  <div className="text-chalkdim text-sm">{item.body}</div>
+                </div>
+              ))}
+            </div>
           </div>
         </section>
 
