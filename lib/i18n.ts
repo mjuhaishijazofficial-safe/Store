@@ -113,7 +113,7 @@ export const dict = {
   'privacy.s3Title': { ur: '3. Kis Ke Sath Share Hota Hai', en: '3. Who We Share It With' },
   'privacy.s3Body': { ur: 'Kisi ko nahi bechte. Sirf zaroori service providers use karte hain: Supabase (database/auth), Stripe (payment processing). Ye dono apni khud ki security policies follow karte hain.', en: 'We don’t sell it to anyone. We only use necessary service providers: Supabase (database/auth), Stripe (payment processing). Both follow their own security policies.' },
   'privacy.s4Title': { ur: '4. Aapke Huqooq', en: '4. Your Rights' },
-  'privacy.s4Body': { ur: 'Aap apna data kabhi bhi dekh, edit, ya delete kar sakte hain app ke andar se. Poora account delete karwane ke liye WhatsApp par rabta karein.', en: 'You can view, edit, or delete your data any time from within the app. To delete your whole account, contact us on WhatsApp.' },
+  'privacy.s4Body': { ur: 'Aap apna data kabhi bhi dekh, edit, ya delete kar sakte hain app ke andar se. Poora account (dukaan ka saara data, sab staff logins) khud Settings → Danger Zone se delete kar sakte hain — koi wait ya email nahi karna padta. Sawal ho to WhatsApp par rabta karein.', en: 'You can view, edit, or delete your data any time from within the app. You can delete your whole account (all shop data, all staff logins) yourself from Settings → Danger Zone — no waiting or emailing required. Questions? Reach us on WhatsApp.' },
   'privacy.disclaimer': { ur: 'Ye document ek starting template hai, poori legal advice nahi. Agar aapko is ki legal sehat ki tasdeeq chahiye, kisi qanooni mushir se rabta karein.', en: 'This document is a starting template, not full legal advice. If you need it legally verified, please consult a lawyer.' },
 
   // auth

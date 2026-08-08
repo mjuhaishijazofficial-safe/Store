@@ -2,15 +2,14 @@
 
 import { WhatsAppIcon } from '@/components/icons';
 import { useLang } from '@/lib/i18n-context';
-
-const SUPPORT_WHATSAPP = '923336687817';
+import { SUPPORT_WHATSAPP_NUMBER } from '@/lib/constants';
 
 export default function WhatsAppFloatingButton() {
   const { t } = useLang();
 
   function open() {
     const msg = t('landing.whatsappMsg');
-    window.open(`https://wa.me/${SUPPORT_WHATSAPP}?text=${encodeURIComponent(msg)}`, '_blank');
+    window.open(`https://wa.me/${SUPPORT_WHATSAPP_NUMBER}?text=${encodeURIComponent(msg)}`, '_blank');
   }
 
   return (

@@ -4,6 +4,7 @@ import ThemeToggle from '@/components/ThemeToggle';
 import WhatsAppFloatingButton from '@/components/WhatsAppFloatingButton';
 import { StoreIcon, WalletIcon, TrendDownIcon, CashIcon, WhatsAppIcon } from '@/components/icons';
 import { getServerT } from '@/lib/i18n-server';
+import { SUPPORT_WHATSAPP_NUMBER } from '@/lib/constants';
 
 export default async function Home() {
   const t = await getServerT();
@@ -157,7 +158,7 @@ export default async function Home() {
           <div className="font-display text-lg font-700 mb-1">{t('landing.supportTitle')}</div>
           <div className="text-chalkdim text-sm mb-5">{t('landing.supportBody')}</div>
           <a
-            href={`https://wa.me/923336687817?text=${encodeURIComponent('Assalam o Alaikum, mujhe Dukaan ERP ke baare mein sawal hai:')}`}
+            href={`https://wa.me/${SUPPORT_WHATSAPP_NUMBER}?text=${encodeURIComponent(t('landing.whatsappMsg'))}`}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 bg-dhania text-white font-700 rounded-lg px-5 py-2.5 hover:brightness-110 transition"
