@@ -8,6 +8,7 @@ import { useShop } from '@/lib/shop-context';
 import { useToast } from '@/lib/toast-context';
 import { usePalette } from '@/lib/palette-context';
 import AppLockSettings from '@/components/AppLockSettings';
+import { downloadJson } from '@/lib/csv';
 
 export default function SettingsPage() {
   const supabase = createClient();
@@ -25,6 +26,7 @@ export default function SettingsPage() {
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => { init(); }, [shopId]);
 
@@ -41,6 +43,22 @@ export default function SettingsPage() {
     const { error: err } = await supabase.from('shops').update({ name, budget }).eq('id', shopId);
     if (err) { showToast(t('common.error'), 'error'); return; }
     showToast(t('settings.saved'), 'success');
+  }
+
+  async function exportAllData() {
+    setExporting(true);
+    try {
+      const res = await fetch('/api/export/full');
+      if (!res.ok) { showToast(t('common.error'), 'error'); return; }
+      const data = await res.json();
+      downloadJson(`dukaan-export-${new Date().toISOString().slice(0, 10)}.json`, data);
+      // localStorage marker for the "last export" reminder elsewhere —
+      // purely a UX nudge, never read for anything security/data-related.
+      localStorage.setItem('dukaan:lastExportAt', new Date().toISOString());
+    } catch {
+      showToast(t('common.error'), 'error');
+    }
+    setExporting(false);
   }
 
   async function confirmDelete() {
@@ -116,6 +134,16 @@ export default function SettingsPage() {
           on a shared counter phone — not gated to owner like the rest
           of this page. */}
       <AppLockSettings />
+
+      {isOwner && (
+        <div className="mt-10 pt-6 border-t border-chalk/10">
+          <div className="text-xs text-chalkdim uppercase tracking-wide font-700 mb-1">{t('settings.dataBackup')}</div>
+          <div className="text-chalkdim text-xs mb-3">{t('settings.dataBackupHint')}</div>
+          <button onClick={exportAllData} disabled={exporting} className="btn-secondary w-full">
+            {exporting ? t('settings.exporting') : t('settings.exportAllData')}
+          </button>
+        </div>
+      )}
 
       {isOwner && (
         <div className="mt-10 pt-6 border-t border-mirch/30">

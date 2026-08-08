@@ -12,6 +12,22 @@ function escapeCsvCell(value: unknown): string {
   return s;
 }
 
+// Same client-side Blob-download technique as downloadCsv below, for the
+// one place a JSON file (not a spreadsheet) is the right shape — the
+// full-shop data export in Settings, where the payload is several
+// tables' worth of rows rather than one flat list.
+export function downloadJson(filename: string, data: unknown) {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 export function downloadCsv(filename: string, rows: Record<string, unknown>[]) {
   if (rows.length === 0) return;
 
