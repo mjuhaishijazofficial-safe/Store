@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import BillingActions from '@/components/BillingActions';
+import ManualPayment from '@/components/ManualPayment';
 import { getServerT } from '@/lib/i18n-server';
 
 export default async function BillingPage() {
@@ -9,11 +10,21 @@ export default async function BillingPage() {
   const { data: { user } } = await supabase.auth.getUser();
   const { data: profile } = await supabase.from('profiles').select('shop_id, role').eq('id', user!.id).single();
   if (profile?.role !== 'owner') redirect('/dashboard');
-  const { data: shop } = await supabase
-    .from('shops')
-    .select('subscription_status, plan, trial_ends_at, stripe_customer_id')
-    .eq('id', profile?.shop_id)
-    .single();
+  const [{ data: shop }, { data: lastClaim }] = await Promise.all([
+    supabase
+      .from('shops')
+      .select('subscription_status, plan, trial_ends_at, stripe_customer_id')
+      .eq('id', profile?.shop_id)
+      .single(),
+    supabase
+      .from('payment_claims')
+      .select('status')
+      .eq('shop_id', profile?.shop_id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+  ]);
+  const pending = lastClaim?.status === 'pending';
 
   const statusLabel: Record<string, string> = {
     trialing: t('billing.statusTrialing'),
@@ -41,7 +52,23 @@ export default async function BillingPage() {
         <div className="text-chalkdim text-sm">{t('billing.perShop')}</div>
       </div>
 
-      <BillingActions hasSubscription={!!shop?.stripe_customer_id} />
+      {shop?.stripe_customer_id ? (
+        <BillingActions hasSubscription />
+      ) : shop?.subscription_status === 'active' ? (
+        <div className="card p-5 text-center text-dhania text-sm">{t('billing.alreadyActive')}</div>
+      ) : (
+        <ManualPayment
+          pending={pending}
+          details={{
+            easypaisaNumber: process.env.EASYPAISA_NUMBER || '',
+            easypaisaTitle: process.env.EASYPAISA_TITLE || '',
+            meezanTitle: process.env.MEEZAN_TITLE || '',
+            meezanAccount: process.env.MEEZAN_ACCOUNT || '',
+            meezanIban: process.env.MEEZAN_IBAN || '',
+            meezanBranch: process.env.MEEZAN_BRANCH || ''
+          }}
+        />
+      )}
     </div>
   );
 }

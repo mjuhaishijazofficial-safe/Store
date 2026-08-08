@@ -356,6 +356,24 @@ export const dict = {
   'billing.manageSubscription': { ur: 'Subscription Manage Karein', en: 'Manage Subscription' },
   'billing.subscribe': { ur: 'Subscribe Karein', en: 'Subscribe' },
   'billing.loading': { ur: 'Loading...', en: 'Loading...' },
+  'billing.alreadyActive': { ur: 'Aap ka subscription active hai. Shukriya! 🎉', en: 'Your subscription is active. Thank you! 🎉' },
+  'billing.manualIntro': {
+    ur: 'Neeche diye gaye kisi bhi account mein ₨999 bhej dein, phir "Maine Payment Kar Di" dabayein — WhatsApp khulega jahan screenshot bhej kar confirm karein. Hum verify kar ke usi din subscription activate kar dete hain.',
+    en: 'Send ₨999 to either account below, then tap "I\'ve Paid" — WhatsApp will open so you can send the screenshot. We verify it and activate your subscription the same day.'
+  },
+  'billing.easypaisa': { ur: 'EasyPaisa', en: 'EasyPaisa' },
+  'billing.bankTransfer': { ur: 'Bank Transfer (Meezan Bank)', en: 'Bank Transfer (Meezan Bank)' },
+  'billing.accountTitle': { ur: 'Account Title', en: 'Account Title' },
+  'billing.accountNumber': { ur: 'Account Number', en: 'Account Number' },
+  'billing.iban': { ur: 'IBAN', en: 'IBAN' },
+  'billing.branch': { ur: 'Branch', en: 'Branch' },
+  'billing.copy': { ur: 'Copy', en: 'Copy' },
+  'billing.copied': { ur: 'Copy ho gaya', en: 'Copied' },
+  'billing.ivePaidVia': { ur: 'Maine Payment Kar Di —', en: "I've Paid via" },
+  'billing.verifyNote': { ur: 'Verification mein thoda time lag sakta hai — usi din subscription activate ho jayega.', en: 'Verification may take a little time — your subscription will be activated the same day.' },
+  'billing.claimSubmitted': { ur: 'Theek hai! WhatsApp pe screenshot bhej dein.', en: 'Got it! Please send the screenshot on WhatsApp.' },
+  'billing.pendingTitle': { ur: 'Payment Verification Pending', en: 'Payment Verification Pending' },
+  'billing.pendingBody': { ur: 'Aap ki payment ki confirmation mil chuki hai, hum WhatsApp screenshot check kar ke jald subscription activate kar denge.', en: 'We\'ve received your payment confirmation — we\'ll check the WhatsApp screenshot and activate your subscription shortly.' },
 
   // settings
   'settings.title': { ur: 'Settings', en: 'Settings' },

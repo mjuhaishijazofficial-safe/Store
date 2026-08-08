@@ -111,6 +111,19 @@ create table if not exists supplier_entries (
   created_at timestamptz not null default now()
 );
 
+-- 9. PAYMENT_CLAIMS (manual EasyPaisa/bank transfer, no payment gateway
+--    for Pakistan yet — owner marks "I've paid", we verify the WhatsApp
+--    screenshot by hand and flip shops.subscription_status ourselves) ----
+create table if not exists payment_claims (
+  id uuid primary key default gen_random_uuid(),
+  shop_id uuid not null references shops(id) on delete cascade,
+  method text not null check (method in ('easypaisa','bank')),
+  amount numeric not null,
+  status text not null default 'pending' check (status in ('pending','confirmed')),
+  created_by uuid references auth.users(id),
+  created_at timestamptz not null default now()
+);
+
 -- ============================================================
 -- Atomic write functions
 --
@@ -287,6 +300,7 @@ alter table customers enable row level security;
 alter table khata_entries enable row level security;
 alter table suppliers enable row level security;
 alter table supplier_entries enable row level security;
+alter table payment_claims enable row level security;
 
 -- shops: a user can only see/update their own shop
 -- Postgres has no "create policy if not exists" — drop-then-create is the
@@ -334,6 +348,12 @@ drop policy if exists "suppliers_own_shop" on suppliers;
 create policy "suppliers_own_shop" on suppliers for all
   using (shop_id = my_shop_id())
   with check (shop_id = my_shop_id());
+-- payment_claims: billing is owner-only, same as shop_update_own above
+drop policy if exists "payment_claims_own_shop" on payment_claims;
+create policy "payment_claims_own_shop" on payment_claims for all
+  using (shop_id = my_shop_id() and my_role() = 'owner')
+  with check (shop_id = my_shop_id() and my_role() = 'owner');
+
 drop policy if exists "supplier_entries_own_shop" on supplier_entries;
 create policy "supplier_entries_own_shop" on supplier_entries for all
   using (shop_id = my_shop_id())
