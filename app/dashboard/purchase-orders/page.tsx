@@ -11,7 +11,7 @@ import NewPurchaseOrderModal from '@/components/NewPurchaseOrderModal';
 
 type Po = {
   id: string;
-  status: 'draft' | 'sent' | 'received' | 'cancelled';
+  status: 'draft' | 'sent' | 'received' | 'partial' | 'cancelled';
   note: string | null;
   created_at: string;
   suppliers: { name: string } | null;
@@ -21,6 +21,7 @@ type Po = {
 const STATUS_COLORS: Record<Po['status'], string> = {
   draft: 'text-chalkdim border-chalk/20',
   sent: 'text-haldi border-haldi/40',
+  partial: 'text-haldi border-haldi/40',
   received: 'text-dhania border-dhania/40',
   cancelled: 'text-mirch border-mirch/40'
 };
@@ -45,6 +46,7 @@ export default function PurchaseOrdersPage() {
   const statusLabels: Record<Po['status'], string> = {
     draft: t('po.statusDraft'),
     sent: t('po.statusSent'),
+    partial: t('po.statusPartial'),
     received: t('po.statusReceived'),
     cancelled: t('po.statusCancelled')
   };

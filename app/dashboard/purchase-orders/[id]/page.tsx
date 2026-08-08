@@ -10,9 +10,9 @@ import { useToast } from '@/lib/toast-context';
 import { useSectionGuard } from '@/lib/use-section-guard';
 import ConfirmDeleteButton from '@/components/ConfirmDeleteButton';
 
-type Status = 'draft' | 'sent' | 'received' | 'cancelled';
+type Status = 'draft' | 'sent' | 'received' | 'partial' | 'cancelled';
 
-type Line = { id: string; item_id: string | null; item_name: string; qty: number; cost_price: number };
+type Line = { id: string; item_id: string | null; item_name: string; qty: number; cost_price: number; received_qty: number };
 
 type Po = {
   id: string;
@@ -47,13 +47,27 @@ export default function PurchaseOrderDetailPage() {
   const [search, setSearch] = useState('');
   const [manualName, setManualName] = useState('');
 
+  // How much to receive right now, per line — defaults to each line's
+  // full remaining quantity so a one-tap "receive everything left"
+  // still works, but any of these can be lowered for a partial delivery.
+  const [receiveQty, setReceiveQty] = useState<Record<string, string>>({});
+
   useEffect(() => { loadAll(); }, [poId, shopId]);
+
+  useEffect(() => {
+    const next: Record<string, string> = {};
+    for (const l of lines) {
+      const remaining = Math.max(0, l.qty - l.received_qty);
+      next[l.id] = remaining > 0 ? String(remaining) : '0';
+    }
+    setReceiveQty(next);
+  }, [lines]);
 
   async function loadAll() {
     setLoading(true);
     const [{ data: poRow }, { data: lineRows }, { data: itemRows }] = await Promise.all([
       supabase.from('purchase_orders').select('id, status, note, created_at, received_at, suppliers(name)').eq('id', poId).single(),
-      supabase.from('purchase_order_items').select('id, item_id, item_name, qty, cost_price').eq('purchase_order_id', poId).order('created_at'),
+      supabase.from('purchase_order_items').select('id, item_id, item_name, qty, cost_price, received_qty').eq('purchase_order_id', poId).order('created_at'),
       supabase.from('items').select('id, name, unit, cost_price').eq('shop_id', shopId).order('name')
     ]);
     setPo((poRow as any) || null);
@@ -70,10 +84,12 @@ export default function PurchaseOrderDetailPage() {
 
   const total = lines.reduce((s, l) => s + l.qty * l.cost_price, 0);
   const isDraft = po?.status === 'draft';
+  const canReceive = po?.status === 'draft' || po?.status === 'sent' || po?.status === 'partial';
 
   const statusLabels: Record<Status, string> = {
     draft: t('po.statusDraft'),
     sent: t('po.statusSent'),
+    partial: t('po.statusPartial'),
     received: t('po.statusReceived'),
     cancelled: t('po.statusCancelled')
   };
@@ -119,10 +135,18 @@ export default function PurchaseOrderDetailPage() {
     await loadAll();
   }
 
-  async function markReceived() {
+  // p_receipts = null receives everything still outstanding on every
+  // line in one shot (the quick path); otherwise only the per-line
+  // amounts typed into the "receive now" inputs go through — a real
+  // delivery covering less than the full order.
+  async function receive(full: boolean) {
     if (lines.length === 0) return;
     setBusy(true);
-    const { error: err } = await supabase.rpc('mark_po_received', { p_po_id: poId });
+    const receipts = full ? null : lines
+      .map(l => ({ line_id: l.id, qty: Number(receiveQty[l.id]) || 0 }))
+      .filter(r => r.qty > 0);
+    if (!full && receipts!.length === 0) { setBusy(false); return; }
+    const { error: err } = await supabase.rpc('receive_po_lines', { p_po_id: poId, p_receipts: receipts });
     setBusy(false);
     if (err) { showToast(t('common.error'), 'error'); return; }
     showToast(t('po.receivedToast'), 'success');
@@ -146,7 +170,7 @@ export default function PurchaseOrderDetailPage() {
           </div>
           <div className={`text-[10px] uppercase border rounded px-2 py-1 ${
             po.status === 'draft' ? 'text-chalkdim border-chalk/20' :
-            po.status === 'sent' ? 'text-haldi border-haldi/40' :
+            po.status === 'sent' || po.status === 'partial' ? 'text-haldi border-haldi/40' :
             po.status === 'received' ? 'text-dhania border-dhania/40' : 'text-mirch border-mirch/40'
           }`}>
             {statusLabels[po.status]}
@@ -160,41 +184,62 @@ export default function PurchaseOrderDetailPage() {
 
       <div className="text-xs text-chalkdim uppercase tracking-wide mb-2">{t('po.items')}</div>
       <div className="space-y-2 mb-4">
-        {lines.map(l => (
-          <div key={l.id} className="card p-3">
-            <div className="flex justify-between items-start mb-2">
-              <div className="text-sm font-600">{l.item_name}</div>
-              {isDraft && <ConfirmDeleteButton onConfirm={() => removeLine(l.id)} />}
+        {lines.map(l => {
+          const remaining = Math.max(0, l.qty - l.received_qty);
+          return (
+            <div key={l.id} className="card p-3">
+              <div className="flex justify-between items-start mb-2">
+                <div className="text-sm font-600">{l.item_name}</div>
+                {isDraft && <ConfirmDeleteButton onConfirm={() => removeLine(l.id)} />}
+              </div>
+              {isDraft ? (
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[10px] text-chalkdim mb-0.5">{t('cart.qty')}</label>
+                    <input
+                      type="number" inputMode="decimal" className="input py-1.5 text-sm"
+                      value={l.qty}
+                      onChange={e => updateLine(l.id, { qty: Number(e.target.value) })}
+                      onBlur={() => saveLine(l.id)}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-chalkdim mb-0.5">{t('po.costPrice')}</label>
+                    <input
+                      type="number" inputMode="decimal" className="input py-1.5 text-sm"
+                      value={l.cost_price}
+                      onChange={e => updateLine(l.id, { cost_price: Number(e.target.value) })}
+                      onBlur={() => saveLine(l.id)}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="flex justify-between text-xs text-chalkdim mb-1">
+                  <span>{l.qty} × {fmt(l.cost_price)}</span>
+                  <span className="font-mono">{fmt(l.qty * l.cost_price)}</span>
+                </div>
+              )}
+
+              {l.received_qty > 0 && (
+                <div className="text-[11px] text-dhania mt-1">{t('po.receivedSoFar')}: {l.received_qty} / {l.qty}</div>
+              )}
+
+              {canReceive && !isDraft && remaining > 0 && (
+                <div className="mt-2 pt-2 border-t border-chalk/10 flex items-center gap-2">
+                  <label className="text-[11px] text-chalkdim whitespace-nowrap">{t('po.receiveNow')}</label>
+                  <input
+                    type="number" inputMode="decimal"
+                    className="input py-1 text-sm flex-1"
+                    value={receiveQty[l.id] ?? ''}
+                    max={remaining}
+                    onChange={e => setReceiveQty(prev => ({ ...prev, [l.id]: e.target.value }))}
+                  />
+                  <span className="text-[11px] text-chalkdim whitespace-nowrap">/ {remaining} {t('po.remaining')}</span>
+                </div>
+              )}
             </div>
-            {isDraft ? (
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-[10px] text-chalkdim mb-0.5">{t('cart.qty')}</label>
-                  <input
-                    type="number" inputMode="decimal" className="input py-1.5 text-sm"
-                    value={l.qty}
-                    onChange={e => updateLine(l.id, { qty: Number(e.target.value) })}
-                    onBlur={() => saveLine(l.id)}
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] text-chalkdim mb-0.5">{t('po.costPrice')}</label>
-                  <input
-                    type="number" inputMode="decimal" className="input py-1.5 text-sm"
-                    value={l.cost_price}
-                    onChange={e => updateLine(l.id, { cost_price: Number(e.target.value) })}
-                    onBlur={() => saveLine(l.id)}
-                  />
-                </div>
-              </div>
-            ) : (
-              <div className="flex justify-between text-xs text-chalkdim">
-                <span>{l.qty} × {fmt(l.cost_price)}</span>
-                <span className="font-mono">{fmt(l.qty * l.cost_price)}</span>
-              </div>
-            )}
-          </div>
-        ))}
+          );
+        })}
 
         {lines.length === 0 && <div className="text-center py-6 text-chalkdim text-sm">{t('cart.empty')}</div>}
       </div>
@@ -223,9 +268,14 @@ export default function PurchaseOrderDetailPage() {
         <span className="font-mono font-800 text-xl">{fmt(total)}</span>
       </div>
 
-      {(po.status === 'draft' || po.status === 'sent') && (
+      {canReceive && (
         <div className="flex flex-col gap-2">
-          <button onClick={markReceived} disabled={busy || lines.length === 0} className="btn-primary w-full">
+          {!isDraft && (
+            <button onClick={() => receive(false)} disabled={busy || lines.length === 0} className="btn-primary w-full">
+              {t('po.receivePartial')}
+            </button>
+          )}
+          <button onClick={() => receive(true)} disabled={busy || lines.length === 0} className={isDraft ? 'btn-primary w-full' : 'btn-secondary w-full'}>
             {t('po.markReceived')}
           </button>
           <div className="flex gap-2">

@@ -161,8 +161,9 @@ alter table supplier_entries add constraint supplier_entries_payment_method_chec
 --     ordering these from supplier X"), separate from supplier_entries
 --     (which only records what already happened: goods received / paid
 --     for / returned). draft = still editable, sent = communicated to
---     the supplier and locked, received = mark_po_received() below has
---     already applied its stock + ledger effects, cancelled = never
+--     the supplier and locked, partial = some lines received but not
+--     all (see purchase_order_items.received_qty and receive_po_lines()
+--     below), received = every line fully received, cancelled = never
 --     fulfilled. Every status transition is one-way in the UI (no
 --     un-cancelling, no un-receiving) — same "ledger, not undo" stance
 --     as the rest of the app.
@@ -176,6 +177,12 @@ create table if not exists purchase_orders (
   created_at timestamptz not null default now(),
   received_at timestamptz
 );
+-- Widened for partial receiving — a supplier shipment often arrives in
+-- more than one delivery, and forcing "all or nothing" meant a shop
+-- with 8 of 10 ordered sacks in hand couldn't record any of it until
+-- the last two showed up.
+alter table purchase_orders drop constraint if exists purchase_orders_status_check;
+alter table purchase_orders add constraint purchase_orders_status_check check (status in ('draft','sent','received','partial','cancelled'));
 
 -- shop_id is denormalized here (not just derived via purchase_order_id ->
 -- purchase_orders.shop_id) so its RLS policy can stay the same simple
@@ -191,6 +198,12 @@ create table if not exists purchase_order_items (
   cost_price numeric not null default 0,
   created_at timestamptz not null default now()
 );
+-- How much of this line has actually arrived so far — always <= qty,
+-- enforced in receive_po_lines() rather than a DB constraint (a
+-- constraint referencing another column of the same row is fine, but
+-- keeping the cap logic in one place — the function — is simpler than
+-- keeping a CHECK in sync with it).
+alter table purchase_order_items add column if not exists received_qty numeric not null default 0;
 
 -- 9. EXPENSES (rent, staff salary, utilities, marketing — overhead that
 --    isn't stock purchase. Without this, "profit" only ever subtracted
@@ -580,14 +593,22 @@ begin
 end;
 $$;
 
--- Marking a PO received is the moment it actually affects the shop: every
--- line with a linked item_id restocks inventory (logged the same way a
--- manual Stock In is, so History/Reports don't need to know POs exist),
--- and one supplier_entries 'purchase' row records the total against what
--- the shop owes that supplier. All atomic, and only valid from
--- draft/sent — calling it twice on an already-received PO is a no-op
--- guard, not a double-restock.
-create or replace function mark_po_received(p_po_id uuid)
+-- Receiving stock against a PO is the moment it actually affects the
+-- shop: every line with a linked item_id restocks inventory (logged the
+-- same way a manual Stock In is, so History/Reports don't need to know
+-- POs exist), and one supplier_entries 'purchase' row records this
+-- delivery's total against what the shop owes that supplier.
+--
+-- p_receipts is a jsonb array of {line_id, qty} — how much of each line
+-- arrived THIS delivery. Passing null (the old mark_po_received's whole
+-- behavior) means "receive everything still outstanding on every line
+-- in one shot" — a real shipment often arrives in more than one
+-- delivery, so a shop with 8 of 10 ordered sacks in hand can record
+-- exactly that instead of waiting for the last two to show up before
+-- anything can be logged at all. Whatever's requested is capped at each
+-- line's own remaining quantity, so this can never over-receive past
+-- what was ordered even if the input tries to.
+create or replace function receive_po_lines(p_po_id uuid, p_receipts jsonb default null)
 returns void
 language plpgsql
 security invoker
@@ -598,6 +619,8 @@ declare
   v_status text;
   v_total numeric := 0;
   v_line record;
+  v_qty_now numeric;
+  v_all_done boolean := true;
 begin
   select supplier_id, status into v_supplier_id, v_status
   from purchase_orders where id = p_po_id and shop_id = v_shop_id;
@@ -605,18 +628,35 @@ begin
   if v_supplier_id is null then
     raise exception 'purchase order not found';
   end if;
-  if v_status not in ('draft', 'sent') then
-    raise exception 'only a draft or sent purchase order can be received';
+  if v_status not in ('draft', 'sent', 'partial') then
+    raise exception 'this purchase order cannot receive any more stock';
   end if;
 
   for v_line in select * from purchase_order_items where purchase_order_id = p_po_id loop
-    v_total := v_total + (v_line.qty * v_line.cost_price);
+    v_qty_now := greatest(0, v_line.qty - v_line.received_qty);
 
-    if v_line.item_id is not null then
-      update items set stock = stock + v_line.qty where id = v_line.item_id;
-      insert into transactions (shop_id, item_id, item_name, type, qty, unit, amount, created_by)
-      select v_shop_id, v_line.item_id, v_line.item_name, 'purchase', v_line.qty, unit, v_line.qty * v_line.cost_price, auth.uid()
-      from items where id = v_line.item_id;
+    if p_receipts is not null then
+      select coalesce((r->>'qty')::numeric, 0) into v_qty_now
+      from jsonb_array_elements(p_receipts) r
+      where (r->>'line_id')::uuid = v_line.id;
+      v_qty_now := least(coalesce(v_qty_now, 0), greatest(0, v_line.qty - v_line.received_qty));
+    end if;
+
+    if v_qty_now > 0 then
+      v_total := v_total + (v_qty_now * v_line.cost_price);
+
+      if v_line.item_id is not null then
+        update items set stock = stock + v_qty_now where id = v_line.item_id;
+        insert into transactions (shop_id, item_id, item_name, type, qty, unit, amount, created_by)
+        select v_shop_id, v_line.item_id, v_line.item_name, 'purchase', v_qty_now, unit, v_qty_now * v_line.cost_price, auth.uid()
+        from items where id = v_line.item_id;
+      end if;
+
+      update purchase_order_items set received_qty = received_qty + v_qty_now where id = v_line.id;
+    end if;
+
+    if v_line.received_qty + v_qty_now < v_line.qty then
+      v_all_done := false;
     end if;
   end loop;
 
@@ -625,9 +665,16 @@ begin
     values (v_shop_id, v_supplier_id, 'purchase', 'Purchase Order', v_total, 'PO #' || left(p_po_id::text, 8), auth.uid());
   end if;
 
-  update purchase_orders set status = 'received', received_at = now() where id = p_po_id;
+  update purchase_orders
+  set status = case when v_all_done then 'received' else 'partial' end,
+      received_at = case when v_all_done then now() else received_at end
+  where id = p_po_id;
 end;
 $$;
+
+-- Superseded by receive_po_lines() above, which subsumes its exact
+-- behavior via p_receipts = null.
+drop function if exists mark_po_received(uuid);
 
 -- ============================================================
 -- Helper: current user's shop_id
