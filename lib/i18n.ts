@@ -143,7 +143,7 @@ export const dict = {
   'auth.loggingIn': { ur: 'Login ho raha hai...', en: 'Logging in...' },
   'auth.loginBtn': { ur: 'Login Karein', en: 'Log In' },
   'auth.noAccount': { ur: 'Account nahi hai?', en: 'Don’t have an account?' },
-  'auth.signupLink': { ur: 'Free trial shuru karein', en: 'Start free trial' },
+  'auth.signupLink': { ur: 'Sign Up Karein', en: 'Sign up' },
   'auth.forgotPassword': { ur: 'Password bhool gaye?', en: 'Forgot password?' },
   'auth.forgotTitle': { ur: 'Password Reset Karein', en: 'Reset Password' },
   'auth.forgotBody': { ur: 'Apna email dein, hum aapko reset link bhejenge.', en: 'Enter your email and we’ll send you a reset link.' },

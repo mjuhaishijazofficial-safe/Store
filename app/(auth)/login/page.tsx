@@ -57,8 +57,9 @@ export default function LoginPage() {
         </button>
 
         <div className="text-center text-sm text-chalkdim">
-          {t('auth.noAccount')} <Link href="/signup" className="text-haldi">{t('auth.signupLink')}</Link>
+          {t('auth.noAccount')} <Link href="/signup" className="text-haldi font-700">{t('auth.signupLink')}</Link>
         </div>
+        <div className="text-center text-[11px] text-chalkdim mt-1">{t('auth.signupSub')}</div>
       </form>
     </main>
   );
