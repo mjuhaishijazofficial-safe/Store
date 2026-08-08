@@ -62,7 +62,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
               <div className="w-10 h-10 rounded-xl bg-haldi/15 text-haldi flex items-center justify-center shrink-0">
                 <StoreIcon className="w-6 h-6" />
               </div>
-              <div className="font-display text-2xl font-800 text-haldi leading-none">{shop?.name || 'Dukaan ERP'}</div>
+              <div>
+                <div className="font-display text-2xl font-800 text-haldi leading-none">{shop?.name || 'Dukaan ERP'}</div>
+                <div className="text-[11px] text-chalkdim tracking-wide mt-0.5">{t('header.subtitle')}</div>
+              </div>
             </div>
             <div className="flex items-center gap-4">
               <ThemeToggle />

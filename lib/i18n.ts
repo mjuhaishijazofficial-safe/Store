@@ -17,6 +17,7 @@ export const dict = {
 
   // nav / shell
   'nav.overview': { ur: 'Overview', en: 'Overview' },
+  'header.subtitle': { ur: 'Store Management', en: 'Store Management' },
   'nav.inventory': { ur: 'Saman', en: 'Inventory' },
   'nav.reorder': { ur: 'Mangwana Hai', en: 'Reorder' },
   'nav.khata': { ur: 'Khata', en: 'Khata' },
@@ -173,6 +174,15 @@ export const dict = {
   'overview.pendingKhata': { ur: 'Kul Bakaya Khata', en: 'Pending Khata' },
   'overview.topSelling': { ur: 'Sabse Zyada Bikne Wale', en: 'Top Selling Products' },
   'overview.noSalesYet': { ur: 'Abhi tak koi bikri nahi', en: 'No sales yet' },
+  'overview.quickActions': { ur: 'Jaldi Karein', en: 'Quick Actions' },
+  'overview.addItem': { ur: 'Item Add Karein', en: 'Add Item' },
+  'overview.khataEntry': { ur: 'Khata Entry', en: 'Khata Entry' },
+  'overview.recordPurchase': { ur: 'Maal Kharida', en: 'Record Purchase' },
+  'overview.recentActivity': { ur: 'Haal ki Activity', en: 'Recent Activity' },
+  'overview.noActivityYet': { ur: 'Abhi tak koi activity nahi', en: 'No activity yet' },
+  'overview.sold': { ur: 'Becha', en: 'Sold' },
+  'overview.purchased': { ur: 'Khareeda', en: 'Purchased' },
+  'overview.paymentReceived': { ur: 'Payment Mili', en: 'Payment received' },
 
   // daily closing report
   'reports.title': { ur: 'Aaj ka Hisaab', en: 'Today’s Summary' },

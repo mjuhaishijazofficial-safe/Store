@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getServerT } from '@/lib/i18n-server';
 import { startOfMonthPKT, daysAgoPKT } from '@/lib/pkt-time';
 import Link from 'next/link';
-import { WalletIcon, TrendDownIcon, CashIcon, ChartIcon, TrendUpIcon, ReceiptIcon, FireIcon, WarningIcon, ArrowRightIcon } from '@/components/icons';
+import { WalletIcon, TrendDownIcon, CashIcon, ChartIcon, TrendUpIcon, ReceiptIcon, FireIcon, WarningIcon, ArrowRightIcon, PlusIcon, CartIcon, ClockIcon } from '@/components/icons';
 
 function fmt(n: number) {
   return '₨' + Number(n || 0).toLocaleString('en-IN');
@@ -48,7 +48,9 @@ export default async function OverviewPage() {
     { data: monthSalesRow },
     { data: weekSales },
     { data: balances },
-    { data: topSelling }
+    { data: topSelling },
+    { data: recentTxns },
+    { data: recentPayments }
   ] = await Promise.all([
     supabase.from('shops').select('budget').eq('id', shopId).single(),
     supabase.from('items').select('id, stock, min_stock').eq('shop_id', shopId),
@@ -59,7 +61,12 @@ export default async function OverviewPage() {
     supabase.from('transactions').select('amount.sum()').eq('shop_id', shopId).eq('type', 'sale').gte('created_at', monthStartIso).single(),
     supabase.from('transactions').select('qty, amount, items(cost_price)').eq('shop_id', shopId).eq('type', 'sale').gte('created_at', weekStartIso),
     supabase.rpc('khata_balances', { p_shop_id: shopId }),
-    supabase.rpc('top_selling_items', { p_shop_id: shopId, p_days: 30, p_limit: 5 })
+    supabase.rpc('top_selling_items', { p_shop_id: shopId, p_days: 30, p_limit: 5 }),
+    // Recent Activity feed below merges these two — stock moves and
+    // khata collections are separate tables, so it's two small queries
+    // instead of one, same tradeoff as the balance-aggregate RPCs above.
+    supabase.from('transactions').select('id, item_name, type, qty, unit, amount, created_at').eq('shop_id', shopId).order('created_at', { ascending: false }).limit(5),
+    supabase.from('khata_entries').select('id, amount, created_at, customers(name)').eq('shop_id', shopId).eq('type', 'payment').order('created_at', { ascending: false }).limit(5)
   ]);
 
   const lowStockItems = (items || []).filter((i: any) => i.stock <= i.min_stock);
@@ -73,6 +80,23 @@ export default async function OverviewPage() {
   }, 0);
 
   const pendingKhata = (balances || []).reduce((s: number, r: any) => s + Math.max(0, r.balance), 0);
+
+  const activity = [
+    ...(recentTxns || []).map((row: any) => ({
+      id: row.id,
+      kind: row.type as 'sale' | 'purchase',
+      label: row.item_name,
+      sub: `${row.qty}${row.unit ? ' ' + row.unit : ''} · ${fmt(row.amount)}`,
+      created_at: row.created_at
+    })),
+    ...(recentPayments || []).map((row: any) => ({
+      id: row.id,
+      kind: 'payment' as const,
+      label: row.customers?.name || '—',
+      sub: fmt(row.amount),
+      created_at: row.created_at
+    }))
+  ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 6);
 
   return (
     <div>
@@ -88,6 +112,30 @@ export default async function OverviewPage() {
         <StatCard href="/dashboard/reports" icon={<ChartIcon className="w-5 h-5" />} iconClass="bg-haldi/15 text-haldi" label={t('overview.monthlySales')} value={fmt(monthlySales)} />
         <StatCard href="/dashboard/reports" icon={<TrendUpIcon className="w-5 h-5" />} iconClass="bg-dhania/15 text-dhania" label={t('overview.weeklyProfit')} value={fmt(weeklyProfit)} valueClass={weeklyProfit >= 0 ? 'text-dhania' : 'text-mirch'} />
         <StatCard href="/dashboard/khata" icon={<ReceiptIcon className="w-5 h-5" />} iconClass="bg-mirch/15 text-mirch" label={t('overview.pendingKhata')} value={fmt(pendingKhata)} valueClass="text-mirch" />
+      </div>
+
+      <div className="mb-8">
+        <h2 className="font-display text-base font-700 mb-3">{t('overview.quickActions')}</h2>
+        <div className="grid grid-cols-3 gap-3">
+          <Link href="/dashboard/inventory" className="card p-4 flex flex-col items-center text-center gap-2">
+            <div className="w-10 h-10 rounded-full bg-haldi/15 text-haldi flex items-center justify-center">
+              <PlusIcon className="w-5 h-5" />
+            </div>
+            <span className="text-xs font-600">{t('overview.addItem')}</span>
+          </Link>
+          <Link href="/dashboard/khata" className="card p-4 flex flex-col items-center text-center gap-2">
+            <div className="w-10 h-10 rounded-full bg-mirch/15 text-mirch flex items-center justify-center">
+              <ReceiptIcon className="w-5 h-5" />
+            </div>
+            <span className="text-xs font-600">{t('overview.khataEntry')}</span>
+          </Link>
+          <Link href="/dashboard/suppliers" className="card p-4 flex flex-col items-center text-center gap-2">
+            <div className="w-10 h-10 rounded-full bg-dhania/15 text-dhania flex items-center justify-center">
+              <CartIcon className="w-5 h-5" />
+            </div>
+            <span className="text-xs font-600">{t('overview.recordPurchase')}</span>
+          </Link>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 mb-8">
@@ -138,6 +186,28 @@ export default async function OverviewPage() {
               </div>
             ))}
           </Link>
+        </div>
+      )}
+
+      {activity.length > 0 && (
+        <div className="mb-8">
+          <div className="flex items-center gap-2 mb-3">
+            <ClockIcon className="w-4 h-4 text-haldi" />
+            <h2 className="font-display text-base font-700">{t('overview.recentActivity')}</h2>
+          </div>
+          <div className="card divide-y divide-chalk/10">
+            {activity.map(a => (
+              <div key={a.id} className="p-3 px-4 flex justify-between items-center text-sm">
+                <div>
+                  <span className={a.kind === 'sale' ? 'text-dhania' : a.kind === 'purchase' ? 'text-chalkdim' : 'text-haldi'}>
+                    {a.kind === 'sale' ? t('overview.sold') : a.kind === 'purchase' ? t('overview.purchased') : t('overview.paymentReceived')}
+                  </span>{' '}
+                  <span className="font-600">{a.label}</span>
+                </div>
+                <div className="font-mono text-xs text-chalkdim shrink-0 ml-3">{a.sub}</div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
