@@ -339,7 +339,16 @@ export const dict = {
   'settings.shopName': { ur: 'Dukaan ka naam', en: 'Shop name' },
   'settings.totalBudget': { ur: 'Kul budget (₨)', en: 'Total budget (₨)' },
   'settings.save': { ur: 'Save Karein', en: 'Save' },
-  'settings.saved': { ur: 'Save ho gaya ✓', en: 'Saved ✓' }
+  'settings.saved': { ur: 'Save ho gaya ✓', en: 'Saved ✓' },
+  'settings.dangerZone': { ur: 'Danger Zone', en: 'Danger Zone' },
+  'settings.deleteAccountTitle': { ur: 'Account Delete Karein', en: 'Delete Account' },
+  'settings.deleteAccountBody': { ur: 'Ye poori dukaan aur uska saara data (inventory, khata, suppliers, staff, sab kuch) hamesha ke liye delete kar dega. Ye wapas nahi ho sakta.', en: 'This permanently deletes the whole shop and all its data (inventory, khata, suppliers, staff, everything). This cannot be undone.' },
+  'settings.deleteAccountBtn': { ur: 'Account Delete Karein', en: 'Delete Account' },
+  'settings.deleteConfirmTitle': { ur: 'Pakka Delete Karna Hai?', en: 'Are You Sure?' },
+  'settings.deleteConfirmBody': { ur: 'Confirm karne ke liye neeche dukaan ka naam type karein:', en: 'Type the shop name below to confirm:' },
+  'settings.deleteConfirmPlaceholder': { ur: 'Dukaan ka naam yahan type karein', en: 'Type the shop name here' },
+  'settings.deleting': { ur: 'Delete ho raha hai...', en: 'Deleting...' },
+  'settings.deleteFailed': { ur: 'Delete nahi ho saka — dobara koshish karein', en: 'Could not delete — please try again' }
 } as const;
 
 export type DictKey = keyof typeof dict;
