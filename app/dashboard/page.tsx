@@ -8,16 +8,26 @@ function fmt(n: number) {
   return '₨' + Number(n || 0).toLocaleString('en-IN');
 }
 
-function StatCard({ icon, iconClass, label, value, valueClass = '' }: { icon: React.ReactNode; iconClass: string; label: string; value: string; valueClass?: string }) {
-  return (
-    <div className="card p-4">
+function StatCard({ icon, iconClass, label, value, valueClass = '', href }: { icon: React.ReactNode; iconClass: string; label: string; value: string; valueClass?: string; href?: string }) {
+  const body = (
+    <>
       <div className={`w-9 h-9 rounded-full flex items-center justify-center mb-3 ${iconClass}`}>
         {icon}
       </div>
       <div className="text-[11px] text-chalkdim uppercase tracking-wide mb-1">{label}</div>
       <div className={`font-mono font-700 text-lg ${valueClass}`}>{value}</div>
-    </div>
+    </>
   );
+
+  if (href) {
+    return (
+      <Link href={href} className="card p-4 block">
+        {body}
+      </Link>
+    );
+  }
+
+  return <div className="card p-4">{body}</div>;
 }
 
 export default async function OverviewPage() {
@@ -69,26 +79,26 @@ export default async function OverviewPage() {
       <h1 className="font-display text-xl font-700 mb-5">{t('overview.title')}</h1>
 
       <div className="grid grid-cols-3 gap-3 mb-4">
-        <StatCard icon={<WalletIcon className="w-5 h-5" />} iconClass="bg-haldi/15 text-haldi" label={t('overview.totalBudget')} value={fmt(budget)} />
-        <StatCard icon={<TrendDownIcon className="w-5 h-5" />} iconClass="bg-mirch/15 text-mirch" label={t('overview.spent')} value={fmt(spent)} valueClass="text-mirch" />
-        <StatCard icon={<CashIcon className="w-5 h-5" />} iconClass="bg-dhania/15 text-dhania" label={t('overview.remaining')} value={fmt(budget - spent)} valueClass="text-dhania" />
+        <StatCard href="/dashboard/settings" icon={<WalletIcon className="w-5 h-5" />} iconClass="bg-haldi/15 text-haldi" label={t('overview.totalBudget')} value={fmt(budget)} />
+        <StatCard href="/dashboard/history" icon={<TrendDownIcon className="w-5 h-5" />} iconClass="bg-mirch/15 text-mirch" label={t('overview.spent')} value={fmt(spent)} valueClass="text-mirch" />
+        <StatCard href="/dashboard/settings" icon={<CashIcon className="w-5 h-5" />} iconClass="bg-dhania/15 text-dhania" label={t('overview.remaining')} value={fmt(budget - spent)} valueClass="text-dhania" />
       </div>
 
       <div className="grid grid-cols-3 gap-3 mb-8">
-        <StatCard icon={<ChartIcon className="w-5 h-5" />} iconClass="bg-haldi/15 text-haldi" label={t('overview.monthlySales')} value={fmt(monthlySales)} />
-        <StatCard icon={<TrendUpIcon className="w-5 h-5" />} iconClass="bg-dhania/15 text-dhania" label={t('overview.weeklyProfit')} value={fmt(weeklyProfit)} valueClass={weeklyProfit >= 0 ? 'text-dhania' : 'text-mirch'} />
-        <StatCard icon={<ReceiptIcon className="w-5 h-5" />} iconClass="bg-mirch/15 text-mirch" label={t('overview.pendingKhata')} value={fmt(pendingKhata)} valueClass="text-mirch" />
+        <StatCard href="/dashboard/reports" icon={<ChartIcon className="w-5 h-5" />} iconClass="bg-haldi/15 text-haldi" label={t('overview.monthlySales')} value={fmt(monthlySales)} />
+        <StatCard href="/dashboard/reports" icon={<TrendUpIcon className="w-5 h-5" />} iconClass="bg-dhania/15 text-dhania" label={t('overview.weeklyProfit')} value={fmt(weeklyProfit)} valueClass={weeklyProfit >= 0 ? 'text-dhania' : 'text-mirch'} />
+        <StatCard href="/dashboard/khata" icon={<ReceiptIcon className="w-5 h-5" />} iconClass="bg-mirch/15 text-mirch" label={t('overview.pendingKhata')} value={fmt(pendingKhata)} valueClass="text-mirch" />
       </div>
 
       <div className="grid grid-cols-2 gap-3 mb-8">
-        <div className="card p-5">
+        <Link href="/dashboard/inventory" className="card p-5 block">
           <div className="text-3xl font-mono font-700 text-haldi">{itemCount || 0}</div>
           <div className="text-sm text-chalkdim mt-1">{t('overview.totalItems')}</div>
-        </div>
-        <div className="card p-5">
+        </Link>
+        <Link href="/dashboard/reorder" className="card p-5 block">
           <div className="text-3xl font-mono font-700 text-mirch">{lowStockItems.length}</div>
           <div className="text-sm text-chalkdim mt-1">{t('overview.itemsToReorder')}</div>
-        </div>
+        </Link>
       </div>
 
       {topSelling && topSelling.length > 0 && (
@@ -97,7 +107,7 @@ export default async function OverviewPage() {
             <FireIcon className="w-4 h-4 text-haldi" />
             <h2 className="font-display text-base font-700">{t('overview.topSelling')}</h2>
           </div>
-          <div className="card divide-y divide-chalk/10">
+          <Link href="/dashboard/inventory" className="card divide-y divide-chalk/10 block">
             {topSelling.map((p: any, i: number) => (
               <div key={p.item_id} className="p-3 px-4 flex justify-between items-center">
                 <div className="flex items-center gap-3">
@@ -110,7 +120,7 @@ export default async function OverviewPage() {
                 </div>
               </div>
             ))}
-          </div>
+          </Link>
         </div>
       )}
 
