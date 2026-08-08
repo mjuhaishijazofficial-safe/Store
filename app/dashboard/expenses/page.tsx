@@ -46,7 +46,7 @@ export default function ExpensesPage() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
-  const [form, setForm] = useState<{ category: Category; amount: string; note: string }>({ category: 'rent', amount: '', note: '' });
+  const [form, setForm] = useState<{ category: Category; amount: string; note: string; paymentMethod: 'cash' | 'bank' | 'easypaisa' | 'jazzcash' }>({ category: 'rent', amount: '', note: '', paymentMethod: 'cash' });
 
   useEffect(() => { init(); }, [shopId]);
 
@@ -84,7 +84,7 @@ export default function ExpensesPage() {
   }
 
   function openAdd() {
-    setForm({ category: 'rent', amount: '', note: '' });
+    setForm({ category: 'rent', amount: '', note: '', paymentMethod: 'cash' });
     setModalOpen(true);
   }
 
@@ -95,7 +95,8 @@ export default function ExpensesPage() {
       shop_id: shopId,
       category: form.category,
       amount,
-      note: form.note.trim() || null
+      note: form.note.trim() || null,
+      payment_method: form.paymentMethod
     });
     if (err) { showToast(t('common.error'), 'error'); return; }
     setModalOpen(false);
@@ -171,6 +172,14 @@ export default function ExpensesPage() {
 
             <label className="block text-xs text-chalkdim mb-1">{t('expenses.amount')}</label>
             <input type="number" inputMode="decimal" className="input mb-3" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} />
+
+            <label className="block text-xs text-chalkdim mb-1">{t('khataDetail.paymentMethod')}</label>
+            <select className="input mb-3" value={form.paymentMethod} onChange={e => setForm({ ...form, paymentMethod: e.target.value as typeof form.paymentMethod })}>
+              <option value="cash">{t('paymentMethod.cash')}</option>
+              <option value="bank">{t('paymentMethod.bank')}</option>
+              <option value="easypaisa">{t('paymentMethod.easypaisa')}</option>
+              <option value="jazzcash">{t('paymentMethod.jazzcash')}</option>
+            </select>
 
             <label className="block text-xs text-chalkdim mb-1">{t('khataDetail.noteOptional')}</label>
             <input className="input mb-5" value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} />

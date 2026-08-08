@@ -69,6 +69,7 @@ export default function KhataDetailPage() {
   const [editOpen, setEditOpen] = useState(false);
   const [statementOpen, setStatementOpen] = useState(false);
   const [form, setForm] = useState({ item_name: '', qty: '', amount: '', note: '' });
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'bank' | 'easypaisa' | 'jazzcash'>('cash');
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [showDropdown, setShowDropdown] = useState(false);
 
@@ -166,6 +167,7 @@ export default function KhataDetailPage() {
     setForm({ item_name: '', qty: '', amount: '', note: '' });
     setSelectedItemId(null);
     setShowDropdown(false);
+    setPaymentMethod('cash');
     setModalType(type);
   }
 
@@ -215,7 +217,8 @@ export default function KhataDetailPage() {
       p_item_name: modalNeedsItem ? (form.item_name.trim() || null) : null,
       p_qty: modalNeedsItem ? qtyNum : null,
       p_amount: amount,
-      p_note: form.note.trim() || null
+      p_note: form.note.trim() || null,
+      p_payment_method: modalType === 'payment' ? paymentMethod : 'cash'
     });
 
     if (err) { showToast(t('common.error'), 'error'); return; }
@@ -462,6 +465,17 @@ export default function KhataDetailPage() {
             <input type="number" inputMode="decimal" className="input mb-1" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} />
             {willGoOverLimit && (
               <div className="text-xs text-mirch mb-2">{t('khataDetail.limitWarning')} ({fmt(customer.credit_limit!)})</div>
+            )}
+            {modalType === 'payment' && (
+              <>
+                <label className="block text-xs text-chalkdim mb-1 mt-2">{t('khataDetail.paymentMethod')}</label>
+                <select className="input mb-1" value={paymentMethod} onChange={e => setPaymentMethod(e.target.value as typeof paymentMethod)}>
+                  <option value="cash">{t('paymentMethod.cash')}</option>
+                  <option value="bank">{t('paymentMethod.bank')}</option>
+                  <option value="easypaisa">{t('paymentMethod.easypaisa')}</option>
+                  <option value="jazzcash">{t('paymentMethod.jazzcash')}</option>
+                </select>
+              </>
             )}
             <label className="block text-xs text-chalkdim mb-1 mt-2">{t('khataDetail.noteOptional')}</label>
             <input className="input mb-5" value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} />

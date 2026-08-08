@@ -115,6 +115,11 @@ create table if not exists khata_entries (
 -- constraint, same pattern supplier_entries' 'return' type already used.
 alter table khata_entries drop constraint if exists khata_entries_type_check;
 alter table khata_entries add constraint khata_entries_type_check check (type in ('purchase','payment','return'));
+-- Same reasoning as supplier_entries.payment_method — only meaningful
+-- on type = 'payment' rows.
+alter table khata_entries add column if not exists payment_method text not null default 'cash';
+alter table khata_entries drop constraint if exists khata_entries_payment_method_check;
+alter table khata_entries add constraint khata_entries_payment_method_check check (payment_method in ('cash','bank','easypaisa','jazzcash'));
 
 -- 7. SUPPLIERS (reverse khata — what the shop owes suppliers) ----------
 create table if not exists suppliers (
@@ -142,6 +147,15 @@ create table if not exists supplier_entries (
 -- re-running this on a live database rather than a fresh one.
 alter table supplier_entries drop constraint if exists supplier_entries_type_check;
 alter table supplier_entries add constraint supplier_entries_type_check check (type in ('purchase','payment','return'));
+-- Which channel a payment moved through — only meaningful on type =
+-- 'payment' rows, ignored elsewhere. Existing rows default to 'cash'
+-- rather than an unset value, since that's the safe assumption for
+-- historical data and keeps bank_expected_change() below from having
+-- to treat null specially. See bank_reconciliations for what this
+-- feeds into.
+alter table supplier_entries add column if not exists payment_method text not null default 'cash';
+alter table supplier_entries drop constraint if exists supplier_entries_payment_method_check;
+alter table supplier_entries add constraint supplier_entries_payment_method_check check (payment_method in ('cash','bank','easypaisa','jazzcash'));
 
 -- 8b. PURCHASE_ORDERS — a document raised BEFORE goods arrive ("I'm
 --     ordering these from supplier X"), separate from supplier_entries
@@ -191,6 +205,12 @@ create table if not exists expenses (
   created_by uuid references auth.users(id),
   created_at timestamptz not null default now()
 );
+-- Every expense is a payment by definition (unlike khata/supplier
+-- entries where only the 'payment' type involves one) — same reasoning
+-- as khata_entries.payment_method otherwise.
+alter table expenses add column if not exists payment_method text not null default 'cash';
+alter table expenses drop constraint if exists expenses_payment_method_check;
+alter table expenses add constraint expenses_payment_method_check check (payment_method in ('cash','bank','easypaisa','jazzcash'));
 
 -- 10. STAFF_ATTENDANCE (owner marks each staff member present/absent per
 --     day; profiles.monthly_salary above is the figure this is tracked
@@ -237,6 +257,29 @@ create table if not exists payment_claims (
   method text not null check (method in ('easypaisa','bank')),
   amount numeric not null,
   status text not null default 'pending' check (status in ('pending','confirmed')),
+  created_by uuid references auth.users(id),
+  created_at timestamptz not null default now()
+);
+
+-- 12. BANK_RECONCILIATIONS — periodically checking the shop's real bank/
+--     mobile-wallet statement against what the app's own bank-tagged
+--     entries (khata payments received, supplier payments made,
+--     expenses paid — all where payment_method != 'cash') say the
+--     balance should have moved by. This app deliberately never stores
+--     a running balance anywhere (khata/supplier balances are always
+--     computed from ledger sums) — a reconciliation snapshot is the one
+--     place a balance figure gets stored, and only because it's the
+--     owner's own external, independently-verifiable number (their
+--     bank statement), not something this app could compute itself.
+create table if not exists bank_reconciliations (
+  id uuid primary key default gen_random_uuid(),
+  shop_id uuid not null references shops(id) on delete cascade,
+  period_start timestamptz not null,
+  period_end timestamptz not null,
+  opening_balance numeric not null,   -- carried from the previous reconciliation's actual_balance, 0 for the first ever
+  expected_change numeric not null,   -- snapshotted at save time from bank_expected_change() — kept even though it's derivable, so a later ledger edit/delete can't quietly rewrite a past reconciliation's numbers
+  actual_balance numeric not null,    -- what the owner's real statement showed at period_end
+  note text,
   created_by uuid references auth.users(id),
   created_at timestamptz not null default now()
 );
@@ -306,7 +349,8 @@ create or replace function record_khata_entry(
   p_item_name text,
   p_qty numeric,
   p_amount numeric,
-  p_note text
+  p_note text,
+  p_payment_method text default 'cash'
 )
 returns void
 language plpgsql
@@ -326,8 +370,8 @@ begin
     raise exception 'amount must be positive';
   end if;
 
-  insert into khata_entries (shop_id, customer_id, type, item_id, item_name, qty, amount, note, created_by)
-  values (v_shop_id, p_customer_id, p_type, p_item_id, p_item_name, p_qty, p_amount, p_note, auth.uid());
+  insert into khata_entries (shop_id, customer_id, type, item_id, item_name, qty, amount, note, created_by, payment_method)
+  values (v_shop_id, p_customer_id, p_type, p_item_id, p_item_name, p_qty, p_amount, p_note, auth.uid(), coalesce(p_payment_method, 'cash'));
 
   if p_type = 'purchase' and p_item_id is not null then
     update items set stock = greatest(0, stock - coalesce(p_qty, 0)) where id = p_item_id;
@@ -454,6 +498,36 @@ as $$
   from expenses
   where shop_id = p_shop_id
     and (p_since is null or created_at >= p_since)
+$$;
+
+-- How much the shop's bank/mobile-wallet balance should have moved
+-- over a period, from the app's own records — bank-tagged khata
+-- payments received, minus bank-tagged supplier payments and expenses
+-- paid. Cash-tagged rows are excluded entirely: they never touched a
+-- bank account, so they have nothing to say about whether the bank
+-- statement matches. See bank_reconciliations for how this gets used.
+create or replace function bank_expected_change(p_shop_id uuid, p_since timestamptz, p_until timestamptz)
+returns numeric
+language sql
+security invoker
+stable
+as $$
+  select
+    coalesce((
+      select sum(amount) from khata_entries
+      where shop_id = p_shop_id and type = 'payment' and payment_method != 'cash'
+        and created_at >= p_since and created_at < p_until
+    ), 0)
+    - coalesce((
+      select sum(amount) from supplier_entries
+      where shop_id = p_shop_id and type = 'payment' and payment_method != 'cash'
+        and created_at >= p_since and created_at < p_until
+    ), 0)
+    - coalesce((
+      select sum(amount) from expenses
+      where shop_id = p_shop_id and payment_method != 'cash'
+        and created_at >= p_since and created_at < p_until
+    ), 0)
 $$;
 
 create or replace function supplier_balances(p_shop_id uuid)
@@ -643,6 +717,14 @@ create policy "payment_claims_own_shop" on payment_claims for all
   using (shop_id = my_shop_id() and my_role() = 'owner')
   with check (shop_id = my_shop_id() and my_role() = 'owner');
 
+-- bank_reconciliations: owner-only, same reasoning as payment_claims —
+-- this is the shop's real bank statement figures, not shop-floor data.
+alter table bank_reconciliations enable row level security;
+drop policy if exists "bank_reconciliations_own_shop" on bank_reconciliations;
+create policy "bank_reconciliations_own_shop" on bank_reconciliations for all
+  using (shop_id = my_shop_id() and my_role() = 'owner')
+  with check (shop_id = my_shop_id() and my_role() = 'owner');
+
 drop policy if exists "supplier_entries_own_shop" on supplier_entries;
 create policy "supplier_entries_own_shop" on supplier_entries for all
   using (shop_id = my_shop_id())
@@ -748,6 +830,7 @@ create index if not exists idx_purchase_orders_shop on purchase_orders(shop_id, 
 create index if not exists idx_purchase_orders_supplier on purchase_orders(supplier_id, created_at desc);
 create index if not exists idx_po_items_po on purchase_order_items(purchase_order_id);
 create index if not exists idx_salary_adjustments_staff on salary_adjustments(staff_id, created_at desc);
+create index if not exists idx_bank_reconciliations_shop on bank_reconciliations(shop_id, period_end desc);
 create unique index if not exists idx_items_shop_barcode on items(shop_id, barcode) where barcode is not null;
 
 -- ============================================================

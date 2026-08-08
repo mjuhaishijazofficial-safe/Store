@@ -77,10 +77,15 @@ export default async function DashboardLayout({ children }: { children: React.Re
     ] : []),
     ...(hasSection(profile.role, allowedSections, 'history') ? [{ href: '/dashboard/history', label: t('nav.history') }] : []),
     ...(hasSection(profile.role, allowedSections, 'expenses') ? [{ href: '/dashboard/expenses', label: t('nav.expenses') }] : []),
-    // billing/settings/staff are owner-only — staff never even see the tabs
+    // billing/settings/staff/bank-reconciliation are owner-only — staff
+    // never even see the tabs. Bank reconciliation isn't in the
+    // allowed_sections list at all (see lib/permissions.ts) — it's the
+    // shop's real bank statement figures, role-gated like billing, not
+    // something a permission toggle should ever be able to hand to staff.
     ...(isOwner ? [
       { href: '/dashboard/staff', label: t('nav.staff') },
       { href: '/dashboard/billing', label: t('nav.billing') },
+      { href: '/dashboard/bank-reconciliation', label: t('nav.bankReconciliation') },
       { href: '/dashboard/settings', label: t('nav.settings') }
     ] : []),
     // Not a shop role — this is the one link only the SaaS operator

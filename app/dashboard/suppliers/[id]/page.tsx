@@ -55,6 +55,7 @@ export default function SupplierDetailPage() {
   const [modalType, setModalType] = useState<EntryType | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [form, setForm] = useState({ item_name: '', qty: '', amount: '', note: '' });
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'bank' | 'easypaisa' | 'jazzcash'>('cash');
 
   useEffect(() => { loadAll(); }, [supplierId, shopId]);
 
@@ -100,6 +101,7 @@ export default function SupplierDetailPage() {
 
   function openModal(type: EntryType) {
     setForm({ item_name: '', qty: '', amount: '', note: '' });
+    setPaymentMethod('cash');
     setModalType(type);
   }
 
@@ -119,7 +121,8 @@ export default function SupplierDetailPage() {
       item_name: modalNeedsItem ? (form.item_name.trim() || null) : null,
       qty: modalNeedsItem && form.qty ? Number(form.qty) : null,
       amount,
-      note: form.note.trim() || null
+      note: form.note.trim() || null,
+      payment_method: modalType === 'payment' ? paymentMethod : 'cash'
     });
 
     if (err) { showToast(t('common.error'), 'error'); return; }
@@ -217,6 +220,17 @@ export default function SupplierDetailPage() {
             )}
             <label className="block text-xs text-chalkdim mb-1">{t('suppliersDetail.amount')}</label>
             <input type="number" inputMode="decimal" className="input mb-3" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} />
+            {modalType === 'payment' && (
+              <>
+                <label className="block text-xs text-chalkdim mb-1">{t('khataDetail.paymentMethod')}</label>
+                <select className="input mb-3" value={paymentMethod} onChange={e => setPaymentMethod(e.target.value as typeof paymentMethod)}>
+                  <option value="cash">{t('paymentMethod.cash')}</option>
+                  <option value="bank">{t('paymentMethod.bank')}</option>
+                  <option value="easypaisa">{t('paymentMethod.easypaisa')}</option>
+                  <option value="jazzcash">{t('paymentMethod.jazzcash')}</option>
+                </select>
+              </>
+            )}
             <label className="block text-xs text-chalkdim mb-1">{t('suppliersDetail.noteOptional')}</label>
             <input className="input mb-5" value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} />
             <div className="flex gap-2">
