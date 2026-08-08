@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import SignOutButton from '@/components/SignOutButton';
@@ -35,6 +35,21 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   const t = await getServerT();
 
+  // Admin badge: how many payment_claims are still waiting on a look.
+  // The WhatsApp ping when someone taps "I've Paid" is real-time, but
+  // it's easy to lose a message in a busy chat — this makes the count
+  // visible every time the operator opens the dashboard for anything
+  // else, not just when they remember to check /dashboard/admin.
+  let adminPendingCount = 0;
+  if (isAdmin(user.email)) {
+    const admin = createAdminClient();
+    const { count } = await admin
+      .from('payment_claims')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'pending');
+    adminPendingCount = count || 0;
+  }
+
   const nav = [
     { href: '/dashboard', label: t('nav.overview') },
     { href: '/dashboard/inventory', label: t('nav.inventory') },
@@ -51,7 +66,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
     // Not a shop role — this is the one link only the SaaS operator
     // (matched by ADMIN_EMAIL) ever sees, regardless of which shop
     // they're logged into or what role they hold in it.
-    ...(isAdmin(user.email) ? [{ href: '/dashboard/admin', label: t('nav.admin') }] : [])
+    ...(isAdmin(user.email) ? [{ href: '/dashboard/admin', label: t('nav.admin'), badge: adminPendingCount }] : [])
   ];
 
   return (

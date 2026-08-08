@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef } from 'react';
 
-type NavItem = { href: string; label: string };
+type NavItem = { href: string; label: string; badge?: number };
 
 export default function DashboardNav({ items }: { items: NavItem[] }) {
   const pathname = usePathname();
@@ -30,11 +30,18 @@ export default function DashboardNav({ items }: { items: NavItem[] }) {
             key={n.href}
             href={n.href}
             ref={active ? activeRef : undefined}
-            className={`text-sm px-3.5 py-1.5 rounded-full border whitespace-nowrap shrink-0 ${
+            className={`text-sm px-3.5 py-1.5 rounded-full border whitespace-nowrap shrink-0 flex items-center gap-1.5 ${
               active ? 'bg-haldi text-board border-haldi font-700' : 'bg-board2 border-chalk/10 hover:border-haldi'
             }`}
           >
             {n.label}
+            {!!n.badge && (
+              <span className={`text-[10px] leading-none rounded-full px-1.5 py-0.5 font-700 ${
+                active ? 'bg-board text-haldi' : 'bg-mirch text-board'
+              }`}>
+                {n.badge}
+              </span>
+            )}
           </Link>
         );
       })}
