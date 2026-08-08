@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useLang } from '@/lib/i18n-context';
 import { useShop } from '@/lib/shop-context';
 import { useToast } from '@/lib/toast-context';
+import { ReceiptIcon, CashIcon } from '@/components/icons';
 
 type Customer = {
   id: string;
@@ -46,6 +47,11 @@ export default function KhataDetailPage() {
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [total, setTotal] = useState(0);
+  // Lifetime totals, kept separate from `entries` because that array is
+  // only ever the currently-loaded page(s) — deriving these from it would
+  // silently understate both figures the moment history spans a page.
+  const [totalGiven, setTotalGiven] = useState(0);
+  const [totalPaid, setTotalPaid] = useState(0);
   const [items, setItems] = useState<ItemLite[]>([]);
   const [loading, setLoading] = useState(true);
   const [advanceDepletedNotice, setAdvanceDepletedNotice] = useState(false);
@@ -78,7 +84,11 @@ export default function KhataDetailPage() {
       supabase.from('khata_entries').select('amount.sum()').eq('customer_id', customerId).eq('type', 'purchase').single(),
       supabase.from('khata_entries').select('amount.sum()').eq('customer_id', customerId).eq('type', 'payment').single()
     ]);
-    const newTotal = ((pSum as any)?.sum || 0) - ((nSum as any)?.sum || 0);
+    const given = (pSum as any)?.sum || 0;
+    const paid = (nSum as any)?.sum || 0;
+    const newTotal = given - paid;
+    setTotalGiven(given);
+    setTotalPaid(paid);
     setTotal(newTotal);
     return newTotal;
   }
@@ -112,6 +122,20 @@ export default function KhataDetailPage() {
   }
 
   const over = customer?.credit_limit != null && total > customer.credit_limit;
+
+  // Running balance per row, like Khatabook/OkCredit show — not just an
+  // isolated +/- amount per entry, but what the balance actually was
+  // right after that entry. entries[] is always newest-first, and
+  // `total` (DB-computed) is the balance after entries[0], so walking
+  // backward from there stays correct even as "load more" appends older
+  // pages — each older entry's balance-after is just the previous one
+  // with that entry's own effect undone.
+  let runningBalance = total;
+  const balanceAfterEntry: number[] = entries.map(e => {
+    const before = runningBalance;
+    runningBalance -= e.type === 'purchase' ? e.amount : -e.amount;
+    return before;
+  });
 
   const projectedTotal = total + (modalType === 'purchase' ? (Number(form.amount) || 0) : 0);
   const willGoOverLimit = modalType === 'purchase' && customer?.credit_limit != null && projectedTotal > customer.credit_limit;
@@ -209,21 +233,77 @@ export default function KhataDetailPage() {
   if (loading) return <div className="text-chalkdim text-sm text-center py-10">{t('khataDetail.loading')}</div>;
   if (!customer) return <div className="text-chalkdim text-sm text-center py-10">{t('khataDetail.notFound')}</div>;
 
+  const lastPayment = entries.find(e => e.type === 'payment');
+
   return (
     <div>
       <Link href="/dashboard/khata" className="text-xs text-chalkdim hover:text-haldi">{t('khataDetail.back')}</Link>
 
       <div className="card p-5 mt-3 mb-4">
-        <div className="font-display text-lg font-700">{customer.name}</div>
-        <div className="text-xs text-chalkdim mb-4">{customer.phone || '—'}</div>
+        <div className="flex items-start gap-3 mb-5">
+          {/* Initial-letter avatar — gives each customer a visual anchor
+              so the page doesn't open as an anonymous wall of numbers. */}
+          <div className="w-11 h-11 rounded-full bg-haldi/15 text-haldi font-display font-800 text-lg flex items-center justify-center shrink-0">
+            {customer.name.trim().charAt(0).toUpperCase()}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="font-display text-lg font-700 leading-tight">{customer.name}</div>
+            <div className="text-xs text-chalkdim">{customer.phone || '—'}</div>
+          </div>
+          <div className="text-right shrink-0">
+            <div className="text-[10px] text-chalkdim uppercase tracking-wide">{total < 0 ? t('khataDetail.advanceBalance') : t('khataDetail.totalUdhaar')}</div>
+            <div className={`font-mono font-800 text-2xl leading-tight ${total > 0 ? 'text-mirch' : 'text-dhania'}`}>{fmt(Math.abs(total))}</div>
+          </div>
+        </div>
 
-        <div className="text-xs text-chalkdim">{total < 0 ? t('khataDetail.advanceBalance') : t('khataDetail.totalUdhaar')}</div>
-        <div className={`font-mono font-800 text-3xl ${total > 0 ? 'text-mirch' : 'text-dhania'}`}>{fmt(Math.abs(total))}</div>
-        {over && <div className="text-xs text-mirch mt-1">{t('khataDetail.overLimit')} ({fmt(customer.credit_limit!)})</div>}
+        {over && <div className="text-xs text-mirch mb-3 -mt-2">{t('khataDetail.overLimit')} ({fmt(customer.credit_limit!)})</div>}
 
-        <div className="flex gap-2 mt-4">
-          <button onClick={() => openModal('purchase')} className="flex-1 text-sm py-2.5 rounded-lg border border-mirch text-mirch">{t('khataDetail.newSaman')}</button>
-          <button onClick={() => openModal('payment')} className="flex-1 text-sm py-2.5 rounded-lg border border-dhania text-dhania">{t('khataDetail.paymentReceived')}</button>
+        {/* Lifetime summary strip — the "sab kuch ek nazar mein" numbers a
+            shopkeeper is actually asked about, rather than making them
+            scroll the whole ledger to work it out. */}
+        <div className="grid grid-cols-3 gap-2 pt-4 border-t border-chalk/10">
+          <div>
+            <div className="text-[10px] text-chalkdim uppercase tracking-wide">{t('khataDetail.totalGiven')}</div>
+            <div className="font-mono font-700 text-sm text-mirch truncate">{fmt(totalGiven)}</div>
+          </div>
+          <div>
+            <div className="text-[10px] text-chalkdim uppercase tracking-wide">{t('khataDetail.totalPaid')}</div>
+            <div className="font-mono font-700 text-sm text-dhania truncate">{fmt(totalPaid)}</div>
+          </div>
+          <div>
+            <div className="text-[10px] text-chalkdim uppercase tracking-wide">{t('khataDetail.lastPayment')}</div>
+            <div className="font-mono font-700 text-sm truncate">
+              {lastPayment
+                ? new Date(lastPayment.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+                : '—'}
+            </div>
+          </div>
+        </div>
+
+        {customer.credit_limit != null && (
+          <div className="mt-4">
+            <div className="flex justify-between text-[10px] text-chalkdim uppercase tracking-wide mb-1">
+              <span>{t('khataDetail.creditUsed')}</span>
+              <span className="font-mono">{fmt(Math.max(0, total))} / {fmt(customer.credit_limit)}</span>
+            </div>
+            <div className="h-1.5 rounded-full bg-board3 overflow-hidden">
+              <div
+                className={`h-full rounded-full ${over ? 'bg-mirch' : 'bg-dhania'}`}
+                style={{ width: `${Math.min(100, (Math.max(0, total) / customer.credit_limit) * 100)}%` }}
+              />
+            </div>
+          </div>
+        )}
+
+        <div className="flex gap-2 mt-5">
+          <button onClick={() => openModal('purchase')} className="flex-1 text-sm py-2.5 rounded-lg border border-mirch text-mirch flex items-center justify-center gap-1.5">
+            <ReceiptIcon className="w-4 h-4" />
+            {t('khataDetail.newSaman')}
+          </button>
+          <button onClick={() => openModal('payment')} className="flex-1 text-sm py-2.5 rounded-lg border border-dhania text-dhania flex items-center justify-center gap-1.5">
+            <CashIcon className="w-4 h-4" />
+            {t('khataDetail.paymentReceived')}
+          </button>
         </div>
 
         {total > 0 && customer.phone && (
@@ -244,28 +324,50 @@ export default function KhataDetailPage() {
         <div className="text-center py-14 text-chalkdim text-sm">{t('khataDetail.empty')}</div>
       )}
 
-      <div className="space-y-2">
-        {entries.map(e => {
-          const d = new Date(e.created_at);
-          const when = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + ' • ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-          return (
-            <div key={e.id} className="card p-3 px-4 flex justify-between items-center">
-              <div>
-                <div className="font-600 text-sm">
-                  {e.type === 'purchase' ? (e.item_name || t('khataDetail.itemDefault')) + (e.qty ? ` — ${e.qty}` : '') : t('khataDetail.paymentLabel')}
+      {entries.length > 0 && (
+        <div className="card overflow-hidden">
+          {/* Two-column ledger: udhaar in one column, payments in the
+              other, so a glance down the page separates money out from
+              money in — the whole point of a khata. The old single
+              amount column put both on the same line, which is exactly
+              what made purchases and payments hard to tell apart.
+              Rightmost column is the running balance after that entry. */}
+          <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-x-3 px-4 py-2 bg-board3/60 text-[10px] text-chalkdim uppercase tracking-wide">
+            <div>{t('khataDetail.colDetail')}</div>
+            <div className="text-right">{t('khataDetail.colGiven')}</div>
+            <div className="text-right">{t('khataDetail.colPaid')}</div>
+            <div className="text-right">{t('khataDetail.colBalance')}</div>
+            <div />
+          </div>
+          <div className="divide-y divide-chalk/10">
+            {entries.map((e, i) => {
+              const d = new Date(e.created_at);
+              const when = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + ' • ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+              const bal = balanceAfterEntry[i];
+              return (
+                <div key={e.id} className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-x-3 px-4 py-3 items-center">
+                  <div className="min-w-0">
+                    <div className="font-600 text-sm truncate">
+                      {e.type === 'purchase' ? (e.item_name || t('khataDetail.itemDefault')) + (e.qty ? ` — ${e.qty}` : '') : t('khataDetail.paymentLabel')}
+                    </div>
+                    <div className="text-[11px] text-chalkdim mt-0.5 truncate">{when}{e.note ? ` • ${e.note}` : ''}</div>
+                  </div>
+                  <div className="font-mono text-sm text-mirch text-right tabular-nums">
+                    {e.type === 'purchase' ? fmt(e.amount) : ''}
+                  </div>
+                  <div className="font-mono text-sm text-dhania text-right tabular-nums">
+                    {e.type === 'payment' ? fmt(e.amount) : ''}
+                  </div>
+                  <div className={`font-mono font-700 text-sm text-right tabular-nums ${bal > 0 ? 'text-mirch' : bal < 0 ? 'text-dhania' : 'text-chalkdim'}`}>
+                    {fmt(Math.abs(bal))}
+                  </div>
+                  <button onClick={() => deleteEntry(e.id)} className="text-chalkdim text-xs hover:text-mirch pl-1">✕</button>
                 </div>
-                <div className="text-xs text-chalkdim mt-0.5">{when}{e.note ? ` • ${e.note}` : ''}</div>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className={`font-mono font-700 text-sm ${e.type === 'purchase' ? 'text-mirch' : 'text-dhania'}`}>
-                  {e.type === 'purchase' ? '+' : '−'}{fmt(e.amount)}
-                </div>
-                <button onClick={() => deleteEntry(e.id)} className="text-chalkdim text-xs hover:text-mirch">✕</button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {hasMore && (
         <button onClick={loadMore} disabled={loadingMore} className="btn-secondary w-full mt-3">

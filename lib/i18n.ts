@@ -307,6 +307,14 @@ export const dict = {
   'khataDetail.remindWhatsapp': { ur: 'WhatsApp par Yaad Dilayein', en: 'Remind on WhatsApp' },
   'khataDetail.reminderMsg': { ur: 'Aapka udhaar Rs. {amount} hai — {shop}', en: 'Your outstanding balance is Rs. {amount} — {shop}' },
   'khataDetail.fromInventory': { ur: 'Inventory se', en: 'From inventory' },
+  'khataDetail.totalGiven': { ur: 'Kul Saman Diya', en: 'Total Given' },
+  'khataDetail.totalPaid': { ur: 'Kul Payment Mili', en: 'Total Paid' },
+  'khataDetail.lastPayment': { ur: 'Aakhri Payment', en: 'Last Payment' },
+  'khataDetail.creditUsed': { ur: 'Credit Limit', en: 'Credit Limit' },
+  'khataDetail.colDetail': { ur: 'Tafseel', en: 'Detail' },
+  'khataDetail.colGiven': { ur: 'Diya', en: 'Given' },
+  'khataDetail.colPaid': { ur: 'Mila', en: 'Paid' },
+  'khataDetail.colBalance': { ur: 'Balance', en: 'Balance' },
 
   // suppliers (reverse khata)
   'nav.suppliers': { ur: 'Supplier', en: 'Suppliers' },
