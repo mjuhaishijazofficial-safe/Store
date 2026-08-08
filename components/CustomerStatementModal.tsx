@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useLang } from '@/lib/i18n-context';
 
-type Entry = { id: string; type: 'purchase' | 'payment'; item_name: string | null; qty: number | null; amount: number; created_at: string };
+type Entry = { id: string; type: 'purchase' | 'payment' | 'return'; item_name: string | null; qty: number | null; amount: number; created_at: string };
 
 function fmt(n: number) {
   return '₨' + Number(n || 0).toLocaleString('en-IN');
@@ -101,10 +101,16 @@ export default function CustomerStatementModal({
                         {new Date(r.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' })}
                       </td>
                       <td className="py-2 pr-2">
-                        {r.type === 'purchase' ? (r.item_name || t('khataDetail.itemDefault')) + (r.qty ? ` — ${r.qty}` : '') : t('khataDetail.paymentLabel')}
+                        {r.type === 'purchase' ? (r.item_name || t('khataDetail.itemDefault')) + (r.qty ? ` — ${r.qty}` : '')
+                          : r.type === 'return' ? (r.item_name || t('khataDetail.itemDefault')) + (r.qty ? ` — ${r.qty}` : '') + ` (${t('khataDetail.maalWapas')})`
+                          : t('khataDetail.paymentLabel')}
                       </td>
                       <td className="py-2 pr-2 text-right font-mono text-mirch tabular-nums">{r.type === 'purchase' ? fmt(r.amount) : ''}</td>
-                      <td className="py-2 pr-2 text-right font-mono text-dhania tabular-nums">{r.type === 'payment' ? fmt(r.amount) : ''}</td>
+                      {/* Return reduces the balance the same direction a
+                          payment does (no cash changed hands, but the
+                          debt still came down) — shown in the same
+                          column, distinguished by the "(Wapas)" label. */}
+                      <td className="py-2 pr-2 text-right font-mono text-dhania tabular-nums">{(r.type === 'payment' || r.type === 'return') ? fmt(r.amount) : ''}</td>
                       <td className="py-2 text-right font-mono font-700 tabular-nums">{fmt(Math.abs(r.balance))}</td>
                     </tr>
                   ))}

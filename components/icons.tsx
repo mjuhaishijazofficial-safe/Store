@@ -131,6 +131,15 @@ export function ClockIcon({ className }: IconProps) {
   );
 }
 
+export function ReturnIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} {...base}>
+      <path d="M3 11a8 8 0 1 1 2.3 5.6" />
+      <path d="M3 6v5h5" />
+    </svg>
+  );
+}
+
 export function WhatsAppIcon({ className }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" className={className} fill="currentColor">

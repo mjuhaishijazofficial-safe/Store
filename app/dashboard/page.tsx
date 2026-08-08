@@ -70,7 +70,9 @@ export default async function OverviewPage() {
     { count: itemCount },
     { data: spentValue },
     { data: monthSalesValue },
+    { data: monthReturnsValue },
     { data: weekSales },
+    { data: weekReturns },
     { data: balances },
     { data: topSelling },
     { data: recentTxns },
@@ -90,7 +92,11 @@ export default async function OverviewPage() {
     // ₨0 regardless of actual sales. See schema.sql for the fuller note.
     supabase.rpc('transactions_sum', { p_shop_id: shopId, p_type: 'purchase' }),
     supabase.rpc('transactions_sum', { p_shop_id: shopId, p_type: 'sale', p_since: monthStartIso }),
+    // Nets a refunded sale back out of Monthly Sales — otherwise a
+    // returned item stays counted as revenue forever.
+    supabase.rpc('transactions_sum', { p_shop_id: shopId, p_type: 'return', p_since: monthStartIso }),
     supabase.from('transactions').select('qty, amount, items(cost_price)').eq('shop_id', shopId).eq('type', 'sale').gte('created_at', weekStartIso),
+    supabase.from('transactions').select('qty, amount, items(cost_price)').eq('shop_id', shopId).eq('type', 'return').gte('created_at', weekStartIso),
     supabase.rpc('khata_balances', { p_shop_id: shopId }),
     supabase.rpc('top_selling_items', { p_shop_id: shopId, p_days: 30, p_limit: 5 }),
     // Recent Activity feed below merges these two — stock moves and
@@ -105,16 +111,23 @@ export default async function OverviewPage() {
   const lowStockItems = (items || []).filter((i: any) => i.stock <= i.min_stock);
   const budget = shop?.budget || 0;
   const spent = spentValue || 0;
-  const monthlySales = monthSalesValue || 0;
+  // A returned sale is refunded revenue — it stops counting as a sale
+  // the moment it's returned, same reasoning as top_selling_items and
+  // reorder_predictions netting returns out in schema.sql.
+  const monthlySales = (monthSalesValue || 0) - (monthReturnsValue || 0);
 
   // Sales margin minus the week's overhead (rent/salary/utility/etc.)
   // — without expenses this card was gross margin labeled "profit,"
   // overstating the real number every week regardless of how much the
-  // shop actually spent to stay open.
-  const weekGrossMargin = (weekSales || []).reduce((s: number, r: any) => {
+  // shop actually spent to stay open. A return reverses both the
+  // revenue and the cost side of whatever sale it undoes, so it's
+  // subtracted using the exact same (amount - qty*cost) formula, not
+  // just netted off the revenue.
+  const marginOf = (rows: any[]) => rows.reduce((s: number, r: any) => {
     const costPrice = r.items?.cost_price || 0;
     return s + (r.amount || 0) - (r.qty || 0) * costPrice;
   }, 0);
+  const weekGrossMargin = marginOf(weekSales || []) - marginOf(weekReturns || []);
   const weeklyProfit = weekGrossMargin - (weekExpensesValue || 0);
 
   const pendingKhata = (balances || []).reduce((s: number, r: any) => s + Math.max(0, r.balance), 0);
@@ -122,7 +135,7 @@ export default async function OverviewPage() {
   const activity = [
     ...(recentTxns || []).map((row: any) => ({
       id: row.id,
-      kind: row.type as 'sale' | 'purchase',
+      kind: row.type as 'sale' | 'purchase' | 'return',
       label: row.item_name,
       sub: `${row.qty}${row.unit ? ' ' + row.unit : ''} · ${fmt(row.amount)}`,
       created_at: row.created_at
@@ -292,8 +305,8 @@ export default async function OverviewPage() {
             {activity.map(a => (
               <div key={a.id} className="p-3 px-4 flex justify-between items-center text-sm">
                 <div>
-                  <span className={a.kind === 'sale' ? 'text-dhania' : a.kind === 'purchase' ? 'text-chalkdim' : 'text-haldi'}>
-                    {a.kind === 'sale' ? t('overview.sold') : a.kind === 'purchase' ? t('overview.purchased') : t('overview.paymentReceived')}
+                  <span className={a.kind === 'sale' ? 'text-dhania' : a.kind === 'purchase' ? 'text-chalkdim' : a.kind === 'return' ? 'text-haldi' : 'text-haldi'}>
+                    {a.kind === 'sale' ? t('overview.sold') : a.kind === 'purchase' ? t('overview.purchased') : a.kind === 'return' ? t('overview.returned') : t('overview.paymentReceived')}
                   </span>{' '}
                   <span className="font-600">{a.label}</span>
                 </div>

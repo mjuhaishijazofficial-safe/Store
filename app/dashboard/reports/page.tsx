@@ -21,20 +21,30 @@ export default async function ReportsPage() {
 
   const startIso = startOfTodayPKT().toISOString();
 
-  const [{ data: txns }, { data: khataRows }, { data: sales }, { data: expensesToday }] = await Promise.all([
+  const [{ data: txns }, { data: khataRows }, { data: sales }, { data: returns }, { data: expensesToday }] = await Promise.all([
     supabase.from('transactions').select('type, amount').eq('shop_id', shopId).gte('created_at', startIso),
     supabase.from('khata_entries').select('type, amount').eq('shop_id', shopId).gte('created_at', startIso),
     // Separate query with the items join (cost_price) just for the sold
     // rows — profit needs cost_price per line, which the summary query
     // above doesn't fetch.
     supabase.from('transactions').select('qty, amount, items(cost_price)').eq('shop_id', shopId).eq('type', 'sale').gte('created_at', startIso),
+    // Same shape, for cash-sale returns — a return reverses both the
+    // revenue and cost side of whatever sale it undoes.
+    supabase.from('transactions').select('qty, amount, items(cost_price)').eq('shop_id', shopId).eq('type', 'return').gte('created_at', startIso),
     supabase.rpc('expenses_sum', { p_shop_id: shopId, p_since: startIso })
   ]);
 
-  const totalSales = (txns || []).filter((r: any) => r.type === 'sale').reduce((s: number, r: any) => s + (r.amount || 0), 0);
+  // A returned sale stops counting as a sale the moment it's returned —
+  // same netting as Overview's Monthly Sales / Weekly Profit cards.
+  const returnsToday = (txns || []).filter((r: any) => r.type === 'return').reduce((s: number, r: any) => s + (r.amount || 0), 0);
+  const totalSales = (txns || []).filter((r: any) => r.type === 'sale').reduce((s: number, r: any) => s + (r.amount || 0), 0) - returnsToday;
   const stockPurchased = (txns || []).filter((r: any) => r.type === 'purchase').reduce((s: number, r: any) => s + (r.amount || 0), 0);
   const udhaarDiya = (khataRows || []).filter((r: any) => r.type === 'purchase').reduce((s: number, r: any) => s + (r.amount || 0), 0);
   const paymentMila = (khataRows || []).filter((r: any) => r.type === 'payment').reduce((s: number, r: any) => s + (r.amount || 0), 0);
+  // Combines credit-note returns (khata) and cash-sale returns — one
+  // "how much came back today" number regardless of which it was.
+  const khataReturnsToday = (khataRows || []).filter((r: any) => r.type === 'return').reduce((s: number, r: any) => s + (r.amount || 0), 0);
+  const totalReturnsToday = returnsToday + khataReturnsToday;
   const expenses = expensesToday || 0;
 
   // Profit = today's sale revenue minus cost of goods sold minus today's
@@ -45,10 +55,11 @@ export default async function ReportsPage() {
   // not exist at all here, which meant this number was really "gross
   // margin," not profit — overstated every single day by whatever the
   // shop actually spent to keep running.
-  const grossMargin = (sales || []).reduce((s: number, r: any) => {
+  const marginOf = (rows: any[]) => rows.reduce((s: number, r: any) => {
     const costPrice = r.items?.cost_price || 0;
     return s + (r.amount || 0) - (r.qty || 0) * costPrice;
   }, 0);
+  const grossMargin = marginOf(sales || []) - marginOf(returns || []);
   const profit = grossMargin - expenses;
 
   const shareText = t('reports.summaryMsg')
@@ -99,6 +110,12 @@ export default async function ReportsPage() {
           <div className="text-xs text-chalkdim uppercase tracking-wide mb-1">{t('reports.expenses')}</div>
           <div className="font-mono font-700 text-lg text-mirch">{fmt(expenses)}</div>
         </div>
+        {totalReturnsToday > 0 && (
+          <div className="card p-4">
+            <div className="text-xs text-chalkdim uppercase tracking-wide mb-1">{t('reports.returnedToday')}</div>
+            <div className="font-mono font-700 text-lg text-haldi">{fmt(totalReturnsToday)}</div>
+          </div>
+        )}
       </div>
 
       <div className="flex flex-col gap-2 no-print">

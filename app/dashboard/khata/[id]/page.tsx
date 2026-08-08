@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useLang } from '@/lib/i18n-context';
 import { useShop } from '@/lib/shop-context';
 import { useToast } from '@/lib/toast-context';
-import { ReceiptIcon, CashIcon } from '@/components/icons';
+import { ReceiptIcon, CashIcon, ReturnIcon } from '@/components/icons';
 import ContactEditModal from '@/components/ContactEditModal';
 import CustomerStatementModal from '@/components/CustomerStatementModal';
 import ConfirmDeleteButton from '@/components/ConfirmDeleteButton';
@@ -20,9 +20,11 @@ type Customer = {
   credit_limit: number | null;
 };
 
+type EntryType = 'purchase' | 'payment' | 'return';
+
 type Entry = {
   id: string;
-  type: 'purchase' | 'payment';
+  type: EntryType;
   item_name: string | null;
   qty: number | null;
   amount: number;
@@ -58,11 +60,12 @@ export default function KhataDetailPage() {
   // silently understate both figures the moment history spans a page.
   const [totalGiven, setTotalGiven] = useState(0);
   const [totalPaid, setTotalPaid] = useState(0);
+  const [totalReturned, setTotalReturned] = useState(0);
   const [items, setItems] = useState<ItemLite[]>([]);
   const [loading, setLoading] = useState(true);
   const [advanceDepletedNotice, setAdvanceDepletedNotice] = useState(false);
 
-  const [modalType, setModalType] = useState<'purchase' | 'payment' | null>(null);
+  const [modalType, setModalType] = useState<EntryType | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [statementOpen, setStatementOpen] = useState(false);
   const [form, setForm] = useState({ item_name: '', qty: '', amount: '', note: '' });
@@ -92,9 +95,14 @@ export default function KhataDetailPage() {
     if (err) { showToast(t('common.error'), 'error'); return total; }
     const given = (data as any)?.given || 0;
     const paid = (data as any)?.paid || 0;
-    const newTotal = given - paid;
+    // A return reduces what's owed the same direction a cash payment
+    // does — no cash actually changes hands, but the customer's debt
+    // still comes down by the returned amount.
+    const returned = (data as any)?.returned || 0;
+    const newTotal = given - paid - returned;
     setTotalGiven(given);
     setTotalPaid(paid);
+    setTotalReturned(returned);
     setTotal(newTotal);
     return newTotal;
   }
@@ -150,7 +158,11 @@ export default function KhataDetailPage() {
     ? items.filter(i => i.name.toLowerCase().includes(form.item_name.toLowerCase())).slice(0, 5)
     : [];
 
-  function openModal(type: 'purchase' | 'payment') {
+  // purchase and return both name a specific item — one going out to the
+  // customer, one coming back — payment is just cash, no item involved.
+  const modalNeedsItem = modalType === 'purchase' || modalType === 'return';
+
+  function openModal(type: EntryType) {
     setForm({ item_name: '', qty: '', amount: '', note: '' });
     setSelectedItemId(null);
     setShowDropdown(false);
@@ -199,9 +211,9 @@ export default function KhataDetailPage() {
     const { error: err } = await supabase.rpc('record_khata_entry', {
       p_customer_id: customerId,
       p_type: modalType,
-      p_item_id: modalType === 'purchase' ? selectedItemId : null,
-      p_item_name: modalType === 'purchase' ? (form.item_name.trim() || null) : null,
-      p_qty: modalType === 'purchase' ? qtyNum : null,
+      p_item_id: modalNeedsItem ? selectedItemId : null,
+      p_item_name: modalNeedsItem ? (form.item_name.trim() || null) : null,
+      p_qty: modalNeedsItem ? qtyNum : null,
       p_amount: amount,
       p_note: form.note.trim() || null
     });
@@ -279,14 +291,21 @@ export default function KhataDetailPage() {
             <div className="text-[10px] text-chalkdim uppercase tracking-wide">{t('khataDetail.totalPaid')}</div>
             <div className="font-mono font-700 text-sm text-dhania truncate">{fmt(totalPaid)}</div>
           </div>
-          <div>
-            <div className="text-[10px] text-chalkdim uppercase tracking-wide">{t('khataDetail.lastPayment')}</div>
-            <div className="font-mono font-700 text-sm truncate">
-              {lastPayment
-                ? new Date(lastPayment.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
-                : '—'}
+          {totalReturned > 0 ? (
+            <div>
+              <div className="text-[10px] text-chalkdim uppercase tracking-wide">{t('khataDetail.totalReturned')}</div>
+              <div className="font-mono font-700 text-sm text-haldi truncate">{fmt(totalReturned)}</div>
             </div>
-          </div>
+          ) : (
+            <div>
+              <div className="text-[10px] text-chalkdim uppercase tracking-wide">{t('khataDetail.lastPayment')}</div>
+              <div className="font-mono font-700 text-sm truncate">
+                {lastPayment
+                  ? new Date(lastPayment.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+                  : '—'}
+              </div>
+            </div>
+          )}
         </div>
 
         {customer.credit_limit != null && (
@@ -314,6 +333,10 @@ export default function KhataDetailPage() {
             {t('khataDetail.paymentReceived')}
           </button>
         </div>
+        <button onClick={() => openModal('return')} className="w-full mt-2 text-sm py-2.5 rounded-lg border border-haldi text-haldi flex items-center justify-center gap-1.5">
+          <ReturnIcon className="w-4 h-4" />
+          {t('khataDetail.maalWapas')}
+        </button>
 
         {total > 0 && customer.phone && (
           <button onClick={remindWhatsapp} className="w-full mt-2 text-sm py-2.5 rounded-lg border border-dhania text-dhania">
@@ -353,19 +376,30 @@ export default function KhataDetailPage() {
             const when = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + ' • ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
             const bal = balanceAfterEntry[i];
             const isPurchase = e.type === 'purchase';
+            // Purchase (owe more) is red, payment and return both reduce
+            // what's owed but stay visually distinct from each other —
+            // green for actual cash in, amber for goods sent back, so
+            // "customer paid" and "customer returned this" never read as
+            // the same thing at a glance. Same convention as the
+            // Suppliers detail page's mirror-image 'return' handling.
+            const color = isPurchase ? 'text-mirch' : e.type === 'return' ? 'text-haldi' : 'text-dhania';
+            const badgeBg = isPurchase ? 'bg-mirch/15 text-mirch' : e.type === 'return' ? 'bg-haldi/15 text-haldi' : 'bg-dhania/15 text-dhania';
+            const icon = isPurchase ? <ReceiptIcon className="w-4 h-4" /> : e.type === 'return' ? <ReturnIcon className="w-4 h-4" /> : <CashIcon className="w-4 h-4" />;
+            const label =
+              isPurchase ? (e.item_name || t('khataDetail.itemDefault')) + (e.qty ? ` — ${e.qty}` : '')
+              : e.type === 'return' ? (e.item_name || t('khataDetail.itemDefault')) + (e.qty ? ` — ${e.qty}` : '') + ` (${t('khataDetail.maalWapas')})`
+              : t('khataDetail.paymentLabel');
             return (
               <div key={e.id} className="p-3 px-4 flex items-center gap-3">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${isPurchase ? 'bg-mirch/15 text-mirch' : 'bg-dhania/15 text-dhania'}`}>
-                  {isPurchase ? <ReceiptIcon className="w-4 h-4" /> : <CashIcon className="w-4 h-4" />}
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${badgeBg}`}>
+                  {icon}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="font-600 text-sm truncate">
-                    {isPurchase ? (e.item_name || t('khataDetail.itemDefault')) + (e.qty ? ` — ${e.qty}` : '') : t('khataDetail.paymentLabel')}
-                  </div>
+                  <div className="font-600 text-sm truncate">{label}</div>
                   <div className="text-[11px] text-chalkdim mt-0.5 truncate">{when}{e.note ? ` • ${e.note}` : ''}</div>
                 </div>
                 <div className="text-right shrink-0">
-                  <div className={`font-mono font-700 text-sm tabular-nums ${isPurchase ? 'text-mirch' : 'text-dhania'}`}>
+                  <div className={`font-mono font-700 text-sm tabular-nums ${color}`}>
                     {isPurchase ? '+' : '−'}{fmt(e.amount)}
                   </div>
                   <div className="text-[10px] text-chalkdim mt-0.5 tabular-nums">
@@ -390,9 +424,9 @@ export default function KhataDetailPage() {
         <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50" onClick={() => setModalType(null)}>
           <div className="card w-full max-w-md p-5 rounded-b-none sm:rounded-b-2xl" onClick={e => e.stopPropagation()}>
             <div className="font-display text-lg text-haldi font-700 mb-4">
-              {modalType === 'purchase' ? t('khataDetail.newSaman') : t('khataDetail.paymentReceived')}
+              {modalType === 'purchase' ? t('khataDetail.newSaman') : modalType === 'return' ? t('khataDetail.maalWapas') : t('khataDetail.paymentReceived')}
             </div>
-            {modalType === 'purchase' && (
+            {modalNeedsItem && (
               <>
                 <label className="block text-xs text-chalkdim mb-1">{t('khataDetail.itemName')}</label>
                 <div className="relative mb-3">

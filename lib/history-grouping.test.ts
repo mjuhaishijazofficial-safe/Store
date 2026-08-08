@@ -4,6 +4,7 @@ import { groupHistoryLogs, HistoryLog } from './history-grouping';
 function row(over: Partial<HistoryLog>): HistoryLog {
   return {
     id: Math.random().toString(36),
+    item_id: 'item-1',
     item_name: 'Item',
     qty: 1,
     unit: 'pc',

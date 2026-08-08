@@ -70,6 +70,14 @@ create table if not exists transactions (
   created_by uuid references auth.users(id),
   created_at timestamptz not null default now()
 );
+-- 'return' = a cash sale return / credit note: a customer brings back
+-- something bought outright (not on khata), stock comes back and the
+-- refunded amount nets against sales everywhere sales are totaled
+-- (Overview, Reports, top_selling_items, reorder_predictions) — see
+-- record_stock_move below for how it moves stock the same direction
+-- a purchase does.
+alter table transactions drop constraint if exists transactions_type_check;
+alter table transactions add constraint transactions_type_check check (type in ('purchase','sale','return'));
 -- Groups the line items of one multi-item cart sale (see SaleCartModal)
 -- into a single "bill" for display in History — null for every purchase
 -- and for a single-item Stock Out, which aren't part of a cart at all.
@@ -96,11 +104,17 @@ create table if not exists khata_entries (
   item_id uuid references items(id),    -- optional link to inventory
   item_name text,                       -- e.g. "Coca Cola" (purchase entries)
   qty numeric,
-  amount numeric not null,              -- purchase = udhaar chadha, payment = utra
+  amount numeric not null,              -- purchase = udhaar chadha, payment = utra, return = utra
   note text,
   created_by uuid references auth.users(id),
   created_at timestamptz not null default now()
 );
+-- 'return' = a credit note: customer brings goods bought on credit back
+-- (defective, wrong item), balance goes down the same direction a
+-- payment would but no cash actually changed hands. Widens an existing
+-- constraint, same pattern supplier_entries' 'return' type already used.
+alter table khata_entries drop constraint if exists khata_entries_type_check;
+alter table khata_entries add constraint khata_entries_type_check check (type in ('purchase','payment','return'));
 
 -- 7. SUPPLIERS (reverse khata — what the shop owes suppliers) ----------
 create table if not exists suppliers (
@@ -256,7 +270,7 @@ declare
   v_item_name text;
   v_unit text;
 begin
-  if p_type not in ('purchase', 'sale') then
+  if p_type not in ('purchase', 'sale', 'return') then
     raise exception 'invalid type: %', p_type;
   end if;
   if p_qty is null or p_qty <= 0 then
@@ -270,7 +284,9 @@ begin
     raise exception 'item not found';
   end if;
 
-  if p_type = 'purchase' then
+  -- A return moves stock the same direction a purchase does — the goods
+  -- physically come back to the shop.
+  if p_type = 'purchase' or p_type = 'return' then
     update items set stock = stock + p_qty where id = p_item_id;
   else
     update items set stock = greatest(0, stock - p_qty) where id = p_item_id;
@@ -299,7 +315,11 @@ as $$
 declare
   v_shop_id uuid := my_shop_id();
 begin
-  if p_type not in ('purchase', 'payment') then
+  -- 'return' = a credit note: goods bought on khata come back, balance
+  -- goes down the same direction a payment would (no cash changes
+  -- hands), and any linked item's stock comes back too — the reverse
+  -- of what 'purchase' does to it below.
+  if p_type not in ('purchase', 'payment', 'return') then
     raise exception 'invalid type: %', p_type;
   end if;
   if p_amount is null or p_amount <= 0 then
@@ -311,6 +331,8 @@ begin
 
   if p_type = 'purchase' and p_item_id is not null then
     update items set stock = greatest(0, stock - coalesce(p_qty, 0)) where id = p_item_id;
+  elsif p_type = 'return' and p_item_id is not null then
+    update items set stock = stock + coalesce(p_qty, 0) where id = p_item_id;
   end if;
 end;
 $$;
@@ -334,6 +356,8 @@ begin
 
   if v_type = 'purchase' and v_item_id is not null then
     update items set stock = stock + coalesce(v_qty, 0) where id = v_item_id;
+  elsif v_type = 'return' and v_item_id is not null then
+    update items set stock = greatest(0, stock - coalesce(v_qty, 0)) where id = v_item_id;
   end if;
 end;
 $$;
@@ -370,15 +394,19 @@ $$;
 -- read as ₨0 with no visible sign anything had gone wrong. A real SQL
 -- function sidesteps the PostgREST feature entirely, same as
 -- khata_balances below already does for the list page.
-create or replace function khata_customer_totals(p_customer_id uuid)
-returns table(given numeric, paid numeric)
+-- Signature grew a column (returned) — create or replace can't change an
+-- existing function's return type, has to be dropped first.
+drop function if exists khata_customer_totals(uuid);
+create function khata_customer_totals(p_customer_id uuid)
+returns table(given numeric, paid numeric, returned numeric)
 language sql
 security invoker
 stable
 as $$
   select
     coalesce(sum(amount) filter (where type = 'purchase'), 0) as given,
-    coalesce(sum(amount) filter (where type = 'payment'), 0) as paid
+    coalesce(sum(amount) filter (where type = 'payment'), 0) as paid,
+    coalesce(sum(amount) filter (where type = 'return'), 0) as returned
   from khata_entries
   where customer_id = p_customer_id
 $$;
@@ -757,10 +785,12 @@ as $$
     end
   from items i
   left join (
-    select item_id, sum(qty) as total_qty
+    -- Nets returns out of the sell-through rate, same reasoning as
+    -- top_selling_items — a returned item isn't actually depleting stock.
+    select item_id, sum(case when type = 'sale' then qty else -qty end) as total_qty
     from transactions
     where shop_id = p_shop_id
-      and type = 'sale'
+      and type in ('sale', 'return')
       and created_at >= now() - (p_lookback_days || ' days')::interval
     group by item_id
   ) sold on sold.item_id = i.id
@@ -789,19 +819,26 @@ $$;
 -- lookback window. Same aggregate-in-Postgres reasoning as everything
 -- else here — cost stays a single grouped query, not proportional to
 -- how much sales history the shop has.
+-- Nets 'return' rows against 'sale' rows (both move stock the same
+-- direction, in opposite senses to a sale) — otherwise a heavily
+-- returned item would still rank as a top seller on its gross qty.
 create or replace function top_selling_items(p_shop_id uuid, p_days int default 30, p_limit int default 5)
 returns table(item_id uuid, item_name text, unit text, qty_sold numeric, revenue numeric)
 language sql
 security invoker
 stable
 as $$
-  select i.id, i.name, i.unit, sum(t.qty), sum(t.amount)
+  select
+    i.id, i.name, i.unit,
+    sum(case when t.type = 'sale' then t.qty else -t.qty end) as qty_sold,
+    sum(case when t.type = 'sale' then t.amount else -t.amount end) as revenue
   from transactions t
   join items i on i.id = t.item_id
   where t.shop_id = p_shop_id
-    and t.type = 'sale'
+    and t.type in ('sale', 'return')
     and t.created_at >= now() - (p_days || ' days')::interval
   group by i.id, i.name, i.unit
-  order by sum(t.qty) desc
+  having sum(case when t.type = 'sale' then t.qty else -t.qty end) > 0
+  order by sum(case when t.type = 'sale' then t.qty else -t.qty end) desc
   limit p_limit
 $$;

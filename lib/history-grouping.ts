@@ -7,10 +7,11 @@
 
 export type HistoryLog = {
   id: string;
+  item_id: string | null;
   item_name: string;
   qty: number;
   unit: string | null;
-  type: 'purchase' | 'sale';
+  type: 'purchase' | 'sale' | 'return';
   amount: number;
   created_at: string;
   sale_ref: string | null;

@@ -197,6 +197,7 @@ export const dict = {
   'overview.sold': { ur: 'Becha', en: 'Sold' },
   'overview.purchased': { ur: 'Khareeda', en: 'Purchased' },
   'overview.paymentReceived': { ur: 'Payment Mili', en: 'Payment received' },
+  'overview.returned': { ur: 'Wapas Hua', en: 'Returned' },
 
   // daily closing report
   'reports.title': { ur: 'Aaj ka Hisaab', en: 'Today’s Summary' },
@@ -208,6 +209,7 @@ export const dict = {
   'reports.profit': { ur: 'Aaj ka Profit', en: "Today's Profit" },
   'reports.profitNote': { ur: 'Bikri ka munafa minus aaj ke kharche (kiraya/tankhwah/bijli)', en: 'Sales margin minus today\'s expenses (rent/salary/utilities)' },
   'reports.expenses': { ur: 'Aaj Ke Kharche', en: "Today's Expenses" },
+  'reports.returnedToday': { ur: 'Aaj Wapas Hua', en: 'Returned Today' },
   'reports.shareWhatsapp': { ur: 'WhatsApp Par Share Karein', en: 'Share on WhatsApp' },
   'reports.print': { ur: 'Print / PDF Save Karein', en: 'Print / Save as PDF' },
   'reports.summaryMsg': {
@@ -307,6 +309,10 @@ export const dict = {
   'history.purchaseIn': { ur: 'Naya maal aaya', en: 'Stock received' },
   'history.saleOut': { ur: 'Bik/use hua', en: 'Sold/used' },
   'history.cartSale': { ur: 'Bikri — {n} items', en: 'Sale — {n} items' },
+  'history.returnLabel': { ur: 'Wapas hua', en: 'Returned' },
+  'history.returnAction': { ur: '↩ Return', en: '↩ Return' },
+  'history.returnSaved': { ur: 'Return record ho gaya, stock update ho gaya ✓', en: 'Return recorded, stock updated ✓' },
+  'history.refundAmount': { ur: 'Wapas ki Raqam (₨)', en: 'Refund Amount (₨)' },
 
   // khata list
   'khata.search': { ur: 'Customer dhoondein...', en: 'Search customers...' },
@@ -397,6 +403,8 @@ export const dict = {
   'expenses.catOther': { ur: 'Doosra', en: 'Other' },
   'khataDetail.totalGiven': { ur: 'Kul Saman Diya', en: 'Total Given' },
   'khataDetail.totalPaid': { ur: 'Kul Payment Mili', en: 'Total Paid' },
+  'khataDetail.totalReturned': { ur: 'Kul Wapas', en: 'Total Returned' },
+  'khataDetail.maalWapas': { ur: 'Saman Wapas', en: 'Goods Returned' },
   'khataDetail.lastPayment': { ur: 'Aakhri Payment', en: 'Last Payment' },
   'khataDetail.creditUsed': { ur: 'Credit Limit', en: 'Credit Limit' },
   'khataDetail.colDetail': { ur: 'Tafseel', en: 'Detail' },
