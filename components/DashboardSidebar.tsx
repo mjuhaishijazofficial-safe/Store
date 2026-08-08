@@ -4,8 +4,6 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useLang } from '@/lib/i18n-context';
-import ThemeToggle from './ThemeToggle';
-import LanguageToggle from './LanguageToggle';
 import SignOutButton from './SignOutButton';
 import {
   StoreIcon, ChartIcon, CartIcon, ReceiptIcon, WalletIcon, CashIcon, ClockIcon,
@@ -103,6 +101,10 @@ export default function DashboardSidebar({ items, shopName, trialLabel }: { item
   }
 
   function Footer({ iconOnly }: { iconOnly: boolean }) {
+    // Theme/language toggles moved to the top-right of the main content
+    // area (see layout.tsx) — this stays just the trial badge + a
+    // centered Sign Out, no longer needing the justify-between split
+    // that used to make room for the toggles on the left.
     return (
       <div className="border-t border-chalk/10 p-3 space-y-2">
         {trialLabel && (
@@ -110,11 +112,7 @@ export default function DashboardSidebar({ items, shopName, trialLabel }: { item
             {iconOnly ? '⏳' : trialLabel}
           </div>
         )}
-        <div className={`flex items-center gap-2 ${iconOnly ? 'flex-col' : 'justify-between'}`}>
-          <div className="flex items-center gap-2">
-            <ThemeToggle />
-            <LanguageToggle />
-          </div>
+        <div className="flex justify-center">
           <SignOutButton />
         </div>
       </div>

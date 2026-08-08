@@ -4,6 +4,8 @@ import Link from 'next/link';
 import DashboardSidebar from '@/components/DashboardSidebar';
 import ConnectionBanner from '@/components/ConnectionBanner';
 import AppLockGate from '@/components/AppLockGate';
+import ThemeToggle from '@/components/ThemeToggle';
+import LanguageToggle from '@/components/LanguageToggle';
 import { getServerT } from '@/lib/i18n-server';
 import { ShopProvider } from '@/lib/shop-context';
 import { isAdmin } from '@/lib/admin';
@@ -103,6 +105,14 @@ export default async function DashboardLayout({ children }: { children: React.Re
         <DashboardSidebar items={nav} shopName={shop?.name || ''} trialLabel={trialLabel} />
 
         <main className="flex-1 min-w-0 px-4 sm:px-6 py-6 max-w-5xl mx-auto w-full">
+          {/* Theme/language toggles live here — top-right of every
+              dashboard page's content — rather than in the sidebar
+              footer, which now stays just the trial badge + a centered
+              Sign Out. */}
+          <div className="flex justify-end gap-2 mb-4 no-print">
+            <ThemeToggle />
+            <LanguageToggle />
+          </div>
           {locked && (
             <div className="card p-5 mb-6 border-mirch">
               <div className="font-display text-lg text-mirch font-700 mb-1">{t('lock.title')}</div>
