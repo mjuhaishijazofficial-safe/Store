@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useLang } from '@/lib/i18n-context';
 import { useShop } from '@/lib/shop-context';
+import SaleReceiptModal from '@/components/SaleReceiptModal';
 
 type Log = {
   id: string;
@@ -24,11 +25,12 @@ function fmt(n: number) {
 export default function HistoryPage() {
   const supabase = createClient();
   const { t } = useLang();
-  const { shopId } = useShop();
+  const { shopId, shopName } = useShop();
   const [logs, setLogs] = useState<Log[]>([]);
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [receiptTxn, setReceiptTxn] = useState<Log | null>(null);
 
   useEffect(() => { init(); }, [shopId]);
 
@@ -78,8 +80,15 @@ export default function HistoryPage() {
                 <div className="font-600 text-sm">{l.item_name} — {l.qty} {l.unit}</div>
                 <div className="text-xs text-chalkdim mt-0.5">{l.type === 'purchase' ? t('history.purchaseIn') : t('history.saleOut')} • {when}</div>
               </div>
-              <div className={`font-mono font-700 text-sm ${l.type === 'purchase' ? 'text-mirch' : 'text-dhania'}`}>
-                {l.amount ? sign + fmt(l.amount) : ''}
+              <div className="flex items-center gap-3">
+                <div className={`font-mono font-700 text-sm ${l.type === 'purchase' ? 'text-mirch' : 'text-dhania'}`}>
+                  {l.amount ? sign + fmt(l.amount) : ''}
+                </div>
+                {l.type === 'sale' && l.amount > 0 && (
+                  <button onClick={() => setReceiptTxn(l)} className="text-chalkdim text-xs hover:text-haldi underline shrink-0">
+                    {t('receipt.print')}
+                  </button>
+                )}
               </div>
             </div>
           );
@@ -90,6 +99,10 @@ export default function HistoryPage() {
         <button onClick={loadMore} disabled={loadingMore} className="btn-secondary w-full mt-3">
           {loadingMore ? t('common.loading') : t('common.loadMore')}
         </button>
+      )}
+
+      {receiptTxn && (
+        <SaleReceiptModal shopName={shopName || 'Dukaan'} txn={receiptTxn} onClose={() => setReceiptTxn(null)} />
       )}
     </div>
   );

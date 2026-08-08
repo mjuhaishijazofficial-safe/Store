@@ -186,3 +186,22 @@ a.card:active, button.card:active {
     --color-dhania: 30 90 30;
   }
 }
+
+/* Print a single element only (the sale receipt), regardless of what
+   page it's opened from — the .no-print rule above hides known chrome,
+   but the receipt can be triggered from Inventory or History, and
+   hand-tracking every element around it on both pages would be fragile.
+   The visibility trick (not display:none) keeps layout/backgrounds
+   intact for the one subtree that stays visible. Toggled by adding
+   .printing-receipt to <body> for exactly as long as the modal is open. */
+@media print {
+  body.printing-receipt * { visibility: hidden; }
+  body.printing-receipt #receipt-print-area,
+  body.printing-receipt #receipt-print-area * { visibility: visible; }
+  body.printing-receipt #receipt-print-area {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+  }
+}

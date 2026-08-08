@@ -7,6 +7,7 @@ import { useShop } from '@/lib/shop-context';
 import { useToast } from '@/lib/toast-context';
 import { downloadCsv, parseCsv } from '@/lib/csv';
 import BarcodeScannerModal from '@/components/BarcodeScannerModal';
+import SaleReceiptModal from '@/components/SaleReceiptModal';
 
 type Item = {
   id: string;
@@ -28,7 +29,7 @@ function fmt(n: number) {
 export default function InventoryPage() {
   const supabase = createClient();
   const { t } = useLang();
-  const { shopId } = useShop();
+  const { shopId, shopName } = useShop();
   const { showToast } = useToast();
   const [items, setItems] = useState<Item[]>([]);
   const [search, setSearch] = useState('');
@@ -40,6 +41,7 @@ export default function InventoryPage() {
   const [loading, setLoading] = useState(true);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [receiptTxn, setReceiptTxn] = useState<{ item_name: string; qty: number; unit: string | null; amount: number; created_at: string } | null>(null);
   const [lookupState, setLookupState] = useState<'idle' | 'loading' | 'found' | 'not_found'>('idle');
 
   const [form, setForm] = useState({ name: '', category: '', unit: '', stock: 0, min_stock: 0, price: 0, cost_price: 0, barcode: '', expiry_date: '' });
@@ -156,7 +158,17 @@ export default function InventoryPage() {
   async function confirmMove() {
     if (!moveItem || !shopId || moveForm.qty <= 0) return;
 
-    const amount = moveType === 'purchase' ? (moveForm.amount || moveForm.qty * moveItem.price) : 0;
+    // Sale amount used to be hardcoded to 0 here — every cash sale
+    // recorded through Stock Out landed in `transactions` with no
+    // revenue at all, which meant Monthly Sales / Weekly Profit on the
+    // Overview and the Reports page were structurally stuck at ₨0
+    // regardless of how much a shop actually sold (khata/credit sales
+    // are a separate table and were never affected by this bug).
+    // Same default the purchase side already used (qty × the item's
+    // listed price) now applies to sale too — moveForm.amount is
+    // editable in the UI below, for a discount or for the rarer
+    // "used, not sold" case where the real amount is 0.
+    const amount = moveForm.amount || moveForm.qty * moveItem.price;
 
     // Atomic: stock update + transactions log row happen in one DB
     // transaction (record_stock_move), so a mid-way failure can't leave
@@ -182,6 +194,14 @@ export default function InventoryPage() {
 
     setMoveOpen(false);
     await loadItems();
+
+    // Offer a receipt right at the moment of sale — the natural point
+    // to hand one to a customer, not something to dig for afterward in
+    // History. Purchases and zero-amount stock-outs (personal use,
+    // spoilage) have nothing worth printing.
+    if (moveType === 'sale' && amount > 0) {
+      setReceiptTxn({ item_name: moveItem.name, qty: moveForm.qty, unit: moveItem.unit, amount, created_at: new Date().toISOString() });
+    }
   }
 
   const filtered = items.filter(i => i.name.toLowerCase().includes(search.toLowerCase()));
@@ -428,12 +448,18 @@ export default function InventoryPage() {
 
             <label className="block text-xs text-chalkdim mb-1">{t('inventory.quantity')} ({moveItem.unit})</label>
             <input type="number" className="input mb-3" value={moveForm.qty} onChange={e => setMoveForm({ ...moveForm, qty: Number(e.target.value) })} />
-            {moveType === 'purchase' && (
-              <>
-                <label className="block text-xs text-chalkdim mb-1">{t('inventory.totalAmount')}</label>
-                <input type="number" className="input mb-3" value={moveForm.amount} onChange={e => setMoveForm({ ...moveForm, amount: Number(e.target.value) })} />
-              </>
-            )}
+            <label className="block text-xs text-chalkdim mb-1">
+              {moveType === 'purchase' ? t('inventory.totalAmount') : t('inventory.saleAmount')}
+            </label>
+            <input
+              type="number"
+              className="input mb-1"
+              value={moveForm.amount || ''}
+              placeholder={fmt(moveForm.qty * moveItem.price)}
+              onChange={e => setMoveForm({ ...moveForm, amount: Number(e.target.value) })}
+            />
+            {moveType === 'sale' && <div className="text-[11px] text-chalkdim mb-3">{t('inventory.saleAmountHint')}</div>}
+            {moveType === 'purchase' && <div className="mb-3" />}
             <div className="flex gap-2 mt-2">
               <button onClick={() => setMoveOpen(false)} className="btn-secondary flex-1">{t('inventory.cancel')}</button>
               <button onClick={confirmMove} className="btn-primary flex-1">{t('inventory.confirm')}</button>
@@ -451,6 +477,10 @@ export default function InventoryPage() {
 
       {scannerOpen && (
         <BarcodeScannerModal onDetected={handleScanned} onClose={() => setScannerOpen(false)} />
+      )}
+
+      {receiptTxn && (
+        <SaleReceiptModal shopName={shopName || 'Dukaan'} txn={receiptTxn} onClose={() => setReceiptTxn(null)} />
       )}
     </div>
   );

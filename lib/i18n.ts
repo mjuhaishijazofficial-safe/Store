@@ -239,6 +239,8 @@ export const dict = {
   'inventory.outStockTitle': { ur: 'Bik/Use Hua — ', en: 'Stock Out — ' },
   'inventory.quantity': { ur: 'Quantity', en: 'Quantity' },
   'inventory.totalAmount': { ur: 'Total amount (₨) — budget se katega', en: 'Total amount (₨) — deducted from budget' },
+  'inventory.saleAmount': { ur: 'Bikri Amount (₨)', en: 'Sale Amount (₨)' },
+  'inventory.saleAmountHint': { ur: 'Khali chhorein to item ki price se khud calculate ho jayega', en: 'Leave empty to auto-calculate from the item\'s price' },
   'inventory.confirm': { ur: 'Confirm', en: 'Confirm' },
   'inventory.boxMode': { ur: 'Box/Carton mein aaya hai', en: 'Arrived in a box/carton' },
   'inventory.boxCount': { ur: 'Kitne Box', en: 'How Many Boxes' },
@@ -343,6 +345,10 @@ export const dict = {
   'contact.deleteConfirm': { ur: 'Haan, Delete Karein', en: 'Yes, Delete' },
   'contact.deleting': { ur: 'Delete ho raha hai...', en: 'Deleting...' },
   'contact.edit': { ur: 'Edit', en: 'Edit' },
+
+  'receipt.total': { ur: 'Total', en: 'Total' },
+  'receipt.thanks': { ur: 'Shukriya! Dobara Tashreef Layein', en: 'Thank you! Please visit again' },
+  'receipt.print': { ur: 'Receipt Print Karein', en: 'Print Receipt' },
 
   'khataDetail.fromInventory': { ur: 'Inventory se', en: 'From inventory' },
   'khataDetail.totalGiven': { ur: 'Kul Saman Diya', en: 'Total Given' },
