@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useLang } from '@/lib/i18n-context';
 import { useShop } from '@/lib/shop-context';
 import { useToast } from '@/lib/toast-context';
+import { usePalette } from '@/lib/palette-context';
 
 export default function SettingsPage() {
   const supabase = createClient();
@@ -13,6 +14,7 @@ export default function SettingsPage() {
   const { t } = useLang();
   const { shopId, role } = useShop();
   const { showToast } = useToast();
+  const { palette, setPalette } = usePalette();
   const isOwner = role === 'owner';
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState('');
@@ -78,6 +80,27 @@ export default function SettingsPage() {
       <input type="number" className="input mb-5" value={budget} onChange={e => setBudget(Number(e.target.value))} />
 
       <button onClick={save} className="btn-primary">{t('settings.save')}</button>
+
+      <div className="mt-10 pt-6 border-t border-chalk/10">
+        <div className="text-xs text-chalkdim uppercase tracking-wide font-700 mb-1">{t('settings.appearance')}</div>
+        <div className="text-chalkdim text-xs mb-3">{t('settings.appearanceHint')}</div>
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            onClick={() => setPalette('spice')}
+            className={`card p-3 flex items-center gap-2.5 text-left ${palette === 'spice' ? 'border-haldi' : ''}`}
+          >
+            <span className="text-lg leading-none">🟠</span>
+            <span className="text-sm font-600">Kiryana Spice</span>
+          </button>
+          <button
+            onClick={() => setPalette('navy')}
+            className={`card p-3 flex items-center gap-2.5 text-left ${palette === 'navy' ? 'border-haldi' : ''}`}
+          >
+            <span className="text-lg leading-none">🔵</span>
+            <span className="text-sm font-600">Ledger Trust</span>
+          </button>
+        </div>
+      </div>
 
       <div className="mt-10 pt-6 border-t border-mirch/30">
         <div className="text-xs text-mirch uppercase tracking-wide font-700 mb-3">{t('settings.dangerZone')}</div>

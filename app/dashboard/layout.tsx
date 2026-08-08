@@ -4,7 +4,6 @@ import Link from 'next/link';
 import SignOutButton from '@/components/SignOutButton';
 import LanguageToggle from '@/components/LanguageToggle';
 import ThemeToggle from '@/components/ThemeToggle';
-import PaletteToggle from '@/components/PaletteToggle';
 import DashboardNav from '@/components/DashboardNav';
 import { StoreIcon } from '@/components/icons';
 import { getServerT } from '@/lib/i18n-server';
@@ -71,7 +70,6 @@ export default async function DashboardLayout({ children }: { children: React.Re
             </div>
             <div className="flex items-center gap-3 shrink-0">
               <ThemeToggle />
-              <PaletteToggle />
               <LanguageToggle />
               <SignOutButton />
             </div>

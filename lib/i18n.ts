@@ -391,6 +391,8 @@ export const dict = {
   'settings.shopName': { ur: 'Dukaan ka naam', en: 'Shop name' },
   'settings.totalBudget': { ur: 'Kul budget (₨)', en: 'Total budget (₨)' },
   'settings.save': { ur: 'Save Karein', en: 'Save' },
+  'settings.appearance': { ur: 'Rang Palette', en: 'Appearance' },
+  'settings.appearanceHint': { ur: 'App ke brand color choose karein', en: 'Choose the app\'s brand color' },
   'settings.saved': { ur: 'Save ho gaya ✓', en: 'Saved ✓' },
   'settings.dangerZone': { ur: 'Danger Zone', en: 'Danger Zone' },
   'settings.deleteAccountTitle': { ur: 'Account Delete Karein', en: 'Delete Account' },

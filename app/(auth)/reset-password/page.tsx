@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import LanguageToggle from '@/components/LanguageToggle';
 import ThemeToggle from '@/components/ThemeToggle';
-import PaletteToggle from '@/components/PaletteToggle';
 import { useLang } from '@/lib/i18n-context';
 
 export default function ResetPasswordPage() {
@@ -61,7 +60,6 @@ export default function ResetPasswordPage() {
       <div className="card w-full max-w-sm p-7">
         <div className="flex justify-end gap-2 mb-3">
           <ThemeToggle />
-          <PaletteToggle />
           <LanguageToggle />
         </div>
         <div className="font-display text-2xl font-700 text-haldi mb-6">{t('auth.newPasswordTitle')}</div>
