@@ -9,6 +9,7 @@ import { useShop } from '@/lib/shop-context';
 import { useToast } from '@/lib/toast-context';
 import { ReceiptIcon, CashIcon } from '@/components/icons';
 import ContactEditModal from '@/components/ContactEditModal';
+import CustomerStatementModal from '@/components/CustomerStatementModal';
 
 type Customer = {
   id: string;
@@ -60,6 +61,7 @@ export default function KhataDetailPage() {
 
   const [modalType, setModalType] = useState<'purchase' | 'payment' | null>(null);
   const [editOpen, setEditOpen] = useState(false);
+  const [statementOpen, setStatementOpen] = useState(false);
   const [form, setForm] = useState({ item_name: '', qty: '', amount: '', note: '' });
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -315,6 +317,10 @@ export default function KhataDetailPage() {
             {t('khataDetail.remindWhatsapp')}
           </button>
         )}
+
+        <button onClick={() => setStatementOpen(true)} className="w-full mt-2 text-xs text-chalkdim hover:text-haldi underline">
+          {t('khataDetail.printStatement')}
+        </button>
       </div>
 
       {advanceDepletedNotice && (
@@ -438,6 +444,16 @@ export default function KhataDetailPage() {
           onClose={() => setEditOpen(false)}
           onSaved={() => { setEditOpen(false); loadAll(); }}
           onDeleted={() => router.push('/dashboard/khata')}
+        />
+      )}
+
+      {statementOpen && (
+        <CustomerStatementModal
+          customerId={customerId}
+          customerName={customer.name}
+          customerPhone={customer.phone}
+          shopName={shopName || 'Dukaan'}
+          onClose={() => setStatementOpen(false)}
         />
       )}
     </div>

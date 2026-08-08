@@ -352,6 +352,11 @@ export const dict = {
   'receipt.thanks': { ur: 'Shukriya! Dobara Tashreef Layein', en: 'Thank you! Please visit again' },
   'receipt.print': { ur: 'Receipt Print Karein', en: 'Print Receipt' },
 
+  'statement.title': { ur: 'Khata Statement', en: 'Khata Statement' },
+  'statement.date': { ur: 'Date', en: 'Date' },
+  'statement.finalBalance': { ur: 'Mojooda Balance', en: 'Current Balance' },
+  'khataDetail.printStatement': { ur: 'Statement Print Karein', en: 'Print Statement' },
+
   'offline.banner': { ur: '⚠ Internet nahi hai — data purana ho sakta hai, connection wapas aate hi khud update ho jayega', en: '⚠ No internet — data may be stale, will update automatically once connection returns' },
   'offline.stale': { ur: 'Purana data dikha rahe hain (connection nahi mila)', en: 'Showing last saved data (couldn\'t reach the server)' },
 
