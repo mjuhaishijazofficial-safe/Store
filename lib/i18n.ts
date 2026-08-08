@@ -13,6 +13,7 @@ export const dict = {
   'common.error': { ur: 'Kuch ghalat ho gaya — dobara koshish karein', en: 'Something went wrong — please try again' },
   'common.loadMore': { ur: 'Aur Dikhayein', en: 'Load More' },
   'common.loading': { ur: 'Load ho raha hai...', en: 'Loading...' },
+  'common.confirmDelete': { ur: 'Pakka? Delete Karein', en: 'Sure? Delete' },
   'common.exportCsv': { ur: 'CSV Export', en: 'Export CSV' },
   'inventory.importCsv': { ur: 'CSV Import Karein', en: 'Import CSV' },
   'inventory.importing': { ur: 'Import ho raha hai...', en: 'Importing...' },

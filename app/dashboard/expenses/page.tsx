@@ -6,6 +6,7 @@ import { useLang } from '@/lib/i18n-context';
 import { useShop } from '@/lib/shop-context';
 import { useToast } from '@/lib/toast-context';
 import { startOfMonthPKT } from '@/lib/pkt-time';
+import ConfirmDeleteButton from '@/components/ConfirmDeleteButton';
 
 type Category = 'rent' | 'salary' | 'utility' | 'marketing' | 'other';
 
@@ -139,7 +140,7 @@ export default function ExpensesPage() {
               </div>
               <div className="flex items-center gap-3">
                 <div className="font-mono font-700 text-sm text-mirch">{fmt(e.amount)}</div>
-                <button onClick={() => remove(e.id)} className="text-chalkdim text-xs hover:text-mirch">✕</button>
+                <ConfirmDeleteButton onConfirm={() => remove(e.id)} />
               </div>
             </div>
           );
@@ -167,7 +168,7 @@ export default function ExpensesPage() {
             </select>
 
             <label className="block text-xs text-chalkdim mb-1">{t('expenses.amount')}</label>
-            <input type="number" className="input mb-3" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} />
+            <input type="number" inputMode="decimal" className="input mb-3" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} />
 
             <label className="block text-xs text-chalkdim mb-1">{t('khataDetail.noteOptional')}</label>
             <input className="input mb-5" value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} />

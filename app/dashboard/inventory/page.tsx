@@ -370,7 +370,7 @@ export default function InventoryPage() {
             <div className="grid grid-cols-2 gap-3 mb-3">
               <div>
                 <label className="block text-xs text-chalkdim mb-1">{t('inventory.stock')}</label>
-                <input type="number" className="input" value={form.stock} onChange={e => setForm({ ...form, stock: Number(e.target.value) })} />
+                <input type="number" inputMode="decimal" className="input" value={form.stock} onChange={e => setForm({ ...form, stock: Number(e.target.value) })} />
               </div>
               <div>
                 <label className="block text-xs text-chalkdim mb-1">{t('inventory.unit')}</label>
@@ -380,16 +380,16 @@ export default function InventoryPage() {
             <div className="grid grid-cols-2 gap-3 mb-3">
               <div>
                 <label className="block text-xs text-chalkdim mb-1">{t('inventory.alertLevel')}</label>
-                <input type="number" className="input" value={form.min_stock} onChange={e => setForm({ ...form, min_stock: Number(e.target.value) })} />
+                <input type="number" inputMode="decimal" className="input" value={form.min_stock} onChange={e => setForm({ ...form, min_stock: Number(e.target.value) })} />
               </div>
               <div>
                 <label className="block text-xs text-chalkdim mb-1">{t('inventory.sellingPrice')}</label>
-                <input type="number" className="input" value={form.price} onChange={e => setForm({ ...form, price: Number(e.target.value) })} />
+                <input type="number" inputMode="decimal" className="input" value={form.price} onChange={e => setForm({ ...form, price: Number(e.target.value) })} />
               </div>
             </div>
             <div className="mb-3">
               <label className="block text-xs text-chalkdim mb-1">{t('inventory.costPrice')}</label>
-              <input type="number" className="input" value={form.cost_price} onChange={e => setForm({ ...form, cost_price: Number(e.target.value) })} />
+              <input type="number" inputMode="decimal" className="input" value={form.cost_price} onChange={e => setForm({ ...form, cost_price: Number(e.target.value) })} />
             </div>
             <div className="mb-3">
               <label className="block text-xs text-chalkdim mb-1">{t('inventory.barcode')}</label>
@@ -430,7 +430,7 @@ export default function InventoryPage() {
                       <div>
                         <label className="block text-[11px] text-chalkdim mb-1">{t('inventory.boxCount')}</label>
                         <input
-                          type="number"
+                          type="number" inputMode="decimal"
                           className="input"
                           value={boxCount}
                           onChange={e => { const v = Number(e.target.value); setBoxCount(v); recalcFromBox(v, piecesPerBox, costPerBox); }}
@@ -439,7 +439,7 @@ export default function InventoryPage() {
                       <div>
                         <label className="block text-[11px] text-chalkdim mb-1">{t('inventory.piecesPerBox')}</label>
                         <input
-                          type="number"
+                          type="number" inputMode="decimal"
                           className="input"
                           value={piecesPerBox}
                           onChange={e => { const v = Number(e.target.value); setPiecesPerBox(v); recalcFromBox(boxCount, v, costPerBox); }}
@@ -448,7 +448,7 @@ export default function InventoryPage() {
                     </div>
                     <label className="block text-[11px] text-chalkdim mb-1">{t('inventory.costPerBox')}</label>
                     <input
-                      type="number"
+                      type="number" inputMode="decimal"
                       className="input mb-2"
                       value={costPerBox}
                       onChange={e => { const v = Number(e.target.value); setCostPerBox(v); recalcFromBox(boxCount, piecesPerBox, v); }}
@@ -466,12 +466,12 @@ export default function InventoryPage() {
             )}
 
             <label className="block text-xs text-chalkdim mb-1">{t('inventory.quantity')} ({moveItem.unit})</label>
-            <input type="number" className="input mb-3" value={moveForm.qty} onChange={e => setMoveForm({ ...moveForm, qty: Number(e.target.value) })} />
+            <input type="number" inputMode="decimal" className="input mb-3" value={moveForm.qty} onChange={e => setMoveForm({ ...moveForm, qty: Number(e.target.value) })} />
             <label className="block text-xs text-chalkdim mb-1">
               {moveType === 'purchase' ? t('inventory.totalAmount') : t('inventory.saleAmount')}
             </label>
             <input
-              type="number"
+              type="number" inputMode="decimal"
               className="input mb-1"
               value={moveForm.amount || ''}
               placeholder={fmt(moveForm.qty * moveItem.price)}

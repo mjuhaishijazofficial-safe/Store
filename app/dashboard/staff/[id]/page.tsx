@@ -124,7 +124,7 @@ export default function StaffDetailPage() {
 
         <label className="block text-xs text-chalkdim mb-1">{t('staffDetail.monthlySalary')}</label>
         <div className="flex gap-2">
-          <input type="number" className="input flex-1" value={salaryInput} onChange={e => setSalaryInput(e.target.value)} />
+          <input type="number" inputMode="decimal" className="input flex-1" value={salaryInput} onChange={e => setSalaryInput(e.target.value)} />
           <button onClick={saveSalary} disabled={savingSalary} className="btn-primary whitespace-nowrap">
             {savingSalary ? t('settings.saving') : t('contact.save')}
           </button>

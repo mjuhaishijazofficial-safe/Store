@@ -186,7 +186,7 @@ export default function KhataPage() {
             <label className="block text-xs text-chalkdim mb-1">{t('khata.phone')}</label>
             <input className="input mb-3" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="03xx-xxxxxxx" />
             <label className="block text-xs text-chalkdim mb-1">{t('khata.creditLimit')}</label>
-            <input type="number" className="input mb-5" value={form.credit_limit} onChange={e => setForm({ ...form, credit_limit: e.target.value })} />
+            <input type="number" inputMode="decimal" className="input mb-5" value={form.credit_limit} onChange={e => setForm({ ...form, credit_limit: e.target.value })} />
             <div className="flex gap-2">
               <button onClick={() => setModalOpen(false)} className="btn-secondary flex-1">{t('khata.cancel')}</button>
               <button onClick={saveCustomer} className="btn-primary flex-1">{t('khata.save')}</button>

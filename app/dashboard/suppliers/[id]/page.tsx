@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import ContactEditModal from '@/components/ContactEditModal';
+import ConfirmDeleteButton from '@/components/ConfirmDeleteButton';
 import { createClient } from '@/lib/supabase/client';
 import { useLang } from '@/lib/i18n-context';
 import { useShop } from '@/lib/shop-context';
@@ -184,7 +185,7 @@ export default function SupplierDetailPage() {
                 <div className={`font-mono font-700 text-sm ${color}`}>
                   {e.type === 'purchase' ? '+' : '−'}{fmt(e.amount)}
                 </div>
-                <button onClick={() => deleteEntry(e.id)} className="text-chalkdim text-xs hover:text-mirch">✕</button>
+                <ConfirmDeleteButton onConfirm={() => deleteEntry(e.id)} />
               </div>
             </div>
           );
@@ -209,11 +210,11 @@ export default function SupplierDetailPage() {
                 <label className="block text-xs text-chalkdim mb-1">{t('suppliersDetail.itemName')}</label>
                 <input className="input mb-3" value={form.item_name} onChange={e => setForm({ ...form, item_name: e.target.value })} placeholder={t('suppliersDetail.itemPlaceholder')} />
                 <label className="block text-xs text-chalkdim mb-1">{t('suppliersDetail.qtyOptional')}</label>
-                <input type="number" className="input mb-3" value={form.qty} onChange={e => setForm({ ...form, qty: e.target.value })} placeholder="e.g. 1" />
+                <input type="number" inputMode="decimal" className="input mb-3" value={form.qty} onChange={e => setForm({ ...form, qty: e.target.value })} placeholder="e.g. 1" />
               </>
             )}
             <label className="block text-xs text-chalkdim mb-1">{t('suppliersDetail.amount')}</label>
-            <input type="number" className="input mb-3" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} />
+            <input type="number" inputMode="decimal" className="input mb-3" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} />
             <label className="block text-xs text-chalkdim mb-1">{t('suppliersDetail.noteOptional')}</label>
             <input className="input mb-5" value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} />
             <div className="flex gap-2">

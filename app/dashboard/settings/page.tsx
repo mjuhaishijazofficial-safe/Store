@@ -77,7 +77,7 @@ export default function SettingsPage() {
       <input className="input mb-4" value={name} onChange={e => setName(e.target.value)} />
 
       <label className="block text-xs text-chalkdim mb-1">{t('settings.totalBudget')}</label>
-      <input type="number" className="input mb-5" value={budget} onChange={e => setBudget(Number(e.target.value))} />
+      <input type="number" inputMode="decimal" className="input mb-5" value={budget} onChange={e => setBudget(Number(e.target.value))} />
 
       <button onClick={save} className="btn-primary">{t('settings.save')}</button>
 

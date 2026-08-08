@@ -10,6 +10,7 @@ import { useToast } from '@/lib/toast-context';
 import { ReceiptIcon, CashIcon } from '@/components/icons';
 import ContactEditModal from '@/components/ContactEditModal';
 import CustomerStatementModal from '@/components/CustomerStatementModal';
+import ConfirmDeleteButton from '@/components/ConfirmDeleteButton';
 
 type Customer = {
   id: string;
@@ -369,7 +370,7 @@ export default function KhataDetailPage() {
                     {t('khataDetail.colBalance')}: {fmt(Math.abs(bal))}
                   </div>
                 </div>
-                <button onClick={() => deleteEntry(e.id)} className="text-chalkdim text-xs hover:text-mirch shrink-0">✕</button>
+                <ConfirmDeleteButton onConfirm={() => deleteEntry(e.id)} />
               </div>
             );
           })}
@@ -418,11 +419,11 @@ export default function KhataDetailPage() {
                   {selectedItemId && <div className="text-[10px] text-dhania mt-1">✓ {t('khataDetail.fromInventory')}</div>}
                 </div>
                 <label className="block text-xs text-chalkdim mb-1">{t('khataDetail.qtyOptional')}</label>
-                <input type="number" className="input mb-3" value={form.qty} onChange={e => onQtyChange(e.target.value)} placeholder="e.g. 1" />
+                <input type="number" inputMode="decimal" className="input mb-3" value={form.qty} onChange={e => onQtyChange(e.target.value)} placeholder="e.g. 1" />
               </>
             )}
             <label className="block text-xs text-chalkdim mb-1">{t('khataDetail.amount')}</label>
-            <input type="number" className="input mb-1" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} />
+            <input type="number" inputMode="decimal" className="input mb-1" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} />
             {willGoOverLimit && (
               <div className="text-xs text-mirch mb-2">{t('khataDetail.limitWarning')} ({fmt(customer.credit_limit!)})</div>
             )}
