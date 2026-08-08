@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useLang } from '@/lib/i18n-context';
 import { useShop } from '@/lib/shop-context';
 import { useToast } from '@/lib/toast-context';
-import { downloadCsv } from '@/lib/csv';
+import { downloadCsv, parseCsv } from '@/lib/csv';
 import BarcodeScannerModal from '@/components/BarcodeScannerModal';
 
 type Item = {
@@ -18,6 +18,7 @@ type Item = {
   price: number;
   cost_price: number;
   barcode: string | null;
+  expiry_date: string | null;
 };
 
 function fmt(n: number) {
@@ -38,9 +39,10 @@ export default function InventoryPage() {
   const [moveType, setMoveType] = useState<'purchase' | 'sale'>('purchase');
   const [loading, setLoading] = useState(true);
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [lookupState, setLookupState] = useState<'idle' | 'loading' | 'found' | 'not_found'>('idle');
 
-  const [form, setForm] = useState({ name: '', category: '', unit: '', stock: 0, min_stock: 0, price: 0, cost_price: 0, barcode: '' });
+  const [form, setForm] = useState({ name: '', category: '', unit: '', stock: 0, min_stock: 0, price: 0, cost_price: 0, barcode: '', expiry_date: '' });
   const [moveForm, setMoveForm] = useState({ qty: 0, amount: 0 });
 
   // Box/carton -> pieces helper: stock is always tracked in the item's
@@ -66,14 +68,14 @@ export default function InventoryPage() {
 
   function openAdd(prefillBarcode?: string) {
     setEditing(null);
-    setForm({ name: '', category: '', unit: '', stock: 0, min_stock: 0, price: 0, cost_price: 0, barcode: prefillBarcode || '' });
+    setForm({ name: '', category: '', unit: '', stock: 0, min_stock: 0, price: 0, cost_price: 0, barcode: prefillBarcode || '', expiry_date: '' });
     setLookupState('idle');
     setModalOpen(true);
   }
 
   function openEdit(it: Item) {
     setEditing(it);
-    setForm({ name: it.name, category: it.category || '', unit: it.unit || '', stock: it.stock, min_stock: it.min_stock, price: it.price, cost_price: it.cost_price || 0, barcode: it.barcode || '' });
+    setForm({ name: it.name, category: it.category || '', unit: it.unit || '', stock: it.stock, min_stock: it.min_stock, price: it.price, cost_price: it.cost_price || 0, barcode: it.barcode || '', expiry_date: it.expiry_date || '' });
     setLookupState('idle');
     setModalOpen(true);
   }
@@ -115,8 +117,9 @@ export default function InventoryPage() {
     if (!form.name.trim() || !shopId) return;
     // Empty string vs null matters here: the barcode unique index only
     // excludes NULLs, so two items saved with an empty string would
-    // collide on it.
-    const payload = { ...form, barcode: form.barcode.trim() || null };
+    // collide on it. expiry_date is a `date` column — Postgres rejects
+    // an empty string outright, it has to be null.
+    const payload = { ...form, barcode: form.barcode.trim() || null, expiry_date: form.expiry_date || null };
     const { error: err } = editing
       ? await supabase.from('items').update(payload).eq('id', editing.id)
       : await supabase.from('items').insert({ ...payload, shop_id: shopId });
@@ -194,9 +197,61 @@ export default function InventoryPage() {
         min_stock: it.min_stock,
         selling_price: it.price,
         cost_price: it.cost_price,
-        barcode: it.barcode || ''
+        barcode: it.barcode || '',
+        expiry_date: it.expiry_date || ''
       }))
     );
+  }
+
+  // Same column names exportCsv writes (selling_price, not price) so a
+  // file round-trips: export, edit in Excel, re-import. Inserted one row
+  // at a time rather than a single bulk insert — a barcode collision on
+  // one row would fail the whole batch in one SQL statement, and the
+  // point of import is that a handful of bad rows in a 200-item sheet
+  // shouldn't block the other 195 from landing.
+  async function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !shopId) return;
+
+    const text = await file.text();
+    const rows = parseCsv(text);
+    if (rows.length === 0) {
+      showToast(t('inventory.importEmpty'), 'error');
+      return;
+    }
+
+    setImporting(true);
+    let ok = 0;
+    let failed = 0;
+    for (const row of rows) {
+      const name = (row.name || '').trim();
+      if (!name) { failed++; continue; }
+      const payload = {
+        shop_id: shopId,
+        name,
+        category: row.category?.trim() || null,
+        unit: row.unit?.trim() || null,
+        stock: Number(row.stock) || 0,
+        min_stock: Number(row.min_stock) || 0,
+        price: Number(row.selling_price ?? row.price) || 0,
+        cost_price: Number(row.cost_price) || 0,
+        barcode: row.barcode?.trim() || null,
+        expiry_date: row.expiry_date?.trim() || null
+      };
+      const { error: err } = await supabase.from('items').insert(payload);
+      if (err) failed++; else ok++;
+    }
+    setImporting(false);
+    await loadItems();
+
+    if (ok > 0 && failed === 0) {
+      showToast(t('inventory.importDone').replace('{n}', String(ok)), 'success');
+    } else if (ok > 0 && failed > 0) {
+      showToast(t('inventory.importPartial').replace('{ok}', String(ok)).replace('{fail}', String(failed)), 'error');
+    } else {
+      showToast(t('inventory.importFailed'), 'error');
+    }
   }
 
   return (
@@ -207,9 +262,15 @@ export default function InventoryPage() {
         <button onClick={() => openAdd()} className="btn-primary whitespace-nowrap">{t('inventory.addNew')}</button>
       </div>
 
-      {items.length > 0 && (
-        <button onClick={exportCsv} className="text-chalkdim text-xs underline mb-4 block">{t('common.exportCsv')}</button>
-      )}
+      <div className="flex gap-4 mb-4">
+        {items.length > 0 && (
+          <button onClick={exportCsv} className="text-chalkdim text-xs underline">{t('common.exportCsv')}</button>
+        )}
+        <label className="text-chalkdim text-xs underline cursor-pointer">
+          {importing ? t('inventory.importing') : t('inventory.importCsv')}
+          <input type="file" accept=".csv" className="hidden" onChange={handleImportFile} disabled={importing} />
+        </label>
+      </div>
 
       {loading && <div className="text-chalkdim text-sm text-center py-10">{t('inventory.loading')}</div>}
 
@@ -223,8 +284,10 @@ export default function InventoryPage() {
       <div className="space-y-2">
         {filtered.map(it => {
           const low = it.stock <= it.min_stock;
+          const daysToExpiry = it.expiry_date ? Math.ceil((new Date(it.expiry_date).getTime() - Date.now()) / 86400000) : null;
+          const expiringSoon = daysToExpiry != null && daysToExpiry <= 30;
           return (
-            <div key={it.id} className={`card p-4 ${low ? 'border-mirch' : ''}`}>
+            <div key={it.id} className={`card p-4 ${low || expiringSoon ? 'border-mirch' : ''}`}>
               <div className="flex justify-between items-start">
                 <div>
                   <div className="font-700">{it.name}</div>
@@ -238,6 +301,11 @@ export default function InventoryPage() {
                 <span>{t('inventory.alertLevel')}: {it.min_stock}</span>
                 <span>{fmt(it.price)} / {it.unit}</span>
               </div>
+              {expiringSoon && (
+                <div className="text-[11px] text-mirch mt-1">
+                  {daysToExpiry! < 0 ? `${t('reorder.expiringTitle')} — ${Math.abs(daysToExpiry!)} ${t('reorder.daysAgo')}` : `${t('reorder.expiringTitle')} — ${daysToExpiry} ${t('reorder.expiryDaysLeft')}`}
+                </div>
+              )}
               <div className="flex gap-2 mt-3">
                 <button onClick={() => openMove(it, 'purchase')} className="flex-1 text-xs py-2 rounded-lg border border-dhania text-dhania">{t('inventory.stockIn')}</button>
                 <button onClick={() => openMove(it, 'sale')} className="flex-1 text-xs py-2 rounded-lg border border-mirch text-mirch">{t('inventory.stockOut')}</button>
@@ -284,9 +352,14 @@ export default function InventoryPage() {
               <label className="block text-xs text-chalkdim mb-1">{t('inventory.costPrice')}</label>
               <input type="number" className="input" value={form.cost_price} onChange={e => setForm({ ...form, cost_price: Number(e.target.value) })} />
             </div>
-            <div className="mb-5">
+            <div className="mb-3">
               <label className="block text-xs text-chalkdim mb-1">{t('inventory.barcode')}</label>
               <input className="input" value={form.barcode} onChange={e => setForm({ ...form, barcode: e.target.value })} />
+            </div>
+            <div className="mb-5">
+              <label className="block text-xs text-chalkdim mb-1">{t('inventory.expiryDate')}</label>
+              <input type="date" className="input" value={form.expiry_date} onChange={e => setForm({ ...form, expiry_date: e.target.value })} />
+              <div className="text-[11px] text-chalkdim mt-1">{t('inventory.expiryHint')}</div>
             </div>
             <div className="flex gap-2 mb-2">
               <button onClick={() => setModalOpen(false)} className="btn-secondary flex-1">{t('inventory.cancel')}</button>

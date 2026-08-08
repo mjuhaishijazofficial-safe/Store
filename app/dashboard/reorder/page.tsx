@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getServerT } from '@/lib/i18n-server';
 
 const SMART_THRESHOLD_DAYS = 7;
+const EXPIRY_WARNING_DAYS = 30;
 
 function fmt(n: number) {
   return '₨' + Number(n || 0).toLocaleString('en-IN');
@@ -31,12 +32,24 @@ export default async function ReorderPage() {
     .filter((p: any) => !lowIds.has(p.item_id) && p.days_remaining != null && p.days_remaining <= SMART_THRESHOLD_DAYS)
     .sort((a: any, b: any) => a.days_remaining - b.days_remaining);
 
+  // Expiring Soon: a completely different kind of "needs attention" than
+  // low stock — this is "sell it, discount it, or throw it out", not
+  // "order more". expiry_date is optional (null for the majority of
+  // kiryana goods that don't expire), so only items that actually set
+  // one show up here at all.
+  const todayMs = Date.now();
+  const expiring = (items || [])
+    .filter((i: any) => i.expiry_date)
+    .map((i: any) => ({ ...i, daysLeft: Math.ceil((new Date(i.expiry_date).getTime() - todayMs) / 86400000) }))
+    .filter((i: any) => i.daysLeft <= EXPIRY_WARNING_DAYS)
+    .sort((a: any, b: any) => a.daysLeft - b.daysLeft);
+
   return (
     <div>
       <h1 className="font-display text-xl font-700 mb-1">{t('reorder.title')}</h1>
       <p className="text-chalkdim text-sm mb-5">{low.length} {t('reorder.subtitle')}</p>
 
-      {low.length === 0 && smart.length === 0 && (
+      {low.length === 0 && smart.length === 0 && expiring.length === 0 && (
         <div className="text-center py-14 text-chalkdim text-sm">
           <div className="font-display text-dhania text-base mb-1">{t('reorder.allGoodTitle')}</div>
           {t('reorder.allGoodBody')}
@@ -88,6 +101,34 @@ export default async function ReorderPage() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {expiring.length > 0 && (
+        <div className="mt-8">
+          <h2 className="font-display text-lg font-700 mb-1 text-mirch">{t('reorder.expiringTitle')}</h2>
+          <p className="text-chalkdim text-xs mb-3">{t('reorder.expiringSubtitle')}</p>
+          <div className="space-y-2">
+            {expiring.map((it: any) => {
+              const expired = it.daysLeft < 0;
+              return (
+                <div key={it.id} className={`card p-4 ${expired ? 'border-mirch' : 'border-haldi/40'}`}>
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <div className="font-700">{it.name}</div>
+                      <div className="text-xs text-chalkdim">{it.stock} {it.unit}</div>
+                    </div>
+                    <div className={`font-mono font-700 text-right ${expired ? 'text-mirch' : 'text-haldi'}`}>
+                      {expired ? Math.abs(it.daysLeft) : it.daysLeft}
+                      <span className="block text-[10px] font-normal text-chalkdim">
+                        {expired ? t('reorder.daysAgo') : t('reorder.expiryDaysLeft')}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

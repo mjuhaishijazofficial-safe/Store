@@ -48,6 +48,7 @@ create table if not exists items (
 );
 alter table items add column if not exists cost_price numeric not null default 0;
 alter table items add column if not exists barcode text;
+alter table items add column if not exists expiry_date date; -- optional; null means "doesn't expire" (most kiryana goods)
 
 -- 4. TRANSACTIONS (purchase / sale log) ------------------------------
 create table if not exists transactions (

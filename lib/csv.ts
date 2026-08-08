@@ -33,3 +33,48 @@ export function downloadCsv(filename: string, rows: Record<string, unknown>[]) {
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
+
+// A hand-rolled state-machine parser rather than text.split(',') — a
+// naive split breaks the moment a cell has a comma or newline inside
+// quotes (a category or item name typed with a comma is a completely
+// normal thing to happen), and this is the exact inverse of
+// escapeCsvCell above, so an exported file always round-trips.
+export function parseCsv(text: string): Record<string, string>[] {
+  // Strip a UTF-8 BOM if present — downloadCsv writes one so Excel opens
+  // the file correctly, and Excel writes one back when re-saving.
+  if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
+
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let cell = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQuotes) {
+      if (c === '"') {
+        if (text[i + 1] === '"') { cell += '"'; i++; }
+        else inQuotes = false;
+      } else {
+        cell += c;
+      }
+      continue;
+    }
+    if (c === '"') inQuotes = true;
+    else if (c === ',') { row.push(cell); cell = ''; }
+    else if (c === '\r') { /* swallow — \n (or end of input) closes the row */ }
+    else if (c === '\n') { row.push(cell); rows.push(row); row = []; cell = ''; }
+    else cell += c;
+  }
+  if (cell.length > 0 || row.length > 0) { row.push(cell); rows.push(row); }
+
+  const filled = rows.filter(r => r.some(c => c.trim() !== ''));
+  if (filled.length === 0) return [];
+
+  const headers = filled[0].map(h => h.trim());
+  return filled.slice(1).map(r => {
+    const obj: Record<string, string> = {};
+    headers.forEach((h, idx) => { obj[h] = (r[idx] ?? '').trim(); });
+    return obj;
+  });
+}

@@ -14,6 +14,12 @@ export const dict = {
   'common.loadMore': { ur: 'Aur Dikhayein', en: 'Load More' },
   'common.loading': { ur: 'Load ho raha hai...', en: 'Loading...' },
   'common.exportCsv': { ur: 'CSV Export', en: 'Export CSV' },
+  'inventory.importCsv': { ur: 'CSV Import Karein', en: 'Import CSV' },
+  'inventory.importing': { ur: 'Import ho raha hai...', en: 'Importing...' },
+  'inventory.importDone': { ur: '{n} items import ho gaye ✓', en: '{n} items imported ✓' },
+  'inventory.importPartial': { ur: '{ok} import hue, {fail} fail (naam khali ya barcode duplicate)', en: '{ok} imported, {fail} failed (missing name or duplicate barcode)' },
+  'inventory.importFailed': { ur: 'Koi item import nahi ho saka', en: 'No items could be imported' },
+  'inventory.importEmpty': { ur: 'File khali hai ya format sahi nahi', en: 'File is empty or not a valid CSV' },
 
   // nav / shell
   'nav.overview': { ur: 'Overview', en: 'Overview' },
@@ -254,6 +260,8 @@ export const dict = {
   'inventory.scanFoundExisting': { ur: 'Ye saman pehle se hai — edit khul gaya', en: 'This item already exists — opened for edit' },
   'inventory.scanNewItem': { ur: 'Naya barcode — saman ki tafseel dein', en: 'New barcode — fill in the item details' },
   'inventory.barcode': { ur: 'Barcode', en: 'Barcode' },
+  'inventory.expiryDate': { ur: 'Expiry Date — optional', en: 'Expiry Date — optional' },
+  'inventory.expiryHint': { ur: 'Sirf un items ke liye jo expire hote hain (medicine, dairy, waghera)', en: 'Only for items that actually expire (medicine, dairy, etc.)' },
 
   // reorder
   'reorder.title': { ur: 'Mangwana Hai', en: 'Reorder' },
@@ -267,6 +275,10 @@ export const dict = {
   'reorder.smartTitle': { ur: 'Jald Khatam Ho Sakta Hai', en: 'Predicted to Run Out Soon' },
   'reorder.smartSubtitle': { ur: 'Pichle 30 din ki bikri ke hisaab se andaza — abhi alert level tak nahi pahuncha', en: 'Estimated from the last 30 days of sales — not at alert level yet' },
   'reorder.daysLeft': { ur: 'din baaki (andaza)', en: 'days left (estimate)' },
+  'reorder.expiringTitle': { ur: 'Expiry Qareeb Hai', en: 'Expiring Soon' },
+  'reorder.expiringSubtitle': { ur: 'Agle 30 din mein expire honay wale items', en: 'Items expiring within the next 30 days' },
+  'reorder.expiryDaysLeft': { ur: 'din baaki', en: 'days left' },
+  'reorder.daysAgo': { ur: 'din pehle expire', en: 'days ago' },
   'reorder.dailyRate': { ur: '/din bikta hai', en: '/day sold' },
 
   // history
