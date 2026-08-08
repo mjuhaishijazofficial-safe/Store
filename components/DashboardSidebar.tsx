@@ -54,7 +54,14 @@ export default function DashboardSidebar({ items, shopName, trialLabel }: { item
 
   function NavList({ onNavigate, iconOnly }: { onNavigate?: () => void; iconOnly: boolean }) {
     return (
-      <nav className="flex-1 overflow-y-auto py-2">
+      // min-h-0 overrides flexbox's default min-height:auto on a flex
+      // child — without it, a flex item with overflow-y-auto refuses to
+      // shrink below its content size, so instead of the nav list
+      // scrolling on its own, the whole <aside> (which is h-screen)
+      // overflows past the viewport and forces a page-level scrollbar,
+      // pushing Settings/Admin out past the bottom, overlapping the
+      // footer. This is the classic flexbox-scroll pitfall.
+      <nav className="flex-1 min-h-0 overflow-y-auto py-2">
         {items.map(n => {
           const active = isActive(n.href);
           const Icon = iconFor(n.href);
