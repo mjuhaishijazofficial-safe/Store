@@ -8,7 +8,18 @@ import { DEFAULT_THEME, Theme, THEME_COOKIE } from '@/lib/theme';
 
 export const metadata: Metadata = {
   title: 'Dukaan ERP — Apni Dukaan Digitalize Karein',
-  description: 'Inventory, budget aur bikri ka poora hisaab — ek jagah.'
+  description: 'Inventory + Khata + Suppliers + Staff + Reports — sab ek jagah, kiryana dukaanon ke liye.',
+  openGraph: {
+    title: 'Dukaan ERP — Apni Dukaan Digitalize Karein',
+    description: 'Inventory + Khata + Suppliers + Staff + Reports — sab ek jagah, kiryana dukaanon ke liye.',
+    type: 'website',
+    locale: 'ur_PK'
+  },
+  twitter: {
+    card: 'summary',
+    title: 'Dukaan ERP',
+    description: 'Inventory + Khata + Suppliers + Staff + Reports — sab ek jagah, kiryana dukaanon ke liye.'
+  }
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {

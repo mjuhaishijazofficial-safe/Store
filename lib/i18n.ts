@@ -88,6 +88,34 @@ export const dict = {
   'landing.footerPrivacy': { ur: 'Privacy Policy', en: 'Privacy Policy' },
   'landing.footerRights': { ur: 'Tamam huqooq mehfooz', en: 'All rights reserved' },
 
+  // legal — starting template, not a substitute for real legal review
+  'legal.back': { ur: '← Wapas', en: '← Back' },
+  'legal.lastUpdated': { ur: 'Aakhri update:', en: 'Last updated:' },
+
+  'terms.title': { ur: 'Terms of Service', en: 'Terms of Service' },
+  'terms.s1Title': { ur: '1. Ye Service Kya Hai', en: '1. What This Service Is' },
+  'terms.s1Body': { ur: 'Dukaan ERP ek cloud-based tool hai jo kiryana dukaanon ko inventory, khata (customer credit), suppliers, aur reports manage karne mein madad karta hai. Har dukaan ka account alag aur mehfooz hota hai.', en: 'Dukaan ERP is a cloud-based tool that helps kiryana shops manage inventory, khata (customer credit), suppliers, and reports. Every shop account is separate and secured.' },
+  'terms.s2Title': { ur: '2. Account aur Billing', en: '2. Account and Billing' },
+  'terms.s2Body': { ur: '14 din ka free trial milta hai, koi card zaroori nahi. Trial khatam hone ke baad, agar aap continue karna chahein, to ₨999/mahina subscription lagta hai (Stripe ke zariye). Subscription kabhi bhi Billing page se cancel ho sakta hai — koi lock-in ya penalty nahi.', en: 'You get a 14-day free trial, no card required. After the trial, continuing costs ₨999/month (via Stripe). You can cancel any time from the Billing page — no lock-in, no penalty.' },
+  'terms.s3Title': { ur: '3. Aapka Data', en: '3. Your Data' },
+  'terms.s3Body': { ur: 'Jo bhi data aap dukaan mein daalte hain (inventory, khata, customers, suppliers) — wo aapka hai. Hum use bech nahi karte. Zyada tafseel Privacy Policy mein.', en: 'All the data you put into your shop (inventory, khata, customers, suppliers) belongs to you. We don’t sell it. More detail in the Privacy Policy.' },
+  'terms.s4Title': { ur: '4. Zimmedari', en: '4. Responsibility' },
+  'terms.s4Body': { ur: 'Ye tool aapki dukaan ka hisaab rakhne mein madad karta hai, lekin final zimmedari data ki sehat (jaise sahi price/stock likhna) aapki apni hai. Kisi bhi financial ya legal faisle se pehle apna khud ka hisaab bhi zaroor check karein.', en: 'This tool helps you keep your shop’s records, but the final responsibility for data accuracy (like entering the right price/stock) is yours. Always double-check your own numbers before any financial or legal decision.' },
+  'terms.s5Title': { ur: '5. Rabta', en: '5. Contact' },
+  'terms.s5Body': { ur: 'Koi sawal ho to WhatsApp par rabta karein — link neeche footer mein hai.', en: 'Questions? Reach us on WhatsApp — link is in the footer below.' },
+  'terms.disclaimer': { ur: 'Ye document ek starting template hai, poori legal advice nahi. Agar aapko is ki legal sehat ki tasdeeq chahiye, kisi qanooni mushir se rabta karein.', en: 'This document is a starting template, not full legal advice. If you need it legally verified, please consult a lawyer.' },
+
+  'privacy.title': { ur: 'Privacy Policy', en: 'Privacy Policy' },
+  'privacy.s1Title': { ur: '1. Kya Data Jama Hota Hai', en: '1. What Data We Collect' },
+  'privacy.s1Body': { ur: 'Aapka email, dukaan ka naam, aur jo bhi aap app mein daalte hain — inventory items, khata entries, customer/supplier details, staff emails.', en: 'Your email, shop name, and whatever you enter in the app — inventory items, khata entries, customer/supplier details, staff emails.' },
+  'privacy.s2Title': { ur: '2. Kahan Store Hota Hai', en: '2. Where It’s Stored' },
+  'privacy.s2Body': { ur: 'Supabase (Postgres database, cloud par) — industry-standard security ke sath. Row-Level Security ki wajah se aapki dukaan ka data database level par hi doosri dukaanon se alag rehta hai.', en: 'Supabase (a Postgres database, in the cloud) — with industry-standard security. Row-Level Security keeps your shop’s data isolated from other shops at the database level itself.' },
+  'privacy.s3Title': { ur: '3. Kis Ke Sath Share Hota Hai', en: '3. Who We Share It With' },
+  'privacy.s3Body': { ur: 'Kisi ko nahi bechte. Sirf zaroori service providers use karte hain: Supabase (database/auth), Stripe (payment processing). Ye dono apni khud ki security policies follow karte hain.', en: 'We don’t sell it to anyone. We only use necessary service providers: Supabase (database/auth), Stripe (payment processing). Both follow their own security policies.' },
+  'privacy.s4Title': { ur: '4. Aapke Huqooq', en: '4. Your Rights' },
+  'privacy.s4Body': { ur: 'Aap apna data kabhi bhi dekh, edit, ya delete kar sakte hain app ke andar se. Poora account delete karwane ke liye WhatsApp par rabta karein.', en: 'You can view, edit, or delete your data any time from within the app. To delete your whole account, contact us on WhatsApp.' },
+  'privacy.disclaimer': { ur: 'Ye document ek starting template hai, poori legal advice nahi. Agar aapko is ki legal sehat ki tasdeeq chahiye, kisi qanooni mushir se rabta karein.', en: 'This document is a starting template, not full legal advice. If you need it legally verified, please consult a lawyer.' },
+
   // auth
   'auth.signupTitle': { ur: 'Naya Account', en: 'New Account' },
   'auth.signupSub': { ur: '14 din free trial — koi card nahi chahiye', en: '14-day free trial — no card required' },
