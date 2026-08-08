@@ -4,6 +4,14 @@ import { useEffect, useRef, useState } from 'react';
 import { BrowserMultiFormatReader, IScannerControls } from '@zxing/browser';
 import { useLang } from '@/lib/i18n-context';
 
+const CAMERA_CONSTRAINTS: MediaStreamConstraints = {
+  video: {
+    facingMode: { ideal: 'environment' },
+    width: { ideal: 1920 },
+    height: { ideal: 1080 }
+  }
+};
+
 export default function BarcodeScannerModal({
   onDetected,
   onClose
@@ -17,41 +25,69 @@ export default function BarcodeScannerModal({
   const [manualCode, setManualCode] = useState('');
 
   useEffect(() => {
-    const reader = new BrowserMultiFormatReader();
-    let controls: IScannerControls | undefined;
     let cancelled = false;
-    let done = false;
+    let rafId: number | undefined;
+    let stream: MediaStream | null = null;
+    let zxingControls: IScannerControls | undefined;
 
-    // Laptop webcams are wide-angle and low-res by default, which is a
-    // bad combination for reading a small, dense barcode from close up —
-    // asking for a higher resolution measurably helps. facingMode is a
-    // soft preference ({ ideal }, not a hard constraint), so it degrades
-    // gracefully on a laptop with only one front camera instead of
-    // failing to find a matching device.
-    const constraints: MediaStreamConstraints = {
-      video: {
-        facingMode: { ideal: 'environment' },
-        width: { ideal: 1920 },
-        height: { ideal: 1080 }
-      }
-    };
+    // Chrome/Edge ship a native BarcodeDetector — it's the browser's own
+    // ML-based scanner (on Chrome this is backed by the same detection
+    // model as Google Lens), and it is dramatically better than a
+    // pure-JS library at handling a mediocre webcam: blur, low light,
+    // a barcode held slightly off-angle. Pure JS (ZXing) only kicks in
+    // as a fallback where BarcodeDetector doesn't exist (Firefox,
+    // Safari) — it's not gone, just no longer the primary path.
+    async function startNative(Detector: any) {
+      stream = await navigator.mediaDevices.getUserMedia(CAMERA_CONSTRAINTS);
+      if (cancelled || !videoRef.current) { stream?.getTracks().forEach(tr => tr.stop()); return; }
+      videoRef.current.srcObject = stream;
+      await videoRef.current.play();
 
-    reader
-      .decodeFromConstraints(constraints, videoRef.current!, (result, err, ctrls) => {
-        controls = ctrls;
-        if (cancelled || done) return;
-        if (result) {
-          done = true;
-          onDetected(result.getText());
+      const detector = new Detector();
+      const tick = async () => {
+        if (cancelled || !videoRef.current) return;
+        try {
+          const codes = await detector.detect(videoRef.current);
+          if (codes && codes.length > 0) {
+            onDetected(codes[0].rawValue);
+            return;
+          }
+        } catch {
+          // Transient — e.g. a frame grabbed before the video has enough
+          // data yet. Just try again next frame.
         }
-      })
-      .catch(() => {
-        if (!cancelled) setError(t('inventory.scanCameraError'));
+        rafId = requestAnimationFrame(tick);
+      };
+      rafId = requestAnimationFrame(tick);
+    }
+
+    async function startZXing() {
+      const reader = new BrowserMultiFormatReader();
+      await reader.decodeFromConstraints(CAMERA_CONSTRAINTS, videoRef.current!, (result, err, ctrls) => {
+        zxingControls = ctrls;
+        if (cancelled) return;
+        if (result) onDetected(result.getText());
       });
+    }
+
+    (async () => {
+      try {
+        const Detector = typeof window !== 'undefined' ? (window as any).BarcodeDetector : undefined;
+        if (Detector) {
+          await startNative(Detector);
+        } else {
+          await startZXing();
+        }
+      } catch {
+        if (!cancelled) setError(t('inventory.scanCameraError'));
+      }
+    })();
 
     return () => {
       cancelled = true;
-      controls?.stop();
+      if (rafId !== undefined) cancelAnimationFrame(rafId);
+      zxingControls?.stop();
+      stream?.getTracks().forEach(tr => tr.stop());
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -70,8 +106,7 @@ export default function BarcodeScannerModal({
         ) : (
           <div className="relative">
             <video ref={videoRef} className="w-full rounded-lg bg-board3" muted playsInline />
-            {/* Guide box — helps position the barcode, camera hardware
-                does the rest. Purely visual, doesn't affect detection. */}
+            {/* Guide box — helps positioning, camera/detector do the rest. */}
             <div className="absolute inset-x-8 top-1/2 -translate-y-1/2 h-16 border-2 border-haldi/70 rounded pointer-events-none" />
           </div>
         )}
