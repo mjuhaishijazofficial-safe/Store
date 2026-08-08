@@ -382,6 +382,10 @@ export const dict = {
   'staff.invited': { ur: 'Invite bhej diya gaya ✓', en: 'Invite sent ✓' },
   'staff.roleOwner': { ur: 'Owner', en: 'Owner' },
   'staff.roleStaff': { ur: 'Staff', en: 'Staff' },
+  'staff.removed': { ur: 'Staff member hata diya gaya ✓', en: 'Staff member removed ✓' },
+  'staff.removeTitle': { ur: 'Staff Hatayein?', en: 'Remove Staff Member?' },
+  'staff.removeBody': { ur: 'ki is dukaan tak rasai khatam ho jayegi — unka login bhi kaam nahi karega.', en: "will lose access to this shop — their login will stop working too." },
+  'staff.removeConfirm': { ur: 'Haan, Hatayein', en: 'Yes, Remove' },
   'staff.ownerOnly': { ur: 'Ye page sirf owner dekh sakte hain.', en: 'Only the shop owner can view this page.' },
   'staff.emailTaken': {
     ur: 'Ye email pehle se kisi (shayad kisi aur dukaan ke) account se juda hua hai — is dukaan ke Staff list mein na dikhne ka matlab hai wo account kahin aur bana tha. Koi doosra email try karein, ya Supabase dashboard mein us purane account ko dekh/hata kar dobara try karein.',
