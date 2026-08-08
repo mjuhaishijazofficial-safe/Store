@@ -23,8 +23,28 @@ function Row({ label, value }: { label: string; value: string }) {
   const { t } = useLang();
 
   async function copy() {
-    await navigator.clipboard.writeText(value);
-    showToast(t('billing.copied'), 'success');
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(value);
+      } else {
+        // navigator.clipboard is missing on plenty of in-app browsers
+        // (WhatsApp's own webview included) and on any non-HTTPS
+        // context — this textarea+execCommand trick is the old but
+        // still universally supported fallback for those.
+        const el = document.createElement('textarea');
+        el.value = value;
+        el.style.position = 'fixed';
+        el.style.opacity = '0';
+        document.body.appendChild(el);
+        el.focus();
+        el.select();
+        document.execCommand('copy');
+        document.body.removeChild(el);
+      }
+      showToast(t('billing.copied'), 'success');
+    } catch {
+      showToast(t('common.error'), 'error');
+    }
   }
 
   return (
@@ -43,21 +63,34 @@ export default function ManualPayment({ details, pending }: { details: Details; 
   const { t } = useLang();
   const { shopId, shopName } = useShop();
   const { showToast } = useToast();
-  const [busy, setBusy] = useState(false);
+  const [busyMethod, setBusyMethod] = useState<'easypaisa' | 'bank' | null>(null);
 
   async function markPaid(method: 'easypaisa' | 'bank') {
-    setBusy(true);
+    if (busyMethod) return;
+    setBusyMethod(method);
+
+    // Open the tab synchronously, in direct response to the click —
+    // mobile browsers only allow window.open without popup-blocking
+    // when it happens inside the same tick as the user gesture. Doing
+    // this *after* the awaited insert below (the old code) meant the
+    // tap looked like it did nothing on phones, so people tapped the
+    // other button too, thinking the first one hadn't registered.
+    const win = window.open('', '_blank');
+
     const { error: err } = await supabase.from('payment_claims').insert({
       shop_id: shopId,
       method,
       amount: AMOUNT
     });
-    setBusy(false);
-    if (err) { showToast(t('common.error'), 'error'); return; }
+
+    setBusyMethod(null);
+    if (err) { win?.close(); showToast(t('common.error'), 'error'); return; }
 
     const methodLabel = method === 'easypaisa' ? 'EasyPaisa' : 'Bank Transfer (Meezan)';
     const msg = `Payment bhej di hai — ${methodLabel}, ₨${AMOUNT}\nDukaan: ${shopName}\nScreenshot yahin bhej raha/rahi hun.`;
-    window.open(`https://wa.me/${SUPPORT_WHATSAPP_NUMBER}?text=${encodeURIComponent(msg)}`, '_blank');
+    const url = `https://wa.me/${SUPPORT_WHATSAPP_NUMBER}?text=${encodeURIComponent(msg)}`;
+    if (win) win.location.href = url;
+    else window.location.href = url; // popup fully blocked — fall back to navigating this tab
     showToast(t('billing.claimSubmitted'), 'success');
   }
 
@@ -80,8 +113,8 @@ export default function ManualPayment({ details, pending }: { details: Details; 
           <Row label={t('billing.accountNumber')} value={details.easypaisaNumber} />
           <Row label={t('billing.accountTitle')} value={details.easypaisaTitle} />
         </div>
-        <button onClick={() => markPaid('easypaisa')} disabled={busy} className="btn-primary w-full mt-3">
-          {t('billing.ivePaidVia')} EasyPaisa
+        <button onClick={() => markPaid('easypaisa')} disabled={!!busyMethod} className="btn-primary w-full mt-3">
+          {busyMethod === 'easypaisa' ? t('billing.loading') : `${t('billing.ivePaidVia')} EasyPaisa`}
         </button>
       </div>
 
@@ -93,8 +126,8 @@ export default function ManualPayment({ details, pending }: { details: Details; 
           <Row label={t('billing.iban')} value={details.meezanIban} />
           {details.meezanBranch && <Row label={t('billing.branch')} value={details.meezanBranch} />}
         </div>
-        <button onClick={() => markPaid('bank')} disabled={busy} className="btn-primary w-full mt-3">
-          {t('billing.ivePaidVia')} Meezan Bank
+        <button onClick={() => markPaid('bank')} disabled={!!busyMethod} className="btn-primary w-full mt-3">
+          {busyMethod === 'bank' ? t('billing.loading') : `${t('billing.ivePaidVia')} Meezan Bank`}
         </button>
       </div>
 
