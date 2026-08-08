@@ -6,6 +6,7 @@ import LanguageToggle from '@/components/LanguageToggle';
 import ThemeToggle from '@/components/ThemeToggle';
 import DashboardNav from '@/components/DashboardNav';
 import ConnectionBanner from '@/components/ConnectionBanner';
+import AppLockGate from '@/components/AppLockGate';
 import { StoreIcon } from '@/components/icons';
 import { getServerT } from '@/lib/i18n-server';
 import { ShopProvider } from '@/lib/shop-context';
@@ -117,7 +118,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
               <Link href="/dashboard/billing" className="btn-primary inline-block">{t('lock.cta')}</Link>
             </div>
           )}
-          {children}
+          <AppLockGate>{children}</AppLockGate>
         </main>
       </div>
     </ShopProvider>

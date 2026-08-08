@@ -7,6 +7,7 @@ import { useLang } from '@/lib/i18n-context';
 import { useShop } from '@/lib/shop-context';
 import { useToast } from '@/lib/toast-context';
 import { usePalette } from '@/lib/palette-context';
+import AppLockSettings from '@/components/AppLockSettings';
 
 export default function SettingsPage() {
   const supabase = createClient();
@@ -65,56 +66,65 @@ export default function SettingsPage() {
 
   if (loading) return null;
 
-  if (!isOwner) {
-    return <div className="text-chalkdim text-sm py-10 text-center">{t('staff.ownerOnly')}</div>;
-  }
-
   return (
     <div className="max-w-sm">
       <h1 className="font-display text-xl font-700 mb-5">{t('settings.title')}</h1>
 
-      <label className="block text-xs text-chalkdim mb-1">{t('settings.shopName')}</label>
-      <input className="input mb-4" value={name} onChange={e => setName(e.target.value)} />
+      {!isOwner && <div className="text-chalkdim text-sm mb-5">{t('staff.ownerOnly')}</div>}
 
-      <label className="block text-xs text-chalkdim mb-1">{t('settings.totalBudget')}</label>
-      <input type="number" inputMode="decimal" className="input mb-5" value={budget} onChange={e => setBudget(Number(e.target.value))} />
+      {isOwner && (
+        <>
+          <label className="block text-xs text-chalkdim mb-1">{t('settings.shopName')}</label>
+          <input className="input mb-4" value={name} onChange={e => setName(e.target.value)} />
 
-      <button onClick={save} className="btn-primary">{t('settings.save')}</button>
+          <label className="block text-xs text-chalkdim mb-1">{t('settings.totalBudget')}</label>
+          <input type="number" inputMode="decimal" className="input mb-5" value={budget} onChange={e => setBudget(Number(e.target.value))} />
 
-      <div className="mt-10 pt-6 border-t border-chalk/10">
-        <div className="text-xs text-chalkdim uppercase tracking-wide font-700 mb-1">{t('settings.appearance')}</div>
-        <div className="text-chalkdim text-xs mb-3">{t('settings.appearanceHint')}</div>
-        <div className="grid grid-cols-2 gap-3">
-          <button
-            onClick={() => setPalette('spice')}
-            className={`card p-3 flex items-center gap-2.5 text-left ${palette === 'spice' ? 'border-haldi' : ''}`}
-          >
-            <span className="text-lg leading-none">🟠</span>
-            <span className="text-sm font-600">Kiryana Spice</span>
-          </button>
-          <button
-            onClick={() => setPalette('navy')}
-            className={`card p-3 flex items-center gap-2.5 text-left ${palette === 'navy' ? 'border-haldi' : ''}`}
-          >
-            <span className="text-lg leading-none">🔵</span>
-            <span className="text-sm font-600">Ledger Trust</span>
-          </button>
+          <button onClick={save} className="btn-primary">{t('settings.save')}</button>
+
+          <div className="mt-10 pt-6 border-t border-chalk/10">
+            <div className="text-xs text-chalkdim uppercase tracking-wide font-700 mb-1">{t('settings.appearance')}</div>
+            <div className="text-chalkdim text-xs mb-3">{t('settings.appearanceHint')}</div>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => setPalette('spice')}
+                className={`card p-3 flex items-center gap-2.5 text-left ${palette === 'spice' ? 'border-haldi' : ''}`}
+              >
+                <span className="text-lg leading-none">🟠</span>
+                <span className="text-sm font-600">Kiryana Spice</span>
+              </button>
+              <button
+                onClick={() => setPalette('navy')}
+                className={`card p-3 flex items-center gap-2.5 text-left ${palette === 'navy' ? 'border-haldi' : ''}`}
+              >
+                <span className="text-lg leading-none">🔵</span>
+                <span className="text-sm font-600">Ledger Trust</span>
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* App Lock is a per-device PIN, useful to owner and staff alike
+          on a shared counter phone — not gated to owner like the rest
+          of this page. */}
+      <AppLockSettings />
+
+      {isOwner && (
+        <div className="mt-10 pt-6 border-t border-mirch/30">
+          <div className="text-xs text-mirch uppercase tracking-wide font-700 mb-3">{t('settings.dangerZone')}</div>
+          <div className="card p-4 border-mirch/40">
+            <div className="font-700 text-sm mb-1">{t('settings.deleteAccountTitle')}</div>
+            <div className="text-chalkdim text-xs mb-3">{t('settings.deleteAccountBody')}</div>
+            <button
+              onClick={() => { setDeleteOpen(true); setDeleteConfirmText(''); setDeleteError(''); }}
+              className="text-mirch text-sm font-700 border border-mirch rounded-lg px-4 py-2 w-full hover:bg-mirch/10"
+            >
+              {t('settings.deleteAccountBtn')}
+            </button>
+          </div>
         </div>
-      </div>
-
-      <div className="mt-10 pt-6 border-t border-mirch/30">
-        <div className="text-xs text-mirch uppercase tracking-wide font-700 mb-3">{t('settings.dangerZone')}</div>
-        <div className="card p-4 border-mirch/40">
-          <div className="font-700 text-sm mb-1">{t('settings.deleteAccountTitle')}</div>
-          <div className="text-chalkdim text-xs mb-3">{t('settings.deleteAccountBody')}</div>
-          <button
-            onClick={() => { setDeleteOpen(true); setDeleteConfirmText(''); setDeleteError(''); }}
-            className="text-mirch text-sm font-700 border border-mirch rounded-lg px-4 py-2 w-full hover:bg-mirch/10"
-          >
-            {t('settings.deleteAccountBtn')}
-          </button>
-        </div>
-      </div>
+      )}
 
       {deleteOpen && (
         <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50" onClick={() => !deleting && setDeleteOpen(false)}>

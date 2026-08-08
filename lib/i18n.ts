@@ -503,7 +503,30 @@ export const dict = {
   'settings.deleteConfirmBody': { ur: 'Confirm karne ke liye neeche dukaan ka naam type karein:', en: 'Type the shop name below to confirm:' },
   'settings.deleteConfirmPlaceholder': { ur: 'Dukaan ka naam yahan type karein', en: 'Type the shop name here' },
   'settings.deleting': { ur: 'Delete ho raha hai...', en: 'Deleting...' },
-  'settings.deleteFailed': { ur: 'Delete nahi ho saka — dobara koshish karein', en: 'Could not delete — please try again' }
+  'settings.deleteFailed': { ur: 'Delete nahi ho saka — dobara koshish karein', en: 'Could not delete — please try again' },
+
+  'settings.appLock': { ur: 'App Lock', en: 'App Lock' },
+  'settings.appLockHint': { ur: 'Is device par PIN laga dein taake counter par phone khula reh jaye to koi data na dekh sake.', en: 'Set a PIN on this device so nobody can browse your data if the counter phone is left open.' },
+  'settings.appLockOn': { ur: 'App Lock ON hai', en: 'App Lock is ON' },
+  'settings.appLockOff': { ur: 'App Lock OFF hai', en: 'App Lock is OFF' },
+  'settings.turnOn': { ur: 'On Karein', en: 'Turn On' },
+  'settings.turnOff': { ur: 'Off Karein', en: 'Turn Off' },
+  'settings.changePin': { ur: 'PIN Badlein', en: 'Change PIN' },
+  'settings.lockNow': { ur: 'Abhi Lock Karein', en: 'Lock now' },
+  'settings.newPin': { ur: 'Naya PIN', en: 'New PIN' },
+  'settings.confirmPin': { ur: 'PIN Dobara Likhein', en: 'Confirm PIN' },
+  'settings.currentPin': { ur: 'Abhi ka PIN', en: 'Current PIN' },
+  'settings.pinFormatHint': { ur: '4 se 6 digit ka PIN', en: '4-6 digit PIN' },
+  'settings.pinMismatch': { ur: 'Dono PIN match nahi ho rahe', en: "PINs don't match" },
+  'settings.pinWrong': { ur: 'Galat PIN', en: 'Wrong PIN' },
+  'settings.continue': { ur: 'Aage Barhein', en: 'Continue' },
+  'settings.appLockEnabled': { ur: 'App Lock laga diya gaya ✓', en: 'App Lock enabled ✓' },
+  'settings.appLockDisabled': { ur: 'App Lock hata diya gaya', en: 'App Lock disabled' },
+
+  'applock.title': { ur: 'App Lock hai', en: 'App is locked' },
+  'applock.subtitle': { ur: 'Jaari rakhne ke liye apna PIN daalein', en: 'Enter your PIN to continue' },
+  'applock.wrong': { ur: 'Galat PIN, dobara koshish karein', en: 'Wrong PIN, try again' },
+  'applock.unlock': { ur: 'Unlock Karein', en: 'Unlock' }
 } as const;
 
 export type DictKey = keyof typeof dict;
