@@ -83,7 +83,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const initialTheme: Theme = cookieTheme === 'dark' || cookieTheme === 'light' ? cookieTheme : DEFAULT_THEME;
 
   const cookiePalette = cookieStore.get(PALETTE_COOKIE)?.value;
-  const initialPalette: Palette = cookiePalette === 'navy' || cookiePalette === 'spice' ? cookiePalette : DEFAULT_PALETTE;
+  const initialPalette: Palette = cookiePalette === 'navy' || cookiePalette === 'spice' || cookiePalette === 'sabz' ? cookiePalette : DEFAULT_PALETTE;
 
   return (
     <html lang={initialLang === 'en' ? 'en' : 'ur'} data-theme={initialTheme} data-palette={initialPalette}>

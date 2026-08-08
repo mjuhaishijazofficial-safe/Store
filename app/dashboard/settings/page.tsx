@@ -85,20 +85,27 @@ export default function SettingsPage() {
           <div className="mt-10 pt-6 border-t border-chalk/10">
             <div className="text-xs text-chalkdim uppercase tracking-wide font-700 mb-1">{t('settings.appearance')}</div>
             <div className="text-chalkdim text-xs mb-3">{t('settings.appearanceHint')}</div>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={() => setPalette('spice')}
-                className={`card p-3 flex items-center gap-2.5 text-left ${palette === 'spice' ? 'border-haldi' : ''}`}
-              >
-                <span className="text-lg leading-none">🟠</span>
-                <span className="text-sm font-600">Kiryana Spice</span>
-              </button>
+            <div className="grid grid-cols-3 gap-3">
               <button
                 onClick={() => setPalette('navy')}
-                className={`card p-3 flex items-center gap-2.5 text-left ${palette === 'navy' ? 'border-haldi' : ''}`}
+                className={`card p-3 flex flex-col items-center gap-1.5 text-center ${palette === 'navy' ? 'border-haldi' : ''}`}
               >
                 <span className="text-lg leading-none">🔵</span>
-                <span className="text-sm font-600">Ledger Trust</span>
+                <span className="text-xs font-600">Ledger Trust</span>
+              </button>
+              <button
+                onClick={() => setPalette('sabz')}
+                className={`card p-3 flex flex-col items-center gap-1.5 text-center ${palette === 'sabz' ? 'border-haldi' : ''}`}
+              >
+                <span className="text-lg leading-none">🟢</span>
+                <span className="text-xs font-600">Sabz Fintech</span>
+              </button>
+              <button
+                onClick={() => setPalette('spice')}
+                className={`card p-3 flex flex-col items-center gap-1.5 text-center ${palette === 'spice' ? 'border-haldi' : ''}`}
+              >
+                <span className="text-lg leading-none">🟠</span>
+                <span className="text-xs font-600">Kiryana Spice</span>
               </button>
             </div>
           </div>

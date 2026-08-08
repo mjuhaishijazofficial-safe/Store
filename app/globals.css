@@ -38,24 +38,46 @@ html[data-theme='dark'] {
   --color-dhania: 34 197 94;     /* #22C55E payments/positive */
 }
 
-/* Palette toggle — independent of the light/dark theme toggle above, and
-   unrelated to it despite the naming coincidence (dark MODE happens to use
-   a navy background; this "Navy" PALETTE is a different thing — a second,
-   cooler brand-accent option users can pick in either light or dark mode).
-   Only the three accent roles (brand/negative/positive) change; board/chalk
-   stay exactly as the light/dark theme above already defines them, so this
-   never has to duplicate the background system. Default palette is "spice"
-   (no override block needed — it's just the :root/dark values above). */
+/* Palette toggle — independent of the light/dark theme toggle above.
+   "Ledger Trust" (navy + muted gold) is a full brand identity, not just
+   a swapped accent — it overrides the surface/text roles too, in both
+   light and dark theme stamps, so it looks like "Ledger Trust" no
+   matter which mode the user is in. */
 :root[data-palette='navy'] {
-  --color-haldi: 30 58 95;      /* #1E3A5F ledger navy — brand/emphasis */
-  --color-mirch: 178 58 46;     /* #B23A2E debt/negative */
-  --color-dhania: 47 125 79;    /* #2F7D4F payments/positive */
+  --color-board: 244 246 248;    /* #F4F6F8 page background */
+  --color-board2: 255 255 255;   /* #FFFFFF card surface */
+  --color-board3: 231 236 242;   /* #E7ECF2 secondary surface / inputs */
+  --color-chalk: 15 42 74;       /* #0F2A4A deep navy ink */
+  --color-chalkdim: 90 112 137;  /* #5A7089 secondary/muted text */
+  --color-haldi: 201 162 75;     /* #C9A24B muted gold — emphasis, same in light + dark */
+  --color-mirch: 194 58 30;      /* #C23A1E debt/negative — unchanged, already reads on this bg */
+  --color-dhania: 63 122 52;     /* #3F7A34 payments/positive — unchanged */
 }
 html[data-theme='dark'][data-palette='navy'] {
-  --color-haldi: 122 165 214;   /* #7AA5D6 lighter steel-blue — #1E3A5F is too dark to clear
-                                    contrast on a near-black background */
-  --color-mirch: 248 113 113;   /* #F87171 */
-  --color-dhania: 52 211 153;   /* #34D399 */
+  --color-board: 15 42 74;       /* #0F2A4A deep navy — page background */
+  --color-board2: 22 52 90;      /* #16345A card surface */
+  --color-board3: 27 67 104;     /* #1B4368 secondary surface / inputs */
+  --color-chalk: 255 255 255;    /* #FFFFFF primary text */
+  --color-chalkdim: 183 196 214; /* #B7C4D6 secondary/muted text */
+  --color-haldi: 201 162 75;     /* #C9A24B muted gold — same as light */
+  --color-mirch: 248 113 113;    /* #F87171 */
+  --color-dhania: 52 211 153;    /* #34D399 */
+}
+
+/* "Sabz Fintech" — a deliberately single-look dark palette (near-black
+   green + emerald accent), same in both theme stamps rather than having
+   a separate light variant — this is the "alternate/dark theme" option,
+   not a light/dark pair of its own. */
+:root[data-palette='sabz'], html[data-theme='dark'][data-palette='sabz'] {
+  --color-board: 14 27 22;       /* #0E1B16 near-black green — page background */
+  --color-board2: 21 40 32;      /* #152820 card surface */
+  --color-board3: 28 50 41;      /* #1C3229 secondary surface / inputs */
+  --color-chalk: 255 255 255;    /* #FFFFFF primary text */
+  --color-chalkdim: 143 163 150; /* #8FA396 secondary/muted text */
+  --color-haldi: 46 204 113;     /* #2ECC71 emerald — brand/emphasis */
+  --color-mirch: 248 113 113;    /* #F87171 debt/negative */
+  --color-dhania: 46 204 113;    /* #2ECC71 payments/positive — same emerald as the accent,
+                                     a single-green fintech convention rather than a second green */
 }
 
 /* Premium treatment: derived from --color-haldi via color-mix(), not a
