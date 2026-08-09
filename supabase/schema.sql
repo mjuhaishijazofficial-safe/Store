@@ -20,6 +20,11 @@ create table if not exists shops (
                                      -- destructive migration; safe to drop in a later cleanup.
   created_at timestamptz not null default now()
 );
+-- Custom receipt branding (Settings → Receipt Branding) — null means
+-- "not set," every receipt-rendering component (print + Bluetooth
+-- thermal) falls back to its existing default when either is null.
+alter table shops add column if not exists receipt_phone text;
+alter table shops add column if not exists receipt_footer text;
 
 -- 2. PROFILES (one row per auth user, links user -> shop) -----------
 create table if not exists profiles (

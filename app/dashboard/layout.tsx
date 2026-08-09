@@ -27,7 +27,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('shop_id, full_name, role, allowed_sections, shops(name, subscription_status, trial_ends_at)')
+    .select('shop_id, full_name, role, allowed_sections, shops(name, subscription_status, trial_ends_at, receipt_phone, receipt_footer)')
     .eq('id', user.id)
     .single();
 
@@ -95,7 +95,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const trialLabel = shop?.subscription_status === 'trialing' && !trialExpired ? t('billing.statusTrialing') : undefined;
 
   return (
-    <ShopProvider value={{ shopId: profile.shop_id, role: profile.role as 'owner' | 'staff', shopName: shop?.name || '', allowedSections }}>
+    <ShopProvider value={{ shopId: profile.shop_id, role: profile.role as 'owner' | 'staff', shopName: shop?.name || '', allowedSections, receiptPhone: shop?.receipt_phone || null, receiptFooter: shop?.receipt_footer || null }}>
       <ConnectionBanner />
       {/* Sidebar + main are flex siblings (not fixed+margin) so the
           sidebar's own collapse toggle reflows main content with no

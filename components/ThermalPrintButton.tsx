@@ -13,7 +13,7 @@ import { encodeReceipt, isWebBluetoothSupported, printViaBluetooth, ReceiptLine 
 // Web Bluetooth (iOS Safari, desktop Safari, Firefox) rather than
 // showing a button that can only ever fail — see lib/thermal-printer.ts
 // for the exact platform limits.
-export default function ThermalPrintButton({ shopName, lines, when }: { shopName: string; lines: ReceiptLine[]; when: string }) {
+export default function ThermalPrintButton({ shopName, lines, when, footer }: { shopName: string; lines: ReceiptLine[]; when: string; footer?: string }) {
   const { t } = useLang();
   const { showToast } = useToast();
   const [printing, setPrinting] = useState(false);
@@ -23,7 +23,7 @@ export default function ThermalPrintButton({ shopName, lines, when }: { shopName
   async function handlePrint() {
     setPrinting(true);
     try {
-      const bytes = encodeReceipt(shopName, lines, when, t('receipt.thanks'));
+      const bytes = encodeReceipt(shopName, lines, when, footer || t('receipt.thanks'));
       await printViaBluetooth(bytes);
       showToast(t('receipt.bluetoothSent'), 'success');
     } catch {

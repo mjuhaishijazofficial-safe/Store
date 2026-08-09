@@ -21,7 +21,7 @@ function fmt(n: number) {
 export default function HistoryPage() {
   const supabase = createClient();
   const { t } = useLang();
-  const { shopId, shopName } = useShop();
+  const { shopId, shopName, receiptPhone, receiptFooter } = useShop();
   const { showToast } = useToast();
   useSectionGuard('history');
   const [logs, setLogs] = useState<Log[]>([]);
@@ -190,7 +190,7 @@ export default function HistoryPage() {
       )}
 
       {receiptTxn && (
-        <SaleReceiptModal shopName={shopName || 'Dukaan'} txn={receiptTxn} onClose={() => setReceiptTxn(null)} />
+        <SaleReceiptModal shopName={shopName || 'Dukaan'} txn={receiptTxn} onClose={() => setReceiptTxn(null)} phone={receiptPhone} footer={receiptFooter} />
       )}
 
       {receiptGroup && (
@@ -198,6 +198,8 @@ export default function HistoryPage() {
           shopName={shopName || 'Dukaan'}
           lines={receiptGroup.map(l => ({ item_name: l.item_name, qty: l.qty, unit: l.unit, amount: l.amount }))}
           createdAt={receiptGroup[0].created_at}
+          phone={receiptPhone}
+          footer={receiptFooter}
           onClose={() => setReceiptGroup(null)}
         />
       )}

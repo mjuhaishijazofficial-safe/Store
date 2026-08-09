@@ -15,6 +15,11 @@ export type ShopInfo = {
   role: 'owner' | 'staff';
   shopName: string;
   allowedSections: string[] | null;
+  // Custom receipt branding (Settings → Receipt Branding) — null means
+  // "not set," and every receipt-rendering component falls back to its
+  // existing default (no phone line, the stock "thank you" message).
+  receiptPhone: string | null;
+  receiptFooter: string | null;
 };
 
 const ShopContext = createContext<ShopInfo | null>(null);

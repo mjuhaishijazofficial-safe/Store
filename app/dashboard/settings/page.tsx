@@ -21,6 +21,8 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState('');
   const [budget, setBudget] = useState(0);
+  const [receiptPhone, setReceiptPhone] = useState('');
+  const [receiptFooter, setReceiptFooter] = useState('');
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
@@ -32,15 +34,26 @@ export default function SettingsPage() {
 
   async function init() {
     if (isOwner) {
-      const { data: shop } = await supabase.from('shops').select('name, budget').eq('id', shopId).single();
+      const { data: shop } = await supabase.from('shops').select('name, budget, receipt_phone, receipt_footer').eq('id', shopId).single();
       setName(shop?.name || '');
       setBudget(shop?.budget || 0);
+      setReceiptPhone(shop?.receipt_phone || '');
+      setReceiptFooter(shop?.receipt_footer || '');
     }
     setLoading(false);
   }
 
   async function save() {
     const { error: err } = await supabase.from('shops').update({ name, budget }).eq('id', shopId);
+    if (err) { showToast(t('common.error'), 'error'); return; }
+    showToast(t('settings.saved'), 'success');
+  }
+
+  async function saveReceiptBranding() {
+    const { error: err } = await supabase.from('shops').update({
+      receipt_phone: receiptPhone.trim() || null,
+      receipt_footer: receiptFooter.trim() || null
+    }).eq('id', shopId);
     if (err) { showToast(t('common.error'), 'error'); return; }
     showToast(t('settings.saved'), 'success');
   }
@@ -126,6 +139,19 @@ export default function SettingsPage() {
                 <span className="text-xs font-600">Kiryana Spice</span>
               </button>
             </div>
+          </div>
+
+          <div className="mt-10 pt-6 border-t border-chalk/10">
+            <div className="text-xs text-chalkdim uppercase tracking-wide font-700 mb-1">{t('settings.receiptBranding')}</div>
+            <div className="text-chalkdim text-xs mb-3">{t('settings.receiptBrandingHint')}</div>
+
+            <label className="block text-xs text-chalkdim mb-1">{t('settings.receiptPhone')}</label>
+            <input className="input mb-3" value={receiptPhone} onChange={e => setReceiptPhone(e.target.value)} placeholder="03xx-xxxxxxx" />
+
+            <label className="block text-xs text-chalkdim mb-1">{t('settings.receiptFooter')}</label>
+            <input className="input mb-3" value={receiptFooter} onChange={e => setReceiptFooter(e.target.value)} placeholder={t('receipt.thanks')} />
+
+            <button onClick={saveReceiptBranding} className="btn-secondary w-full">{t('settings.save')}</button>
           </div>
         </>
       )}

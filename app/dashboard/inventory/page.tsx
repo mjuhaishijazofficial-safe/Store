@@ -35,7 +35,7 @@ function fmt(n: number) {
 export default function InventoryPage() {
   const supabase = createClient();
   const { t } = useLang();
-  const { shopId, shopName } = useShop();
+  const { shopId, shopName, receiptPhone, receiptFooter } = useShop();
   useSectionGuard('inventory');
   const { showToast } = useToast();
   const [items, setItems] = useState<Item[]>([]);
@@ -542,7 +542,7 @@ export default function InventoryPage() {
       )}
 
       {receiptTxn && (
-        <SaleReceiptModal shopName={shopName || 'Dukaan'} txn={receiptTxn} onClose={() => setReceiptTxn(null)} />
+        <SaleReceiptModal shopName={shopName || 'Dukaan'} txn={receiptTxn} onClose={() => setReceiptTxn(null)} phone={receiptPhone} footer={receiptFooter} />
       )}
 
       {printLabel && (

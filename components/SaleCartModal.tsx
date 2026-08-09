@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useLang } from '@/lib/i18n-context';
+import { useShop } from '@/lib/shop-context';
 import BarcodeScannerModal from './BarcodeScannerModal';
 import CartReceiptModal from './CartReceiptModal';
 
@@ -26,6 +27,7 @@ export default function SaleCartModal({
 }) {
   const supabase = createClient();
   const { t } = useLang();
+  const { receiptPhone, receiptFooter } = useShop();
 
   // One id per checkout session, not per attempt — a retry after a
   // partial failure (see checkout()) is still logically the same sale,
@@ -121,6 +123,8 @@ export default function SaleCartModal({
         shopName={shopName || 'Dukaan'}
         lines={receiptLines}
         createdAt={new Date().toISOString()}
+        phone={receiptPhone}
+        footer={receiptFooter}
         onClose={() => {
           setReceiptLines(null);
           if (cart.length === 0) onClose();

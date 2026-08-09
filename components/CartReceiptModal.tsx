@@ -17,17 +17,22 @@ export default function CartReceiptModal({
   shopName,
   lines,
   createdAt,
-  onClose
+  onClose,
+  phone,
+  footer
 }: {
   shopName: string;
   lines: ReceiptLine[];
   createdAt: string;
   onClose: () => void;
+  phone?: string | null;
+  footer?: string | null;
 }) {
   const { t } = useLang();
   const d = new Date(createdAt);
   const when = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) + ' • ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
   const total = lines.reduce((s, l) => s + l.amount, 0);
+  const thanksMsg = footer || t('receipt.thanks');
 
   useEffect(() => {
     document.body.classList.add('printing-receipt');
@@ -39,6 +44,7 @@ export default function CartReceiptModal({
       <div className="card w-full max-w-xs overflow-hidden" onClick={e => e.stopPropagation()}>
         <div id="receipt-print-area" className="p-6 font-mono">
           <div className="text-center font-display font-800 text-base mb-1">{shopName}</div>
+          {phone && <div className="text-center text-[11px] text-chalkdim">{phone}</div>}
           <div className="text-center text-[11px] text-chalkdim mb-4">{when}</div>
           <div className="border-t border-dashed border-chalk/30 my-2" />
           {lines.map((l, i) => {
@@ -58,7 +64,7 @@ export default function CartReceiptModal({
             <span>{t('receipt.total')}</span>
             <span>{fmt(total)}</span>
           </div>
-          <div className="text-center text-[11px] text-chalkdim mt-5">{t('receipt.thanks')}</div>
+          <div className="text-center text-[11px] text-chalkdim mt-5">{thanksMsg}</div>
         </div>
 
         <div className="no-print flex flex-col gap-2 p-4 pt-0">
@@ -66,7 +72,7 @@ export default function CartReceiptModal({
             <button onClick={onClose} className="btn-secondary flex-1">{t('contact.cancel')}</button>
             <button onClick={() => window.print()} className="btn-primary flex-1">{t('receipt.print')}</button>
           </div>
-          <ThermalPrintButton shopName={shopName} lines={lines.map(l => ({ name: l.item_name, qty: l.qty, unit: l.unit, amount: l.amount }))} when={when} />
+          <ThermalPrintButton shopName={shopName} lines={lines.map(l => ({ name: l.item_name, qty: l.qty, unit: l.unit, amount: l.amount }))} when={when} footer={thanksMsg} />
         </div>
       </div>
     </div>
