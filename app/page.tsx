@@ -79,18 +79,25 @@ export default async function Home() {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
       <main className="max-w-[1440px] mx-auto px-6 sm:px-10 lg:px-16 py-16">
-        <div className="flex items-center justify-between mb-16 gap-3">
-          <div className="flex items-center gap-2.5">
+        {/* Logo + toggles + Login + Signup used to sit in one unwrapped
+            flex row — fine down to ~420px, but a narrow phone (375px
+            and below) had nowhere for the last item (Login) to go and
+            it ran straight off the right edge instead of wrapping. The
+            "Free Trial" button (already the hero's own big CTA right
+            below) hides below sm to declutter first; flex-wrap is the
+            safety net if even that doesn't leave enough room. */}
+        <div className="flex items-center justify-between mb-16 gap-3 flex-wrap">
+          <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-9 h-9 rounded-lg bg-haldi/15 text-haldi flex items-center justify-center shrink-0">
               <StoreIcon className="w-5 h-5" />
             </div>
-            <div className="font-display text-xl font-800 text-haldi">Dukaan ERP</div>
+            <div className="font-display text-xl font-800 text-haldi truncate">Dukaan ERP</div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <ThemeToggle />
             <LanguageToggle />
-            <Link href="/login" className="btn-secondary text-sm">{t('landing.login')}</Link>
-            <Link href="/signup" className="btn-primary text-sm">{t('landing.freeTrialNav')}</Link>
+            <Link href="/login" className="btn-secondary text-sm whitespace-nowrap">{t('landing.login')}</Link>
+            <Link href="/signup" className="btn-primary text-sm whitespace-nowrap hidden sm:inline-block">{t('landing.freeTrialNav')}</Link>
           </div>
         </div>
 
@@ -127,27 +134,32 @@ export default async function Home() {
                   </div>
                   <div className="font-display font-700 text-sm">Meri Dukaan</div>
                 </div>
-                <div className="grid grid-cols-3 gap-2.5">
-                  <div className="card p-3">
-                    <div className="w-7 h-7 rounded-full bg-haldi/15 text-haldi flex items-center justify-center mb-2">
-                      <WalletIcon className="w-4 h-4" />
+                {/* Fixed 3 columns (not md:grid-cols-3 — this mockup is
+                    meant to read as a phone screen at any viewport, not
+                    reflow) — text sizes step down on the narrowest
+                    phones so ₨50,000 etc. never gets tight enough to
+                    wrap inside its own card. */}
+                <div className="grid grid-cols-3 gap-1.5 sm:gap-2.5">
+                  <div className="card p-2 sm:p-3">
+                    <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-haldi/15 text-haldi flex items-center justify-center mb-1.5 sm:mb-2">
+                      <WalletIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                     </div>
-                    <div className="text-[10px] text-chalkdim uppercase tracking-wide">{t('overview.totalBudget')}</div>
-                    <div className="font-mono font-700 text-sm">₨50,000</div>
+                    <div className="text-[9px] sm:text-[10px] text-chalkdim uppercase tracking-wide truncate">{t('overview.totalBudget')}</div>
+                    <div className="font-mono font-700 text-xs sm:text-sm">₨50,000</div>
                   </div>
-                  <div className="card p-3">
-                    <div className="w-7 h-7 rounded-full bg-mirch/15 text-mirch flex items-center justify-center mb-2">
-                      <TrendDownIcon className="w-4 h-4" />
+                  <div className="card p-2 sm:p-3">
+                    <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-mirch/15 text-mirch flex items-center justify-center mb-1.5 sm:mb-2">
+                      <TrendDownIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                     </div>
-                    <div className="text-[10px] text-chalkdim uppercase tracking-wide">{t('overview.spent')}</div>
-                    <div className="font-mono font-700 text-sm text-mirch">₨18,400</div>
+                    <div className="text-[9px] sm:text-[10px] text-chalkdim uppercase tracking-wide truncate">{t('overview.spent')}</div>
+                    <div className="font-mono font-700 text-xs sm:text-sm text-mirch">₨18,400</div>
                   </div>
-                  <div className="card p-3">
-                    <div className="w-7 h-7 rounded-full bg-dhania/15 text-dhania flex items-center justify-center mb-2">
-                      <CashIcon className="w-4 h-4" />
+                  <div className="card p-2 sm:p-3">
+                    <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-dhania/15 text-dhania flex items-center justify-center mb-1.5 sm:mb-2">
+                      <CashIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                     </div>
-                    <div className="text-[10px] text-chalkdim uppercase tracking-wide">{t('overview.remaining')}</div>
-                    <div className="font-mono font-700 text-sm text-dhania">₨31,600</div>
+                    <div className="text-[9px] sm:text-[10px] text-chalkdim uppercase tracking-wide truncate">{t('overview.remaining')}</div>
+                    <div className="font-mono font-700 text-xs sm:text-sm text-dhania">₨31,600</div>
                   </div>
                 </div>
               </div>
