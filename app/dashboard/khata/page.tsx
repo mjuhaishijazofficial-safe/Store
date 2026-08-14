@@ -36,6 +36,7 @@ export default function KhataPage() {
   const [showingStale, setShowingStale] = useState(false);
   const [form, setForm] = useState({ name: '', phone: '', credit_limit: '' });
   const [duplicateOf, setDuplicateOf] = useState<Customer | null>(null);
+  const [savingCustomer, setSavingCustomer] = useState(false);
   // Bulk import (spec §25-J): parsed rows sit in a preview the Owner
   // must confirm before anything is written — never insert straight off
   // a file select, since a mis-mapped column would otherwise silently
@@ -110,17 +111,24 @@ export default function KhataPage() {
   }
 
   async function saveCustomer(force = false) {
-    if (!form.name.trim()) return;
+    // Guards against a duplicate insert from a double-tap or slow
+    // connection encouraging a second tap — nothing previously stopped
+    // "Save"/"Add Anyway" from firing more than once while the first
+    // request was still in flight.
+    if (!form.name.trim() || savingCustomer) return;
     if (!force) {
       const dup = findDuplicate(form.name);
       if (dup) { setDuplicateOf(dup); return; }
     }
+    setSavingCustomer(true);
     const { error: err } = await supabase.from('customers').insert({
       shop_id: shopId,
+      branch_id: branchId,
       name: form.name.trim(),
       phone: form.phone.trim() || null,
       credit_limit: form.credit_limit ? Number(form.credit_limit) : null
     });
+    setSavingCustomer(false);
     if (err) { showToast(t('common.error'), 'error'); return; }
     setModalOpen(false);
     setDuplicateOf(null);
@@ -295,16 +303,16 @@ export default function KhataPage() {
                   <Link href={`/dashboard/khata/${duplicateOf.id}`} className="btn-secondary flex-1 text-center text-xs py-2">
                     {t('khata.duplicateUseExisting')}
                   </Link>
-                  <button onClick={() => saveCustomer(true)} className="btn-secondary flex-1 text-xs py-2">
-                    {t('khata.duplicateAddAnyway')}
+                  <button onClick={() => saveCustomer(true)} disabled={savingCustomer} className="btn-secondary flex-1 text-xs py-2">
+                    {savingCustomer ? t('settings.saving') : t('khata.duplicateAddAnyway')}
                   </button>
                 </div>
               </div>
             )}
 
             <div className="flex gap-2">
-              <button onClick={() => setModalOpen(false)} className="btn-secondary flex-1">{t('khata.cancel')}</button>
-              <button onClick={() => saveCustomer(false)} className="btn-primary flex-1">{t('khata.save')}</button>
+              <button onClick={() => setModalOpen(false)} disabled={savingCustomer} className="btn-secondary flex-1">{t('khata.cancel')}</button>
+              <button onClick={() => saveCustomer(false)} disabled={savingCustomer} className="btn-primary flex-1">{savingCustomer ? t('settings.saving') : t('khata.save')}</button>
             </div>
           </div>
         </div>

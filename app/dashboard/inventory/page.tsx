@@ -53,6 +53,7 @@ export default function InventoryPage() {
   const [lookupState, setLookupState] = useState<'idle' | 'loading' | 'found' | 'not_found'>('idle');
   const [printLabel, setPrintLabel] = useState<{ code: string; name: string } | null>(null);
   const [cartOpen, setCartOpen] = useState(false);
+  const [savingItem, setSavingItem] = useState(false);
 
   const [form, setForm] = useState({ name: '', category: '', unit: '', stock: 0, min_stock: 0, price: 0, cost_price: 0, barcode: '', expiry_date: '' });
   const [moveForm, setMoveForm] = useState({ qty: 0, amount: 0 });
@@ -148,10 +149,13 @@ export default function InventoryPage() {
   }
 
   async function saveItem() {
-    if (!form.name.trim() || !shopId) return;
+    // savingItem guards against a double-tap/slow-connection double
+    // submit firing two inserts for the same new item.
+    if (!form.name.trim() || !shopId || savingItem) return;
     // Spec §33-H: grace-period-expired/suspended shops go view-only —
     // existing data stays, but no new changes land.
     if (locked) { showToast(t('lock.viewOnly'), 'error'); return; }
+    setSavingItem(true);
     // Empty string vs null matters here: the barcode unique index only
     // excludes NULLs, so two items saved with an empty string would
     // collide on it. expiry_date is a `date` column — Postgres rejects
@@ -161,6 +165,7 @@ export default function InventoryPage() {
       ? await supabase.from('items').update(payload).eq('id', editing.id)
       : await supabase.from('items').insert({ ...payload, shop_id: shopId });
 
+    setSavingItem(false);
     if (err) { showToast(t('common.error'), 'error'); return; }
     setModalOpen(false);
     await loadItems();
@@ -456,8 +461,8 @@ export default function InventoryPage() {
               <div className="text-[11px] text-chalkdim mt-1">{t('inventory.expiryHint')}</div>
             </div>
             <div className="flex gap-2 mb-2">
-              <button onClick={() => setModalOpen(false)} className="btn-secondary flex-1">{t('inventory.cancel')}</button>
-              <button onClick={saveItem} className="btn-primary flex-1">{t('inventory.save')}</button>
+              <button onClick={() => setModalOpen(false)} disabled={savingItem} className="btn-secondary flex-1">{t('inventory.cancel')}</button>
+              <button onClick={saveItem} disabled={savingItem} className="btn-primary flex-1">{savingItem ? t('settings.saving') : t('inventory.save')}</button>
             </div>
             {editing && <button onClick={deleteItem} className="w-full text-mirch text-sm py-2">{t('inventory.deleteItem')}</button>}
           </div>
