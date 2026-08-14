@@ -39,6 +39,10 @@ export type ShopInfo = {
   // anywhere in the app unless an Owner turns it on from Settings.
   fbrEnabled: boolean;
   taxRatePercent: number;
+  // System Settings feature flag (spec §27) — Super Admin can disable
+  // Smart Reorder platform-wide during a rollout; true (default) means
+  // no restriction, unchanged from before this existed.
+  smartReorderEnabled: boolean;
 };
 
 const ShopContext = createContext<ShopInfo | null>(null);

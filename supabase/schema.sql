@@ -1412,3 +1412,122 @@ begin
   return new;
 end;
 $$;
+
+-- ============================================================
+-- 16. SUPER ADMIN — Plans, Support Tickets, System Settings (spec §27)
+-- ============================================================
+
+-- Plans catalog — this product currently sells exactly one flat plan
+-- (₨999/month via STRIPE_PRICE_ID), so this seeds one real row rather
+-- than fabricating tiers that don't exist in Stripe. Structured so a
+-- genuine second tier can be added later without a schema change.
+create table if not exists plans (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  price numeric not null,
+  billing_interval text not null default 'month',
+  features text[] not null default '{}',
+  is_active boolean not null default true,
+  created_at timestamptz not null default now()
+);
+insert into plans (name, price, billing_interval, features)
+select 'Standard', 999, 'month', array['Unlimited items', 'Unlimited khata customers', 'AI Slip-Scan stock-in', 'Multi-branch + staff roles', 'WhatsApp receipts & reminders']
+where not exists (select 1 from plans);
+-- No RLS — same "admin-only, unreachable via anon/authenticated roles"
+-- pattern as admin_actions; only the service-role client (Super
+-- Admin's own routes) ever touches this table.
+
+-- Support tickets — a dukaandar raises one from their own shop
+-- (Settings > Support); Super Admin sees every shop's tickets in one
+-- place and resolves them.
+create table if not exists support_tickets (
+  id uuid primary key default gen_random_uuid(),
+  shop_id uuid not null references shops(id) on delete cascade,
+  subject text not null,
+  message text not null,
+  status text not null default 'open' check (status in ('open', 'resolved')),
+  assigned_to text,
+  created_by uuid references auth.users(id),
+  created_at timestamptz not null default now(),
+  resolved_at timestamptz
+);
+alter table support_tickets enable row level security;
+drop policy if exists "support_tickets_shop_select" on support_tickets;
+create policy "support_tickets_shop_select" on support_tickets for select using (shop_id = my_shop_id());
+drop policy if exists "support_tickets_shop_insert" on support_tickets;
+create policy "support_tickets_shop_insert" on support_tickets for insert with check (shop_id = my_shop_id());
+-- No update/delete policy for shop users — resolving/assigning a
+-- ticket only happens from the Super Admin panel (service-role).
+create index if not exists idx_support_tickets_shop on support_tickets(shop_id, created_at desc);
+create index if not exists idx_support_tickets_status on support_tickets(status, created_at desc);
+
+-- System Settings — a single global row. default_trial_days actually
+-- feeds handle_new_user() below (replacing shops.trial_ends_at's fixed
+-- 14-day column default), so changing it here takes effect on new
+-- signups immediately, no redeploy needed. feature_flags/
+-- maintenance_mode are read by every logged-in shop's own dashboard
+-- (to show the maintenance banner / hide a flagged-off feature), which
+-- is why this table gets a real (narrow, read-only) RLS policy instead
+-- of the "no RLS, admin-only" pattern the rest of this section uses —
+-- writes still only ever happen from Super Admin via service-role.
+create table if not exists platform_settings (
+  id boolean primary key default true check (id), -- singleton: exactly one row, always id = true
+  default_trial_days int not null default 14,
+  maintenance_mode boolean not null default false,
+  feature_flags jsonb not null default '{"smart_reorder": true}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+insert into platform_settings (id) values (true) on conflict (id) do nothing;
+alter table platform_settings enable row level security;
+drop policy if exists "platform_settings_read_all" on platform_settings;
+create policy "platform_settings_read_all" on platform_settings for select using (auth.uid() is not null);
+
+-- handle_new_user(): identical to the version above except a fresh
+-- signup's trial_ends_at now comes from platform_settings.default_trial_days
+-- instead of the shops table's fixed 14-day column default.
+create or replace function handle_new_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  new_shop_id uuid;
+  invited_shop_id uuid;
+  invited_role text;
+  invited_branch_id uuid;
+  trial_days int;
+begin
+  invited_shop_id := nullif(new.raw_app_meta_data->>'invited_shop_id', '')::uuid;
+
+  if invited_shop_id is not null then
+    invited_role := coalesce(nullif(new.raw_app_meta_data->>'invited_role', ''), 'cashier');
+    if invited_role not in ('manager', 'cashier') then
+      invited_role := 'cashier';
+    end if;
+
+    select id into invited_branch_id from branches where shop_id = invited_shop_id and is_main limit 1;
+
+    insert into profiles (id, shop_id, branch_id, full_name, email, role)
+    values (new.id, invited_shop_id, invited_branch_id, new.raw_user_meta_data->>'full_name', new.email, invited_role);
+  else
+    select coalesce(default_trial_days, 14) into trial_days from platform_settings limit 1;
+
+    insert into shops (name, owner_id, trial_ends_at)
+    values (
+      coalesce(new.raw_user_meta_data->>'shop_name', 'Meri Dukaan'),
+      new.id,
+      now() + (coalesce(trial_days, 14) || ' days')::interval
+    )
+    returning id into new_shop_id;
+
+    insert into branches (shop_id, name, is_main)
+    values (new_shop_id, 'Main Branch', true);
+
+    insert into profiles (id, shop_id, full_name, email, role)
+    values (new.id, new_shop_id, new.raw_user_meta_data->>'full_name', new.email, 'owner');
+  end if;
+
+  return new;
+end;
+$$;

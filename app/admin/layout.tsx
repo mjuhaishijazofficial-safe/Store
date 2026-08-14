@@ -1,8 +1,16 @@
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import { isAdmin } from '@/lib/admin';
 import SignOutButton from '@/components/SignOutButton';
 import type { Metadata } from 'next';
+
+const NAV = [
+  { href: '/admin', label: 'Businesses' },
+  { href: '/admin/plans', label: 'Plans' },
+  { href: '/admin/support', label: 'Support' },
+  { href: '/admin/settings', label: 'Settings' }
+];
 
 // Super Admin surface (Master Spec §27) — deliberately its own layout,
 // not nested under app/dashboard: that layout requires a `profiles` row
@@ -27,11 +35,27 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const { data: { user } } = await supabase.auth.getUser();
   if (!isAdmin(user?.email)) redirect('/login');
 
+  const admin = createAdminClient();
+  const { count: openTickets } = await admin
+    .from('support_tickets')
+    .select('id', { count: 'exact', head: true })
+    .eq('status', 'open');
+
   return (
     <div className="min-h-screen">
       <div className="border-b border-chalk/10 px-4 sm:px-6 py-3 flex justify-between items-center">
         <span className="font-display font-700 text-haldi">Dukaan ERP — Admin</span>
         <SignOutButton />
+      </div>
+      <div className="border-b border-chalk/10 px-4 sm:px-6 flex gap-1 overflow-x-auto">
+        {NAV.map(n => (
+          <Link key={n.href} href={n.href} className="text-sm text-chalkdim hover:text-haldi px-3 py-2.5 whitespace-nowrap flex items-center gap-1.5">
+            {n.label}
+            {n.href === '/admin/support' && !!openTickets && (
+              <span className="text-[10px] bg-mirch text-white rounded-full px-1.5 py-0.5">{openTickets}</span>
+            )}
+          </Link>
+        ))}
       </div>
       <main className="px-4 sm:px-6 py-6 max-w-5xl mx-auto w-full">{children}</main>
     </div>

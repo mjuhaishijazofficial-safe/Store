@@ -22,6 +22,12 @@ export default async function ReorderPage() {
   const shopId = profile?.shop_id;
   if (profile && !hasSection(profile.role as 'owner' | 'manager' | 'cashier', profile.allowed_sections as string[] | null, 'reorder')) redirect('/dashboard');
 
+  // System Settings feature flag (spec §27) — Super Admin can disable
+  // this platform-wide (e.g. mid-rollout); direct-URL access is gated
+  // here too, not just the nav link (see app/dashboard/layout.tsx).
+  const { data: platformSettings } = await supabase.from('platform_settings').select('feature_flags').eq('id', true).single();
+  if ((platformSettings?.feature_flags as any)?.smart_reorder === false) redirect('/dashboard');
+
   const [{ data: items }, { data: predictions }] = await Promise.all([
     supabase.from('items').select('*').eq('shop_id', shopId).order('name'),
     supabase.rpc('reorder_predictions', { p_shop_id: shopId, p_lookback_days: 30 })

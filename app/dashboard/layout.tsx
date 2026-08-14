@@ -55,7 +55,26 @@ export default async function DashboardLayout({ children }: { children: React.Re
     ? Math.max(0, Math.ceil((new Date(shop.grace_ends_at).getTime() - Date.now()) / 86400000))
     : null;
 
+  // System Settings (spec §27) — readable by every logged-in shop (see
+  // platform_settings' own RLS policy), Super Admin bypasses maintenance
+  // mode entirely so they can actually turn it back off.
+  const { data: platformSettings } = await supabase.from('platform_settings').select('maintenance_mode, feature_flags').eq('id', true).single();
+  const maintenanceActive = !!platformSettings?.maintenance_mode && !isAdmin(user.email);
+  const smartReorderEnabled = (platformSettings?.feature_flags as any)?.smart_reorder ?? true;
+
   const t = await getServerT();
+
+  if (maintenanceActive) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4 text-center">
+        <div>
+          <div className="text-4xl mb-3">🛠️</div>
+          <div className="font-display text-lg font-700 mb-1">{t('maintenance.title')}</div>
+          <p className="text-chalkdim text-sm">{t('maintenance.body')}</p>
+        </div>
+      </div>
+    );
+  }
 
   // Admin badge: how many payment_claims are still waiting on a look.
   // The WhatsApp ping when someone taps "I've Paid" is real-time, but
@@ -81,7 +100,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
     // never section-gated — Owner, Manager and Cashier all bill a sale.
     { href: '/dashboard/billing', label: t('nav.pos') },
     ...(hasSection(profile.role, allowedSections, 'inventory') ? [{ href: '/dashboard/inventory', label: t('nav.inventory') }] : []),
-    ...(hasSection(profile.role, allowedSections, 'reorder') ? [{ href: '/dashboard/reorder', label: t('nav.reorder') }] : []),
+    ...(hasSection(profile.role, allowedSections, 'reorder') && smartReorderEnabled ? [{ href: '/dashboard/reorder', label: t('nav.reorder') }] : []),
     ...(hasSection(profile.role, allowedSections, 'khata') ? [{ href: '/dashboard/khata', label: t('nav.khata') }] : []),
     ...(hasSection(profile.role, allowedSections, 'suppliers') ? [
       { href: '/dashboard/suppliers', label: t('nav.suppliers') },
@@ -112,7 +131,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const trialLabel = shop?.subscription_status === 'trialing' && !trialExpired ? t('billing.statusTrialing') : undefined;
 
   return (
-    <ShopProvider value={{ shopId: profile.shop_id, role: profile.role as 'owner' | 'manager' | 'cashier', shopName: shop?.name || '', allowedSections, receiptPhone: shop?.receipt_phone || null, receiptFooter: shop?.receipt_footer || null, cashierDiscountCapPercent: shop?.cashier_discount_cap_percent || 0, locked, branchId: profile.branch_id || null, branches: branches || [], fbrEnabled: shop?.fbr_enabled || false, taxRatePercent: shop?.tax_rate_percent || 0 }}>
+    <ShopProvider value={{ shopId: profile.shop_id, role: profile.role as 'owner' | 'manager' | 'cashier', shopName: shop?.name || '', allowedSections, receiptPhone: shop?.receipt_phone || null, receiptFooter: shop?.receipt_footer || null, cashierDiscountCapPercent: shop?.cashier_discount_cap_percent || 0, locked, branchId: profile.branch_id || null, branches: branches || [], fbrEnabled: shop?.fbr_enabled || false, taxRatePercent: shop?.tax_rate_percent || 0, smartReorderEnabled }}>
       <ConnectionBanner />
       {/* Sidebar + main are flex siblings (not fixed+margin) so the
           sidebar's own collapse toggle reflows main content with no

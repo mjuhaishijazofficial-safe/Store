@@ -29,6 +29,10 @@ export default function SettingsPage() {
   const [fbrNtn, setFbrNtn] = useState('');
   const [taxRate, setTaxRate] = useState(0);
   const [savingFbr, setSavingFbr] = useState(false);
+  const [tickets, setTickets] = useState<{ id: string; subject: string; status: string; created_at: string }[]>([]);
+  const [ticketSubject, setTicketSubject] = useState('');
+  const [ticketMessage, setTicketMessage] = useState('');
+  const [sendingTicket, setSendingTicket] = useState(false);
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
@@ -49,8 +53,27 @@ export default function SettingsPage() {
       setFbrEnabled(shop?.fbr_enabled || false);
       setFbrNtn(shop?.fbr_ntn || '');
       setTaxRate(shop?.tax_rate_percent || 0);
+
+      const { data: tix } = await supabase.from('support_tickets').select('id, subject, status, created_at').eq('shop_id', shopId).order('created_at', { ascending: false }).limit(10);
+      setTickets(tix || []);
     }
     setLoading(false);
+  }
+
+  async function sendTicket() {
+    if (!ticketSubject.trim() || !ticketMessage.trim()) return;
+    setSendingTicket(true);
+    const { error: err } = await supabase.from('support_tickets').insert({
+      shop_id: shopId,
+      subject: ticketSubject.trim(),
+      message: ticketMessage.trim()
+    });
+    setSendingTicket(false);
+    if (err) { showToast(t('common.error'), 'error'); return; }
+    setTicketSubject('');
+    setTicketMessage('');
+    showToast(t('settings.supportSent'), 'success');
+    await init();
   }
 
   async function save() {
@@ -214,6 +237,33 @@ export default function SettingsPage() {
             <input className="input mb-3" value={receiptFooter} onChange={e => setReceiptFooter(e.target.value)} placeholder={t('receipt.thanks')} />
 
             <button onClick={saveReceiptBranding} className="btn-secondary w-full">{t('settings.save')}</button>
+          </div>
+
+          <div className="mt-10 pt-6 border-t border-chalk/10">
+            <div className="text-xs text-chalkdim uppercase tracking-wide font-700 mb-1">{t('settings.support')}</div>
+            <div className="text-chalkdim text-xs mb-3">{t('settings.supportHint')}</div>
+
+            <label className="block text-xs text-chalkdim mb-1">{t('settings.supportSubject')}</label>
+            <input className="input mb-3" value={ticketSubject} onChange={e => setTicketSubject(e.target.value)} />
+            <label className="block text-xs text-chalkdim mb-1">{t('settings.supportMessage')}</label>
+            <textarea className="input mb-3" rows={4} value={ticketMessage} onChange={e => setTicketMessage(e.target.value)} />
+            <button onClick={sendTicket} disabled={sendingTicket || !ticketSubject.trim() || !ticketMessage.trim()} className="btn-primary w-full mb-4">
+              {sendingTicket ? t('settings.saving') : t('settings.supportSend')}
+            </button>
+
+            {tickets.length > 0 && (
+              <>
+                <div className="text-[11px] text-chalkdim uppercase tracking-wide mb-2">{t('settings.supportYourTickets')}</div>
+                <div className="card divide-y divide-chalk/10">
+                  {tickets.map(tk => (
+                    <div key={tk.id} className="p-2.5 px-3 flex justify-between items-center text-sm">
+                      <span>{tk.subject}</span>
+                      <span className={`text-[10px] uppercase border rounded px-1.5 py-0.5 ${tk.status === 'open' ? 'text-haldi border-haldi/40' : 'text-dhania border-dhania/40'}`}>{tk.status}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         </>
       )}
