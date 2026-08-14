@@ -45,6 +45,8 @@ export default function StaffDetailPage() {
   const [savingPerms, setSavingPerms] = useState(false);
   const [branchInput, setBranchInput] = useState('');
   const [savingBranch, setSavingBranch] = useState(false);
+  const [logoutConfirming, setLogoutConfirming] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
   const [adjustments, setAdjustments] = useState<Adjustment[]>([]);
   const [adjForm, setAdjForm] = useState<{ type: AdjustmentType; amount: string; note: string }>({ type: 'bonus', amount: '', note: '' });
   const [savingAdj, setSavingAdj] = useState(false);
@@ -131,6 +133,19 @@ export default function StaffDetailPage() {
     setSavingBranch(false);
     if (!res.ok) { showToast(t('common.error'), 'error'); return; }
     showToast(t('settings.saved'), 'success');
+  }
+
+  async function logoutAllDevices() {
+    setLoggingOut(true);
+    const res = await fetch('/api/staff/logout-all-devices', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ staffId })
+    });
+    setLoggingOut(false);
+    setLogoutConfirming(false);
+    if (!res.ok) { showToast(t('common.error'), 'error'); return; }
+    showToast(t('staffDetail.logoutAllDevicesDone'), 'success');
   }
 
   async function savePermissions() {
@@ -309,6 +324,25 @@ export default function StaffDetailPage() {
         <button onClick={savePermissions} disabled={savingPerms} className="btn-primary w-full">
           {savingPerms ? t('settings.saving') : t('contact.save')}
         </button>
+      </div>
+
+      {/* Spec §33 edge case: a lost/stolen device with this staff
+          member's session still active — forces every existing login to
+          re-authenticate rather than just hoping they change their own
+          password eventually. */}
+      <div className="card p-5 mb-4">
+        <div className="text-xs text-chalkdim uppercase tracking-wide mb-1">{t('staffDetail.logoutAllDevices')}</div>
+        <p className="text-[11px] text-chalkdim mb-3">{t('staffDetail.logoutAllDevicesHint')}</p>
+        {logoutConfirming ? (
+          <div className="flex gap-2">
+            <button onClick={() => setLogoutConfirming(false)} className="btn-secondary flex-1">{t('contact.cancel')}</button>
+            <button onClick={logoutAllDevices} disabled={loggingOut} className="flex-1 rounded-lg font-700 text-white bg-mirch disabled:opacity-40 px-4 py-2.5">
+              {loggingOut ? t('contact.deleting') : t('staffDetail.logoutAllDevicesConfirm')}
+            </button>
+          </div>
+        ) : (
+          <button onClick={() => setLogoutConfirming(true)} className="btn-secondary w-full">{t('staffDetail.logoutAllDevices')}</button>
+        )}
       </div>
 
       <div className="card p-5 mb-4">
