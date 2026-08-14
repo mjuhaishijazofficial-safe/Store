@@ -3,10 +3,11 @@
 import { useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useLang } from '@/lib/i18n-context';
+import { useShop } from '@/lib/shop-context';
 import { useToast } from '@/lib/toast-context';
 
 // AI Slip-Scan (Master Handoff Spec §10 / §23) — the "flagship" stock-in
-// screen: a photo of a supplier delivery slip → Claude vision extracts
+// screen: a photo of a supplier delivery slip → Gemini vision extracts
 // item/qty/price rows → owner confirms (editable, Maujood/Naya Item
 // badges) → confirmed rows become a fully-received purchase order in
 // one shot, reusing create_purchase_order + receive_po_lines exactly
@@ -46,6 +47,7 @@ export default function SlipScanModal({
 }) {
   const supabase = createClient();
   const { t } = useLang();
+  const { shopId, branchId } = useShop();
   const { showToast } = useToast();
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
@@ -121,6 +123,8 @@ export default function SlipScanModal({
           const { data: created, error: createErr } = await supabase
             .from('items')
             .insert({
+              shop_id: shopId,
+              branch_id: branchId,
               name: row.name,
               unit: 'piece',
               stock: 0,
