@@ -8,6 +8,7 @@ import { useShop } from '@/lib/shop-context';
 import { useToast } from '@/lib/toast-context';
 import { downloadCsv } from '@/lib/csv';
 import { useSectionGuard } from '@/lib/use-section-guard';
+import { WalletIcon } from '@/components/icons';
 
 type Supplier = {
   id: string;
@@ -84,11 +85,23 @@ export default function SuppliersPage() {
     );
   }
 
+  const totalPayable = Object.values(balances).reduce((s, b) => s + Math.max(0, b), 0);
+
   return (
     <div>
+      <div className="flex justify-between items-center mb-4">
+        <h1 className="font-display text-xl font-700">{t('nav.suppliers')}</h1>
+        <button onClick={openAdd} className="btn-primary text-sm px-4 py-2">{t('suppliers.addSupplier')}</button>
+      </div>
+
+      {/* Figma stat row */}
+      <div className="grid grid-cols-2 gap-3 mb-4">
+        <div className="card p-3 text-center"><div className="font-mono font-700 text-lg text-mirch">{fmt(totalPayable)}</div><div className="text-[10px] text-chalkdim mt-0.5">{t('suppliers.totalPayable')}</div></div>
+        <div className="card p-3 text-center"><div className="font-mono font-700 text-lg">{suppliers.length}</div><div className="text-[10px] text-chalkdim mt-0.5">{t('suppliers.totalSuppliers')}</div></div>
+      </div>
+
       <div className="flex gap-2 mb-2">
         <input className="input flex-1" placeholder={t('suppliers.search')} value={search} onChange={e => setSearch(e.target.value)} />
-        <button onClick={openAdd} className="btn-primary whitespace-nowrap">{t('suppliers.addSupplier')}</button>
       </div>
 
       <div className="flex items-center gap-4 mb-4">
@@ -111,14 +124,17 @@ export default function SuppliersPage() {
         {filtered.map(s => {
           const bal = balances[s.id] || 0;
           return (
-            <Link key={s.id} href={`/dashboard/suppliers/${s.id}`} className="card p-4 flex justify-between items-center">
-              <div>
-                <div className="font-700">{s.name}</div>
-                <div className="text-xs text-chalkdim">{s.phone || '—'}</div>
+            <Link key={s.id} href={`/dashboard/suppliers/${s.id}`} className="card p-4 flex justify-between items-center gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-9 h-9 rounded-full bg-mirch/15 text-mirch flex items-center justify-center shrink-0"><WalletIcon className="w-4 h-4" /></div>
+                <div className="min-w-0">
+                  <div className="font-700 truncate">{s.name}</div>
+                  <div className="text-xs text-chalkdim truncate">{s.phone || '—'}</div>
+                </div>
               </div>
-              <div className="text-right">
-                <div className="text-[10px] text-chalkdim uppercase">{t('suppliers.youOwe')}</div>
+              <div className="text-right shrink-0">
                 <div className={`font-mono font-700 ${bal > 0 ? 'text-mirch' : 'text-chalkdim'}`}>{fmt(bal)}</div>
+                <div className={`text-[10px] uppercase ${bal > 0 ? 'text-mirch' : 'text-dhania'}`}>{bal > 0 ? t('khata.filterUnpaid') : t('suppliers.cleared')}</div>
               </div>
             </Link>
           );
