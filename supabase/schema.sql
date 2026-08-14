@@ -1087,9 +1087,17 @@ end;
 $$;
 
 -- record_stock_move grows an optional reason/note (spec §25-B: Returns
--- get an optional Reason field) — trailing param with a default, every
--- existing caller (SaleCartModal, Inventory's Stock In/Out, the new
--- Billing POS page) keeps working unchanged.
+-- get an optional Reason field) — a new trailing parameter, which
+-- `create or replace function` does NOT treat as the same function: a
+-- different parameter list creates a second overload alongside the
+-- original 5-arg one instead of replacing it, and every existing call
+-- site (which never passes p_note) becomes ambiguous between the two —
+-- PostgREST/Postgres can't tell which one to use and every single call
+-- fails with "could not choose the best candidate function", not an
+-- intermittent/offline issue. Drop the old signature explicitly first,
+-- same pattern this file already uses for khata_customer_totals /
+-- supplier_contact_totals above when their shape changed.
+drop function if exists record_stock_move(uuid, text, numeric, numeric, uuid);
 create or replace function record_stock_move(
   p_item_id uuid,
   p_type text,
