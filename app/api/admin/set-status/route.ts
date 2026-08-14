@@ -21,7 +21,18 @@ export async function POST(req: Request) {
   const { data: shop, error: shopErr } = await admin.from('shops').select('id, subscription_status').eq('id', shopId).single();
   if (shopErr || !shop) return NextResponse.json({ error: 'shop not found' }, { status: 404 });
 
-  const { error: updErr } = await admin.from('shops').update({ subscription_status: status }).eq('id', shopId);
+  // Clearing grace_ends_at whenever an admin manually restores 'active'
+  // matters beyond just tidiness: app/api/stripe/webhook's
+  // invoice.payment_failed handler reuses an existing grace_ends_at
+  // rather than pushing it out again ("don't extend an already-running
+  // grace period on a second failed retry") — if a stale one survives
+  // here, the NEXT unrelated failed payment months later would inherit
+  // an already-past timestamp and get suspended with zero days of
+  // warning instead of the real 4-day grace period.
+  const { error: updErr } = await admin.from('shops').update({
+    subscription_status: status,
+    ...(status === 'active' ? { grace_ends_at: null } : {})
+  }).eq('id', shopId);
   if (updErr) return NextResponse.json({ error: updErr.message }, { status: 400 });
 
   await admin.from('admin_actions').insert({

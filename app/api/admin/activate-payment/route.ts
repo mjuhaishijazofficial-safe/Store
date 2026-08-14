@@ -25,9 +25,12 @@ export async function POST(req: Request) {
     .single();
   if (claimErr || !claim) return NextResponse.json({ error: 'claim not found' }, { status: 404 });
 
+  // Also clears grace_ends_at — see the matching note in
+  // app/api/admin/set-status/route.ts for why a stale one left behind
+  // here would corrupt a future, unrelated grace period.
   const { error: shopErr } = await admin
     .from('shops')
-    .update({ subscription_status: 'active' })
+    .update({ subscription_status: 'active', grace_ends_at: null })
     .eq('id', claim.shop_id);
   if (shopErr) return NextResponse.json({ error: shopErr.message }, { status: 400 });
 
