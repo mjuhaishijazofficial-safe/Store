@@ -302,6 +302,7 @@ export const dict = {
   'inventory.scan': { ur: '📷 Scan', en: '📷 Scan' },
   'inventory.scanTitle': { ur: 'Barcode Scan Karein', en: 'Scan Barcode' },
   'inventory.scanHint': { ur: 'Barcode ko camera ke saamne rakhein', en: 'Hold the barcode in front of the camera' },
+  'inventory.scanTakingLong': { ur: 'Detect nahi ho raha? Neeche manually barcode number type kar dein', en: "Not detecting? Type the barcode number manually below" },
   'inventory.scanCameraError': { ur: 'Camera access nahi mila — permission check karein', en: 'Could not access camera — check permissions' },
   'inventory.scanManualLabel': { ur: 'Ya barcode number khud type karein', en: 'Or type the barcode number yourself' },
   'inventory.scanManualPlaceholder': { ur: 'Barcode number', en: 'Barcode number' },

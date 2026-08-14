@@ -12,6 +12,21 @@ const CAMERA_CONSTRAINTS: MediaStreamConstraints = {
   }
 };
 
+// Without an explicit `formats` list, some BarcodeDetector
+// implementations default to QR-code-only — a grocery item's EAN-13/
+// UPC barcode then never detects even though the camera preview and
+// permission are both fine, which reads to a shopkeeper as "scan
+// bilkul kaam nahi kar raha" with no error shown anywhere. Every format
+// a kiryana shop is realistically going to see, explicit.
+const BARCODE_FORMATS = ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39', 'qr_code'];
+
+// How long to wait with the camera open and nothing detected before
+// nudging toward the manual-entry field already below the preview —
+// covers every other silent failure mode (bad lighting, a damaged
+// barcode, a format genuinely not supported) without needing to know
+// which one it was.
+const SCAN_TIMEOUT_MS = 10000;
+
 export default function BarcodeScannerModal({
   onDetected,
   onClose
@@ -23,6 +38,7 @@ export default function BarcodeScannerModal({
   const videoRef = useRef<HTMLVideoElement>(null);
   const [error, setError] = useState('');
   const [manualCode, setManualCode] = useState('');
+  const [takingTooLong, setTakingTooLong] = useState(false);
   // Spec §33 edge case: a barcode scanned twice in quick succession
   // shouldn't fire onDetected twice. Every call site closes this modal
   // the instant it fires (unmounting stops the scan loop), which
@@ -45,6 +61,8 @@ export default function BarcodeScannerModal({
       onDetected(code);
     }
 
+    const timeoutId = setTimeout(() => { if (!cancelled) setTakingTooLong(true); }, SCAN_TIMEOUT_MS);
+
     // Chrome/Edge ship a native BarcodeDetector — it's the browser's own
     // ML-based scanner (on Chrome this is backed by the same detection
     // model as Google Lens), and it is dramatically better than a
@@ -58,7 +76,7 @@ export default function BarcodeScannerModal({
       videoRef.current.srcObject = stream;
       await videoRef.current.play();
 
-      const detector = new Detector();
+      const detector = new Detector({ formats: BARCODE_FORMATS });
       const tick = async () => {
         if (cancelled || !videoRef.current) return;
         try {
@@ -100,6 +118,7 @@ export default function BarcodeScannerModal({
 
     return () => {
       cancelled = true;
+      clearTimeout(timeoutId);
       if (rafId !== undefined) cancelAnimationFrame(rafId);
       zxingControls?.stop();
       stream?.getTracks().forEach(tr => tr.stop());
@@ -126,6 +145,7 @@ export default function BarcodeScannerModal({
           </div>
         )}
         <p className="text-chalkdim text-xs mt-3">{t('inventory.scanHint')}</p>
+        {!error && takingTooLong && <p className="text-haldi text-xs mt-1">{t('inventory.scanTakingLong')}</p>}
 
         <div className="mt-4 pt-4 border-t border-chalk/10">
           <label className="block text-xs text-chalkdim mb-1">{t('inventory.scanManualLabel')}</label>
