@@ -33,8 +33,8 @@ export async function POST() {
     customer: customerId,
     mode: 'subscription',
     line_items: [{ price: requireEnv('STRIPE_PRICE_ID'), quantity: 1 }],
-    success_url: `${appUrl}/dashboard/billing?success=1`,
-    cancel_url: `${appUrl}/dashboard/billing?canceled=1`,
+    success_url: `${appUrl}/dashboard/settings/subscription?success=1`,
+    cancel_url: `${appUrl}/dashboard/settings/subscription?canceled=1`,
     subscription_data: {
       metadata: { shop_id: shop.id }
     }

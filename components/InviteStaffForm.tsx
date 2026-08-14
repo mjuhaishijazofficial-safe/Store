@@ -10,6 +10,7 @@ export default function InviteStaffForm() {
   const router = useRouter();
   const { showToast } = useToast();
   const [email, setEmail] = useState('');
+  const [role, setRole] = useState<'cashier' | 'manager'>('cashier');
   const [loading, setLoading] = useState(false);
   // email_taken gets a full explanatory paragraph, not a flash-and-gone
   // message — worth keeping visible inline rather than an auto-dismissing
@@ -24,7 +25,7 @@ export default function InviteStaffForm() {
     const res = await fetch('/api/staff/invite', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: email.trim() })
+      body: JSON.stringify({ email: email.trim(), role })
     });
     const data = await res.json().catch(() => ({}));
     setLoading(false);
@@ -48,6 +49,11 @@ export default function InviteStaffForm() {
       <div className="font-display text-lg text-haldi font-700 mb-3">{t('staff.inviteTitle')}</div>
       <label className="block text-xs text-chalkdim mb-1">{t('staff.email')}</label>
       <input className="input mb-3" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="staff@example.com" />
+      <label className="block text-xs text-chalkdim mb-1">{t('staff.role')}</label>
+      <select className="input mb-3" value={role} onChange={e => setRole(e.target.value as 'cashier' | 'manager')}>
+        <option value="cashier">{t('staff.roleCashier')}</option>
+        <option value="manager">{t('staff.roleManager')}</option>
+      </select>
       <button onClick={invite} disabled={loading} className="btn-primary w-full">
         {loading ? t('staff.inviting') : t('staff.inviteBtn')}
       </button>

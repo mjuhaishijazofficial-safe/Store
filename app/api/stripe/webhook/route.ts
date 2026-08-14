@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { createAdminClient } from '@/lib/supabase/server';
 import { requireEnv } from '@/lib/env';
+import { GRACE_PERIOD_DAYS } from '@/lib/constants';
 
 export async function POST(req: Request) {
   const stripe = new Stripe(requireEnv('STRIPE_SECRET_KEY'));
@@ -27,7 +28,8 @@ export async function POST(req: Request) {
         const { error, count } = await supabase.from('shops').update({
           stripe_subscription_id: session.subscription as string,
           subscription_status: 'active',
-          plan: 'monthly'
+          plan: 'monthly',
+          grace_ends_at: null
         }, { count: 'exact' }).eq('stripe_customer_id', customerId);
 
         // No shop found for this Stripe customer, or the update itself
@@ -49,7 +51,10 @@ export async function POST(req: Request) {
       if (shopId) {
         const { error } = await supabase.from('shops').update({
           subscription_status: status,
-          stripe_subscription_id: sub.id
+          stripe_subscription_id: sub.id,
+          // Stripe itself recovered the payment (auto-retry succeeded) —
+          // clears the same grace timer invoice.payment_failed started.
+          ...(status === 'active' ? { grace_ends_at: null } : {})
         }).eq('id', shopId);
         if (error) console.error('[stripe webhook] subscription update failed', { shopId, error });
       } else {
@@ -76,8 +81,31 @@ export async function POST(req: Request) {
     case 'invoice.payment_failed': {
       const invoice = event.data.object as Stripe.Invoice;
       const customerId = invoice.customer as string;
-      const { error } = await supabase.from('shops').update({ subscription_status: 'past_due' }).eq('stripe_customer_id', customerId);
-      if (error) console.error('[stripe webhook] payment_failed update failed', { customerId, error });
+      // Starts the grace period (spec §25-H) — the shop stays fully
+      // functional with a warning banner until grace_ends_at, then
+      // app/api/cron/check-grace-periods suspends it. Only set once:
+      // a second failed retry inside an already-running grace period
+      // shouldn't push the deadline back out.
+      const { data: shop } = await supabase.from('shops').select('id, grace_ends_at').eq('stripe_customer_id', customerId).single();
+      if (shop) {
+        const { error } = await supabase.from('shops').update({
+          subscription_status: 'past_due',
+          grace_ends_at: shop.grace_ends_at || new Date(Date.now() + GRACE_PERIOD_DAYS * 86400000).toISOString()
+        }).eq('id', shop.id);
+        if (error) console.error('[stripe webhook] payment_failed update failed', { customerId, error });
+      } else {
+        console.error('[stripe webhook] payment_failed: no shop matched', { customerId });
+      }
+      break;
+    }
+
+    case 'invoice.paid': {
+      // A recovered payment (manual retry or Stripe's own dunning)
+      // clears the grace timer even before subscription.updated fires.
+      const invoice = event.data.object as Stripe.Invoice;
+      const customerId = invoice.customer as string;
+      const { error } = await supabase.from('shops').update({ subscription_status: 'active', grace_ends_at: null }).eq('stripe_customer_id', customerId);
+      if (error) console.error('[stripe webhook] invoice.paid update failed', { customerId, error });
       break;
     }
   }

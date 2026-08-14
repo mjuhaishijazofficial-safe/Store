@@ -35,7 +35,7 @@ function fmt(n: number) {
 export default function InventoryPage() {
   const supabase = createClient();
   const { t } = useLang();
-  const { shopId, shopName, receiptPhone, receiptFooter } = useShop();
+  const { shopId, shopName, receiptPhone, receiptFooter, locked, role, branchId } = useShop();
   useSectionGuard('inventory');
   const { showToast } = useToast();
   const [items, setItems] = useState<Item[]>([]);
@@ -80,7 +80,14 @@ export default function InventoryPage() {
     // `error` here means those retries were exhausted too — worth
     // falling back to whatever was on screen last, rather than an empty
     // "no items" state that looks like the inventory got wiped.
-    const { data, error: err } = await supabase.from('items').select('*').eq('shop_id', shopId).order('name');
+    // Manager sees only their own branch's items (plus any item never
+    // attributed to a branch, e.g. from before this shop went
+    // multi-branch) — spec §17/§20. Owner/Cashier see everything, same
+    // as always (a Cashier's own branch scoping isn't spec'd — Billing
+    // is explicitly branch-agnostic today, see app/dashboard/billing).
+    let query = supabase.from('items').select('*').eq('shop_id', shopId);
+    if (role === 'manager' && branchId) query = query.or(`branch_id.eq.${branchId},branch_id.is.null`);
+    const { data, error: err } = await query.order('name');
     if (err) {
       const cached = loadCache<Item[]>(cacheKey);
       if (cached) { setItems(cached); setShowingStale(true); }
@@ -142,6 +149,9 @@ export default function InventoryPage() {
 
   async function saveItem() {
     if (!form.name.trim() || !shopId) return;
+    // Spec §33-H: grace-period-expired/suspended shops go view-only —
+    // existing data stays, but no new changes land.
+    if (locked) { showToast(t('lock.viewOnly'), 'error'); return; }
     // Empty string vs null matters here: the barcode unique index only
     // excludes NULLs, so two items saved with an empty string would
     // collide on it. expiry_date is a `date` column — Postgres rejects
@@ -158,6 +168,7 @@ export default function InventoryPage() {
 
   async function deleteItem() {
     if (!editing) return;
+    if (locked) { showToast(t('lock.viewOnly'), 'error'); return; }
     const { error: err } = await supabase.from('items').delete().eq('id', editing.id);
     if (err) { showToast(t('common.error'), 'error'); return; }
     setModalOpen(false);
@@ -182,6 +193,7 @@ export default function InventoryPage() {
 
   async function confirmMove() {
     if (!moveItem || !shopId || moveForm.qty <= 0) return;
+    if (locked) { showToast(t('lock.viewOnly'), 'error'); return; }
 
     // Sale amount used to be hardcoded to 0 here — every cash sale
     // recorded through Stock Out landed in `transactions` with no

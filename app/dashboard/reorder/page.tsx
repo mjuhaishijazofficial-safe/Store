@@ -1,10 +1,14 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import { getServerT } from '@/lib/i18n-server';
 import { hasSection } from '@/lib/permissions';
 
 const SMART_THRESHOLD_DAYS = 7;
 const EXPIRY_WARNING_DAYS = 30;
+// Spec §29's own default safety margin for the suggested-order-quantity
+// formula: (average daily sale × buffer days) − current stock.
+const BUFFER_DAYS = 7;
 
 function fmt(n: number) {
   return '₨' + Number(n || 0).toLocaleString('en-IN');
@@ -16,7 +20,7 @@ export default async function ReorderPage() {
   const { data: { user } } = await supabase.auth.getUser();
   const { data: profile } = await supabase.from('profiles').select('shop_id, role, allowed_sections').eq('id', user!.id).single();
   const shopId = profile?.shop_id;
-  if (profile && !hasSection(profile.role as 'owner' | 'staff', profile.allowed_sections as string[] | null, 'reorder')) redirect('/dashboard');
+  if (profile && !hasSection(profile.role as 'owner' | 'manager' | 'cashier', profile.allowed_sections as string[] | null, 'reorder')) redirect('/dashboard');
 
   const [{ data: items }, { data: predictions }] = await Promise.all([
     supabase.from('items').select('*').eq('shop_id', shopId).order('name'),
@@ -33,6 +37,12 @@ export default async function ReorderPage() {
   // which is more trustworthy than it sounds and cheap to compute.
   const smart = (predictions || [])
     .filter((p: any) => !lowIds.has(p.item_id) && p.days_remaining != null && p.days_remaining <= SMART_THRESHOLD_DAYS)
+    .map((p: any) => ({
+      ...p,
+      // Spec §29: suggested qty = (avg daily sale × buffer days) − current
+      // stock, floored at 0 — never suggest a negative order.
+      suggestedQty: Math.max(0, Math.ceil(p.avg_daily_sale * BUFFER_DAYS - p.stock))
+    }))
     .sort((a: any, b: any) => a.days_remaining - b.days_remaining);
 
   // Expiring Soon: a completely different kind of "needs attention" than
@@ -102,6 +112,28 @@ export default async function ReorderPage() {
                     <span className="block text-[10px] font-normal text-chalkdim">{t('reorder.daysLeft')}</span>
                   </div>
                 </div>
+                {/* Reason line (spec §29 UI requirement) — explains the
+                    suggestion instead of showing a bare number. */}
+                <div className="text-[11px] text-chalkdim mt-2">
+                  {t('reorder.reasonLine')
+                    .replace('{rate}', Number(p.avg_daily_sale).toFixed(1))
+                    .replace('{unit}', p.unit || '')
+                    .replace('{stock}', String(p.stock))}
+                </div>
+                {p.suggestedQty > 0 && (
+                  <div className="flex justify-between items-center mt-3 pt-2 border-t border-chalk/10">
+                    <div className="text-xs">
+                      <span className="text-chalkdim">{t('reorder.suggestedQty')}: </span>
+                      <span className="font-mono font-700">{p.suggestedQty} {p.unit}</span>
+                    </div>
+                    <Link
+                      href={`/dashboard/purchase-orders?reorderItem=${p.item_id}&reorderQty=${p.suggestedQty}`}
+                      className="text-xs text-haldi hover:underline shrink-0"
+                    >
+                      {t('reorder.sendToStockIn')}
+                    </Link>
+                  </div>
+                )}
               </div>
             ))}
           </div>

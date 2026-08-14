@@ -11,7 +11,7 @@ import { startOfTodayPKT, startOfMonthPKT } from '@/lib/pkt-time';
 import { ALL_SECTIONS, Section } from '@/lib/permissions';
 import ConfirmDeleteButton from '@/components/ConfirmDeleteButton';
 
-type StaffProfile = { id: string; full_name: string | null; email: string | null; role: string; monthly_salary: number; allowed_sections: string[] | null };
+type StaffProfile = { id: string; full_name: string | null; email: string | null; role: string; monthly_salary: number; allowed_sections: string[] | null; branch_id: string | null };
 type AttendanceRow = { id: string; date: string; status: 'present' | 'absent' | 'half_day' | 'leave' };
 type Status = AttendanceRow['status'];
 type AdjustmentType = 'bonus' | 'overtime' | 'deduction';
@@ -29,7 +29,7 @@ export default function StaffDetailPage() {
   const staffId = params.id as string;
   const supabase = createClient();
   const { t } = useLang();
-  const { shopId, role: myRole } = useShop();
+  const { shopId, role: myRole, branches } = useShop();
   const { showToast } = useToast();
 
   const [staff, setStaff] = useState<StaffProfile | null>(null);
@@ -43,6 +43,8 @@ export default function StaffDetailPage() {
   // see lib/permissions.ts.
   const [allowedSections, setAllowedSections] = useState<string[] | null>(null);
   const [savingPerms, setSavingPerms] = useState(false);
+  const [branchInput, setBranchInput] = useState('');
+  const [savingBranch, setSavingBranch] = useState(false);
   const [adjustments, setAdjustments] = useState<Adjustment[]>([]);
   const [adjForm, setAdjForm] = useState<{ type: AdjustmentType; amount: string; note: string }>({ type: 'bonus', amount: '', note: '' });
   const [savingAdj, setSavingAdj] = useState(false);
@@ -72,7 +74,7 @@ export default function StaffDetailPage() {
   async function loadAll() {
     setLoading(true);
     const [{ data: prof }, { data: att }, { data: adj }] = await Promise.all([
-      supabase.from('profiles').select('id, full_name, email, role, monthly_salary, allowed_sections').eq('id', staffId).single(),
+      supabase.from('profiles').select('id, full_name, email, role, monthly_salary, allowed_sections, branch_id').eq('id', staffId).single(),
       supabase
         .from('staff_attendance')
         .select('id, date, status')
@@ -89,6 +91,7 @@ export default function StaffDetailPage() {
     setStaff(prof || null);
     setSalaryInput(prof ? String(prof.monthly_salary || 0) : '');
     setAllowedSections(prof ? (prof.allowed_sections as string[] | null) : null);
+    setBranchInput(prof?.branch_id || '');
     setAttendance(att || []);
     setAdjustments(adj || []);
     setLoading(false);
@@ -116,6 +119,18 @@ export default function StaffDetailPage() {
       const base = prev === null ? ALL_SECTIONS.map(s => s.key) : prev;
       return base.includes(section) ? base.filter(s => s !== section) : [...base, section];
     });
+  }
+
+  async function saveBranch() {
+    setSavingBranch(true);
+    const res = await fetch('/api/staff/set-branch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ staffId, branchId: branchInput || null })
+    });
+    setSavingBranch(false);
+    if (!res.ok) { showToast(t('common.error'), 'error'); return; }
+    showToast(t('settings.saved'), 'success');
   }
 
   async function savePermissions() {
@@ -250,6 +265,20 @@ export default function StaffDetailPage() {
           {savingAdj ? t('settings.saving') : t('staffDetail.addAdjustment')}
         </button>
       </div>
+
+      {branches.length > 1 && (
+        <div className="card p-5 mb-4">
+          <div className="text-xs text-chalkdim uppercase tracking-wide mb-2">{t('staff.branch')}</div>
+          <div className="flex gap-2">
+            <select className="input flex-1" value={branchInput} onChange={e => setBranchInput(e.target.value)}>
+              {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </select>
+            <button onClick={saveBranch} disabled={savingBranch} className="btn-primary whitespace-nowrap">
+              {savingBranch ? t('settings.saving') : t('contact.save')}
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="card p-5 mb-4">
         <div className="text-xs text-chalkdim uppercase tracking-wide mb-1">{t('staffDetail.permissions')}</div>

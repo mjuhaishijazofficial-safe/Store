@@ -7,17 +7,22 @@
 /* Light "paper ledger" — default. Values are R G B triples (no commas),
    consumed via rgb(var(--x) / <alpha-value>) so Tailwind's opacity
    modifiers (bg-board2/60, border-chalk/10, ...) keep working. */
+/* "Saffron Bazaar" default stamp — Master Handoff Spec §18 exact hex
+   (bg/screen #FFF8EE, action/accent #E8A33D, text/main #3A2618,
+   text/muted #8A6747, border/default #E7D8C5 doubling as the
+   secondary-surface/input tint, state/warning #7A2E1D shared across
+   all three palettes per spec §18's mobile token table). dhania
+   (positive/success) isn't a spec-defined token — kept at its existing
+   value. */
 :root {
-  --color-board: 247 242 231;    /* #F7F2E7 page background — warm cream paper */
+  --color-board: 255 248 238;    /* #FFF8EE page background */
   --color-board2: 255 255 255;   /* #FFFFFF card surface */
-  --color-board3: 237 228 208;   /* #EDE4D0 secondary surface / inputs */
-  --color-chalk: 31 43 36;       /* #1F2B24 primary text — dark green ink */
-  --color-chalkdim: 138 127 112; /* #8A7F6C secondary/muted text */
-  --color-haldi: 184 121 26;     /* #B8791A turmeric gold — emphasis */
-  --color-mirch: 194 58 30;      /* #C23A1E chili red — debt/negative. Brighter than the old
-                                     #A8391F (which was too dull) while still clearing 4.5:1
-                                     contrast on the cream background for small error text. */
-  --color-dhania: 63 122 52;     /* #3F7A34 coriander green — positive */
+  --color-board3: 231 216 197;   /* #E7D8C5 secondary surface / inputs (spec border/default) */
+  --color-chalk: 58 38 24;       /* #3A2618 primary text */
+  --color-chalkdim: 138 103 71;  /* #8A6747 secondary/muted text */
+  --color-haldi: 232 163 61;     /* #E8A33D action/accent */
+  --color-mirch: 122 46 29;      /* #7A2E1D state/warning (shared) */
+  --color-dhania: 63 122 52;     /* #3F7A34 coriander green — positive, not a spec token */
 }
 
 /* Dark — opt-in via the toggle. Navy "fintech dashboard" palette, hand-
@@ -39,45 +44,69 @@ html[data-theme='dark'] {
 }
 
 /* Palette toggle — independent of the light/dark theme toggle above.
-   "Ledger Trust" (navy + muted gold) is a full brand identity, not just
-   a swapped accent — it overrides the surface/text roles too, in both
-   light and dark theme stamps, so it looks like "Ledger Trust" no
+   'navy' is this codebase's internal key for "Teal Ledger" (Master Spec
+   §18's default palette, exact hex below) — kept as-is rather than
+   renamed, since Palette/PALETTE_COOKIE values are already persisted in
+   users' cookies and the DB (shops.theme_palette); only the visual
+   values changed, not the key. Overrides the surface/text roles too, in
+   both light and dark theme stamps, so it looks like "Teal Ledger" no
    matter which mode the user is in. */
 :root[data-palette='navy'] {
-  --color-board: 244 246 248;    /* #F4F6F8 page background */
-  --color-board2: 255 255 255;   /* #FFFFFF card surface */
-  --color-board3: 231 236 242;   /* #E7ECF2 secondary surface / inputs */
-  --color-chalk: 15 42 74;       /* #0F2A4A deep navy ink */
-  --color-chalkdim: 90 112 137;  /* #5A7089 secondary/muted text */
-  --color-haldi: 201 162 75;     /* #C9A24B muted gold — emphasis, same in light + dark */
-  --color-mirch: 194 58 30;      /* #C23A1E debt/negative — unchanged, already reads on this bg */
-  --color-dhania: 63 122 52;     /* #3F7A34 payments/positive — unchanged */
+  --color-board: 245 251 250;    /* #F5FBFA bg/screen */
+  --color-board2: 255 255 255;   /* #FFFFFF surface/card */
+  --color-board3: 199 229 224;   /* #C7E5E0 secondary surface / inputs (spec border/default) */
+  --color-chalk: 11 94 86;       /* #0B5E56 text/main — deep teal ink, spec-exact */
+  --color-chalkdim: 107 141 137; /* #6B8D89 text/muted */
+  --color-haldi: 232 163 61;     /* #E8A33D action/accent — same amber as Saffron Bazaar per spec */
+  --color-mirch: 122 46 29;      /* #7A2E1D state/warning (shared) */
+  --color-dhania: 63 122 52;     /* #3F7A34 payments/positive — unchanged, not a spec token */
 }
+/* Spec's tables don't define a Teal-Ledger-in-dark-mode combination
+   (Teal Ledger is explicitly a light-surface palette, §18) — this stamp
+   predates that spec and is kept close to its existing values rather
+   than guessed at, just aligned to the same accent/warning as the light
+   stamp above for visual consistency when a user toggles dark mode on
+   top of this palette. */
 html[data-theme='dark'][data-palette='navy'] {
   --color-board: 15 42 74;       /* #0F2A4A deep navy — page background */
   --color-board2: 22 52 90;      /* #16345A card surface */
   --color-board3: 27 67 104;     /* #1B4368 secondary surface / inputs */
   --color-chalk: 255 255 255;    /* #FFFFFF primary text */
   --color-chalkdim: 183 196 214; /* #B7C4D6 secondary/muted text */
-  --color-haldi: 201 162 75;     /* #C9A24B muted gold — same as light */
-  --color-mirch: 248 113 113;    /* #F87171 */
+  --color-haldi: 232 163 61;     /* #E8A33D action/accent — matches the light stamp */
+  --color-mirch: 248 113 113;    /* #F87171 — kept brighter than the spec's shared #7A2E1D,
+                                     which fails WCAG AA contrast against this dark background */
   --color-dhania: 52 211 153;    /* #34D399 */
 }
 
-/* "Sabz Fintech" — a deliberately single-look dark palette (near-black
-   green + emerald accent), same in both theme stamps rather than having
-   a separate light variant — this is the "alternate/dark theme" option,
-   not a light/dark pair of its own. */
+/* "Sada Sabz" — Master Handoff Spec §18 exact hex, a deliberately
+   single-look dark palette (deep green + emerald accent, Pakistan's
+   national colors as inspiration — never the flag itself, colors only,
+   per the mobile brief §2), same in both theme stamps rather than
+   having a separate light variant.
+   One deliberate deviation from the literal spec table: §18 lists this
+   palette's card Surface as #FFFFFF (white cards on the near-black bg,
+   echoing "deep green + white"). This app renders all text through a
+   single global --color-chalk value shared by both --color-board (the
+   page bg) and --color-board2 (the card surface) — a genuinely white
+   card here would need its own separate dark-ink token to stay
+   readable, which the current CSS variable set doesn't have. Kept
+   --color-board2 dark instead (closer to the Super Admin brief's own
+   explicit instruction to "design this dark-mode-native, not a light
+   theme with dark accents") rather than ship white cards with wrong-
+   contrast text on them; the flag-echo still reads via the near-black
+   background + emerald accent. Revisit if/when Figma screens for this
+   palette exist and confirm white cards are truly intended. */
 :root[data-palette='sabz'], html[data-theme='dark'][data-palette='sabz'] {
-  --color-board: 14 27 22;       /* #0E1B16 near-black green — page background */
-  --color-board2: 21 40 32;      /* #152820 card surface */
-  --color-board3: 28 50 41;      /* #1C3229 secondary surface / inputs */
-  --color-chalk: 255 255 255;    /* #FFFFFF primary text */
-  --color-chalkdim: 143 163 150; /* #8FA396 secondary/muted text */
-  --color-haldi: 46 204 113;     /* #2ECC71 emerald — brand/emphasis */
-  --color-mirch: 248 113 113;    /* #F87171 debt/negative */
-  --color-dhania: 46 204 113;    /* #2ECC71 payments/positive — same emerald as the accent,
-                                     a single-green fintech convention rather than a second green */
+  --color-board: 13 27 18;       /* #0D1B12 bg/screen, spec-exact */
+  --color-board2: 21 40 32;      /* #152820 card surface — see deviation note above */
+  --color-board3: 45 92 63;      /* #2D5C3F secondary surface / inputs (spec border/default) */
+  --color-chalk: 255 255 255;    /* #FFFFFF text/onDark, spec-exact */
+  --color-chalkdim: 143 191 160; /* #8FBFA0 text/muted, spec-exact */
+  --color-haldi: 30 122 76;      /* #1E7A4C action/accent, spec-exact */
+  --color-mirch: 248 113 113;    /* #F87171 — kept brighter than the spec's shared #7A2E1D,
+                                     which fails WCAG AA contrast against this near-black background */
+  --color-dhania: 46 204 113;    /* #2ECC71 payments/positive — not a spec token, unchanged */
 }
 
 /* Premium treatment: derived from --color-haldi via color-mix(), not a

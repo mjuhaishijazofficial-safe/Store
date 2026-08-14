@@ -3,10 +3,13 @@ import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { requireEnv } from '@/lib/env';
 
 export async function POST(req: Request) {
-  const { email } = await req.json();
+  const { email, role } = await req.json();
   if (!email || typeof email !== 'string') {
     return NextResponse.json({ error: 'email required' }, { status: 400 });
   }
+  // Defaults to cashier — matches the signup trigger's own fallback if
+  // this were ever omitted (see handle_new_user in supabase/schema.sql).
+  const invitedRole = role === 'manager' ? 'manager' : 'cashier';
 
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -31,7 +34,7 @@ export async function POST(req: Request) {
   const { data: created, error: createErr } = await admin.auth.admin.createUser({
     email: email.trim(),
     email_confirm: true,
-    app_metadata: { invited_shop_id: profile.shop_id }
+    app_metadata: { invited_shop_id: profile.shop_id, invited_role: invitedRole }
   });
 
   if (createErr) {

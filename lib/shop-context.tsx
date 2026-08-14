@@ -12,7 +12,7 @@ import { createContext, useContext } from 'react';
 
 export type ShopInfo = {
   shopId: string;
-  role: 'owner' | 'staff';
+  role: 'owner' | 'manager' | 'cashier';
   shopName: string;
   allowedSections: string[] | null;
   // Custom receipt branding (Settings → Receipt Branding) — null means
@@ -20,6 +20,21 @@ export type ShopInfo = {
   // existing default (no phone line, the stock "thank you" message).
   receiptPhone: string | null;
   receiptFooter: string | null;
+  // Spec §17/§33 — a Cashier's discount on the Billing/POS screen is
+  // capped at this percent of the bill (0 = no discount allowed at
+  // all), Owner-set from Settings.
+  cashierDiscountCapPercent: number;
+  // Spec §33-H: trial expired / payment failed / canceled / suspended —
+  // Billing and Inventory go view-only (existing data stays, no new
+  // changes) rather than the app just showing a banner with no teeth.
+  locked: boolean;
+  // Multi-Branch (spec §20/§25-E): null for Owner (org-wide, sees every
+  // branch) and for a single-branch shop that's never split into
+  // branches. Set for Manager/Cashier once an Owner assigns one —
+  // pages filter their own queries by this rather than an RLS-level
+  // restriction, same convention as allowedSections above.
+  branchId: string | null;
+  branches: { id: string; name: string }[];
 };
 
 const ShopContext = createContext<ShopInfo | null>(null);

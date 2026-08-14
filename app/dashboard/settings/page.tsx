@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { useLang } from '@/lib/i18n-context';
 import { useShop } from '@/lib/shop-context';
@@ -23,6 +24,7 @@ export default function SettingsPage() {
   const [budget, setBudget] = useState(0);
   const [receiptPhone, setReceiptPhone] = useState('');
   const [receiptFooter, setReceiptFooter] = useState('');
+  const [discountCap, setDiscountCap] = useState(0);
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
@@ -34,17 +36,24 @@ export default function SettingsPage() {
 
   async function init() {
     if (isOwner) {
-      const { data: shop } = await supabase.from('shops').select('name, budget, receipt_phone, receipt_footer').eq('id', shopId).single();
+      const { data: shop } = await supabase.from('shops').select('name, budget, receipt_phone, receipt_footer, cashier_discount_cap_percent').eq('id', shopId).single();
       setName(shop?.name || '');
       setBudget(shop?.budget || 0);
       setReceiptPhone(shop?.receipt_phone || '');
       setReceiptFooter(shop?.receipt_footer || '');
+      setDiscountCap(shop?.cashier_discount_cap_percent || 0);
     }
     setLoading(false);
   }
 
   async function save() {
     const { error: err } = await supabase.from('shops').update({ name, budget }).eq('id', shopId);
+    if (err) { showToast(t('common.error'), 'error'); return; }
+    showToast(t('settings.saved'), 'success');
+  }
+
+  async function saveDiscountCap() {
+    const { error: err } = await supabase.from('shops').update({ cashier_discount_cap_percent: discountCap }).eq('id', shopId);
     if (err) { showToast(t('common.error'), 'error'); return; }
     showToast(t('settings.saved'), 'success');
   }
@@ -105,6 +114,11 @@ export default function SettingsPage() {
 
       {isOwner && (
         <>
+          <Link href="/dashboard/settings/subscription" className="card p-4 mb-6 flex items-center justify-between hover:border-haldi">
+            <span className="font-600 text-sm">{t('billing.title')}</span>
+            <span className="text-chalkdim text-xs">›</span>
+          </Link>
+
           <label className="block text-xs text-chalkdim mb-1">{t('settings.shopName')}</label>
           <input className="input mb-4" value={name} onChange={e => setName(e.target.value)} />
 
@@ -122,22 +136,32 @@ export default function SettingsPage() {
                 className={`card p-3 flex flex-col items-center gap-1.5 text-center ${palette === 'navy' ? 'border-haldi' : ''}`}
               >
                 <span className="text-lg leading-none">🔵</span>
-                <span className="text-xs font-600">Ledger Trust</span>
+                <span className="text-xs font-600">Teal Ledger</span>
+                <span className="text-[10px] text-chalkdim">{t('settings.defaultPalette')}</span>
               </button>
               <button
                 onClick={() => setPalette('sabz')}
                 className={`card p-3 flex flex-col items-center gap-1.5 text-center ${palette === 'sabz' ? 'border-haldi' : ''}`}
               >
                 <span className="text-lg leading-none">🟢</span>
-                <span className="text-xs font-600">Sabz Fintech</span>
+                <span className="text-xs font-600">Sada Sabz</span>
               </button>
               <button
                 onClick={() => setPalette('spice')}
                 className={`card p-3 flex flex-col items-center gap-1.5 text-center ${palette === 'spice' ? 'border-haldi' : ''}`}
               >
                 <span className="text-lg leading-none">🟠</span>
-                <span className="text-xs font-600">Kiryana Spice</span>
+                <span className="text-xs font-600">Saffron Bazaar</span>
               </button>
+            </div>
+          </div>
+
+          <div className="mt-10 pt-6 border-t border-chalk/10">
+            <div className="text-xs text-chalkdim uppercase tracking-wide font-700 mb-1">{t('settings.cashierDiscountCap')}</div>
+            <div className="text-chalkdim text-xs mb-3">{t('settings.cashierDiscountCapHint')}</div>
+            <div className="flex gap-2">
+              <input type="number" inputMode="decimal" min={0} max={100} className="input flex-1" value={discountCap || ''} onChange={e => setDiscountCap(Math.max(0, Math.min(100, Number(e.target.value))))} placeholder="0" />
+              <button onClick={saveDiscountCap} className="btn-secondary whitespace-nowrap">{t('settings.save')}</button>
             </div>
           </div>
 

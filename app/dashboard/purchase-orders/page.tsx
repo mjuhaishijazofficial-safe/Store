@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useLang } from '@/lib/i18n-context';
 import { useShop } from '@/lib/shop-context';
 import { useSectionGuard } from '@/lib/use-section-guard';
+import { useToast } from '@/lib/toast-context';
 import NewPurchaseOrderModal from '@/components/NewPurchaseOrderModal';
+import SlipScanModal from '@/components/SlipScanModal';
 
 type Po = {
   id: string;
@@ -33,15 +35,33 @@ function fmt(n: number) {
 export default function PurchaseOrdersPage() {
   const supabase = createClient();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { t } = useLang();
   const { shopId } = useShop();
   useSectionGuard('suppliers');
+  const { showToast } = useToast();
 
   const [pos, setPos] = useState<Po[]>([]);
   const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([]);
   const [items, setItems] = useState<{ id: string; name: string; unit: string | null; cost_price: number }[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
+  const [slipScanOpen, setSlipScanOpen] = useState(false);
+  // Smart Reorder's "1-tap send to stock-in" (spec §29) — ?reorderItem=
+  // &reorderQty= from /dashboard/reorder pre-fills and auto-opens the
+  // New Purchase Order modal with that line already in the cart.
+  const reorderItemId = searchParams.get('reorderItem');
+  const reorderQty = Number(searchParams.get('reorderQty')) || 0;
+  const reorderInitialLine = reorderItemId
+    ? (() => {
+        const it = items.find(i => i.id === reorderItemId);
+        return it ? { itemId: it.id, name: it.name, unit: it.unit, qty: reorderQty || 1, costPrice: it.cost_price || 0 } : undefined;
+      })()
+    : undefined;
+
+  useEffect(() => {
+    if (reorderItemId && items.length > 0 && !modalOpen) setModalOpen(true);
+  }, [reorderItemId, items.length]);
 
   const statusLabels: Record<Po['status'], string> = {
     draft: t('po.statusDraft'),
@@ -87,7 +107,13 @@ export default function PurchaseOrdersPage() {
           {t('po.needSupplierFirst')} <Link href="/dashboard/suppliers" className="text-haldi underline">{t('nav.suppliers')}</Link>
         </div>
       ) : (
-        <button onClick={openNew} className="btn-primary w-full mb-5">{t('po.newTitle')}</button>
+        <>
+          {/* Slip Scan is the spec's flagship stock-in entry point (§10)
+              — leads, with Manual (the button below) as the fallback
+              when a photo genuinely isn't possible. */}
+          <button onClick={() => setSlipScanOpen(true)} className="btn-primary w-full mb-2">{t('slipScan.button')}</button>
+          <button onClick={openNew} className="btn-secondary w-full mb-5">{t('po.newTitle')}</button>
+        </>
       )}
 
       {loading && <div className="text-chalkdim text-sm text-center py-10">{t('common.loading')}</div>}
@@ -120,8 +146,17 @@ export default function PurchaseOrdersPage() {
         <NewPurchaseOrderModal
           suppliers={suppliers}
           items={items}
-          onClose={() => setModalOpen(false)}
+          initialLine={reorderInitialLine}
+          onClose={() => { setModalOpen(false); if (reorderItemId) router.replace('/dashboard/purchase-orders'); }}
           onCreated={(poId) => { setModalOpen(false); router.push(`/dashboard/purchase-orders/${poId}`); }}
+        />
+      )}
+
+      {slipScanOpen && (
+        <SlipScanModal
+          suppliers={suppliers}
+          onClose={() => setSlipScanOpen(false)}
+          onDone={() => { setSlipScanOpen(false); showToast(t('settings.saved'), 'success'); loadAll(); }}
         />
       )}
     </div>

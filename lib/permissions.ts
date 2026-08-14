@@ -27,12 +27,26 @@ export const ALL_SECTIONS: { key: Section; labelKey: DictKey }[] = [
   { key: 'expenses', labelKey: 'nav.expenses' }
 ];
 
-// Owner always has every section; a staff member with allowedSections
-// === null is unrestricted (the default — nothing shrinks silently for
-// existing staff just because this feature shipped); otherwise it's an
-// explicit whitelist.
-export function hasSection(role: 'owner' | 'staff', allowedSections: string[] | null, section: Section): boolean {
+// Cashier's P0 default (Master Handoff Spec §17): Billing/POS + Inventory
+// (view) + Khata (own entries) only — Suppliers/Stock-in/Reorder/Reports/
+// Expenses/History don't render in nav unless an owner explicitly widens
+// allowed_sections for that one cashier. This is what a freshly-invited
+// cashier (allowed_sections still null, the column's default) gets out of
+// the box — narrower than the old blanket "null = unrestricted" staff
+// default, which the spec never gave a Cashier. Billing/POS itself isn't
+// in this list at all — see app/dashboard/layout.tsx — because the spec
+// never section-gates it; every role gets it unconditionally.
+const CASHIER_DEFAULT_SECTIONS: Section[] = ['inventory', 'khata'];
+
+// Owner always has every section. Manager defaults to every section too
+// (§17: Inventory/Khata/Suppliers/Reports) — what narrows a Manager's
+// view is branch scoping (each page's own query, see profiles.branch_id
+// in supabase/schema.sql), not section-hiding. A cashier with
+// allowedSections === null (the column's default) falls back to
+// CASHIER_DEFAULT_SECTIONS instead of "everything". Any role can still
+// be widened/narrowed further via an explicit whitelist.
+export function hasSection(role: 'owner' | 'manager' | 'cashier', allowedSections: string[] | null, section: Section): boolean {
   if (role === 'owner') return true;
-  if (allowedSections === null) return true;
-  return allowedSections.includes(section);
+  if (allowedSections !== null) return allowedSections.includes(section);
+  return role === 'manager' || (CASHIER_DEFAULT_SECTIONS as string[]).includes(section);
 }

@@ -27,7 +27,7 @@ export default function SaleCartModal({
 }) {
   const supabase = createClient();
   const { t } = useLang();
-  const { receiptPhone, receiptFooter } = useShop();
+  const { receiptPhone, receiptFooter, locked } = useShop();
 
   // One id per checkout session, not per attempt — a retry after a
   // partial failure (see checkout()) is still logically the same sale,
@@ -80,6 +80,8 @@ export default function SaleCartModal({
 
   async function checkout() {
     if (cart.length === 0) return;
+    // Spec §33-H: view-only once a shop's grace period has actually run out.
+    if (locked) { setCheckoutError(t('lock.viewOnly')); return; }
     setCheckingOut(true);
     setCheckoutError('');
 
@@ -214,7 +216,7 @@ export default function SaleCartModal({
           </div>
           <div className="flex gap-2">
             <button onClick={onClose} className="btn-secondary flex-1">{t('inventory.cancel')}</button>
-            <button onClick={checkout} disabled={cart.length === 0 || checkingOut} className="btn-primary flex-1">
+            <button onClick={checkout} disabled={cart.length === 0 || checkingOut || locked} className="btn-primary flex-1">
               {checkingOut ? t('common.loading') : t('cart.completeSale')}
             </button>
           </div>

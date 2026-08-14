@@ -1,20 +1,12 @@
-import { createClient, createAdminClient } from '@/lib/supabase/server';
-import { redirect } from 'next/navigation';
-import { isAdmin } from '@/lib/admin';
+import { createAdminClient } from '@/lib/supabase/server';
 import AdminPaymentClaims from '@/components/AdminPaymentClaims';
 import AdminShopManagement from '@/components/AdminShopManagement';
 
+// Moved from app/dashboard/admin/page.tsx — see app/admin/layout.tsx
+// for why this surface no longer lives under the shop-scoped dashboard.
+// isAdmin() is already re-checked there; this page trusts that gate the
+// same way it always trusted /dashboard/admin's.
 export default async function AdminPage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
-  // Not a role check — every other gate in this app is scoped to "my
-  // shop" via RLS, but this page reads/writes across every shop, so it
-  // has to be the one place that isn't RLS-scoped at all. Locked down
-  // to a single person by email instead, re-checked again server-side
-  // in every /api/admin/* route (never trust this redirect alone).
-  if (!isAdmin(user?.email)) redirect('/dashboard');
-
   const admin = createAdminClient();
 
   const [{ data: claims }, { data: shops }, { data: owners }, { data: recentActions }] = await Promise.all([
@@ -45,7 +37,7 @@ export default async function AdminPage() {
 
   return (
     <div>
-      <h1 className="font-display text-xl font-700 mb-5">Admin</h1>
+      <h1 className="font-display text-xl font-700 mb-5">Businesses</h1>
 
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-8">
         {[

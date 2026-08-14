@@ -21,9 +21,12 @@ function fmt(n: number) {
 export default function HistoryPage() {
   const supabase = createClient();
   const { t } = useLang();
-  const { shopId, shopName, receiptPhone, receiptFooter } = useShop();
+  const { shopId, shopName, role, receiptPhone, receiptFooter } = useShop();
   const { showToast } = useToast();
   useSectionGuard('history');
+  // Return-approve is Owner-only (spec §17/§25-B — a Cashier can't
+  // self-approve a return, fraud/misuse prevention).
+  const isOwner = role === 'owner';
   const [logs, setLogs] = useState<Log[]>([]);
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -34,6 +37,7 @@ export default function HistoryPage() {
   const [returnFor, setReturnFor] = useState<Log | null>(null);
   const [returnQty, setReturnQty] = useState('');
   const [returnAmount, setReturnAmount] = useState('');
+  const [returnReason, setReturnReason] = useState('');
   const [returningNow, setReturningNow] = useState(false);
 
   useEffect(() => { init(); }, [shopId]);
@@ -67,12 +71,17 @@ export default function HistoryPage() {
     setReturnFor(l);
     setReturnQty(String(l.qty));
     setReturnAmount(String(l.amount));
+    setReturnReason('');
   }
 
-  // A return moves stock back in (record_stock_move handles that the
-  // same way a purchase does) and logs its own transactions row rather
-  // than editing the original sale — same "ledger, not undo" convention
-  // as every other entry type in this app.
+  // A return moves stock back in and logs its own transactions row
+  // rather than editing the original sale — same "ledger, not undo"
+  // convention as every other entry type in this app. A row with
+  // customer_id set came from a Khata-mode sale (see record_khata_entry
+  // in supabase/schema.sql) — reversing it through record_khata_entry
+  // instead of record_stock_move also credits the amount back off that
+  // customer's owed balance (spec §25-B: "refund amount cash/khata mein
+  // adjust ho"), not just the stock.
   async function confirmReturn() {
     if (!returnFor || !returnFor.item_id) return;
     const qty = Number(returnQty);
@@ -80,12 +89,23 @@ export default function HistoryPage() {
     if (!qty || qty <= 0 || !amount || amount < 0) return;
 
     setReturningNow(true);
-    const { error: err } = await supabase.rpc('record_stock_move', {
-      p_item_id: returnFor.item_id,
-      p_type: 'return',
-      p_qty: qty,
-      p_amount: amount
-    });
+    const { error: err } = returnFor.customer_id
+      ? await supabase.rpc('record_khata_entry', {
+          p_customer_id: returnFor.customer_id,
+          p_type: 'return',
+          p_item_id: returnFor.item_id,
+          p_item_name: returnFor.item_name,
+          p_qty: qty,
+          p_amount: amount,
+          p_note: returnReason.trim() || null
+        })
+      : await supabase.rpc('record_stock_move', {
+          p_item_id: returnFor.item_id,
+          p_type: 'return',
+          p_qty: qty,
+          p_amount: amount,
+          p_note: returnReason.trim() || null
+        });
     setReturningNow(false);
     if (err) { showToast(t('common.error'), 'error'); return; }
     setReturnFor(null);
@@ -128,7 +148,7 @@ export default function HistoryPage() {
                       {t('receipt.print')}
                     </button>
                   )}
-                  {l.type === 'sale' && l.item_id && (
+                  {l.type === 'sale' && l.item_id && isOwner && (
                     <button onClick={() => openReturn(l)} className="text-chalkdim text-xs hover:text-haldi underline shrink-0">
                       {t('history.returnAction')}
                     </button>
@@ -168,9 +188,17 @@ export default function HistoryPage() {
               {isOpen && (
                 <div className="mt-2 pt-2 border-t border-chalk/10 space-y-1.5">
                   {g.rows.map(l => (
-                    <div key={l.id} className="flex justify-between text-xs text-chalkdim">
+                    <div key={l.id} className="flex justify-between items-center text-xs text-chalkdim gap-2">
                       <span>{l.item_name} — {l.qty} {l.unit}</span>
-                      <span className="font-mono">{fmt(l.amount)}</span>
+                      <span className="flex items-center gap-2 shrink-0">
+                        <span className="font-mono">{fmt(l.amount)}</span>
+                        {/* Return per line item (spec §25-B: "poora bill
+                            ya sirf kuch items") — a cart sale has no
+                            single-row return button above, this is it. */}
+                        {l.type === 'sale' && l.item_id && isOwner && (
+                          <button onClick={() => openReturn(l)} className="hover:text-haldi underline">{t('history.returnAction')}</button>
+                        )}
+                      </span>
                     </div>
                   ))}
                   <button onClick={() => setReceiptGroup(g.rows)} className="text-chalkdim text-xs hover:text-haldi underline mt-1">
@@ -214,7 +242,11 @@ export default function HistoryPage() {
             <input type="number" inputMode="decimal" className="input mb-3" value={returnQty} onChange={e => setReturnQty(e.target.value)} />
 
             <label className="block text-xs text-chalkdim mb-1">{t('history.refundAmount')}</label>
-            <input type="number" inputMode="decimal" className="input mb-5" value={returnAmount} onChange={e => setReturnAmount(e.target.value)} />
+            <input type="number" inputMode="decimal" className="input mb-1" value={returnAmount} onChange={e => setReturnAmount(e.target.value)} />
+            {returnFor.customer_id && <p className="text-[11px] text-chalkdim mb-3">{t('history.returnKhataHint')}</p>}
+
+            <label className="block text-xs text-chalkdim mb-1">{t('history.returnReason')}</label>
+            <input className="input mb-5" value={returnReason} onChange={e => setReturnReason(e.target.value)} placeholder={t('khataDetail.noteOptional')} />
 
             <div className="flex gap-2">
               <button onClick={() => setReturnFor(null)} className="btn-secondary flex-1">{t('contact.cancel')}</button>

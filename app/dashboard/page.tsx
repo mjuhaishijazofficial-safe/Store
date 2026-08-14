@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { redirect } from 'next/navigation';
 import { getServerT } from '@/lib/i18n-server';
 import { startOfMonthPKT, daysAgoPKT } from '@/lib/pkt-time';
 import Link from 'next/link';
@@ -54,7 +55,10 @@ export default async function OverviewPage() {
   const { data: { user } } = await supabase.auth.getUser();
   const { data: profile } = await supabase.from('profiles').select('shop_id, role, allowed_sections').eq('id', user!.id).single();
   const shopId = profile?.shop_id;
-  const role = (profile?.role as 'owner' | 'staff') || 'staff';
+  const role = (profile?.role as 'owner' | 'manager' | 'cashier') || 'cashier';
+  // Billing/POS is the spec's forced default landing for Cashier (§14) —
+  // Overview is an owner-facing snapshot a cashier has no use for.
+  if (role === 'cashier') redirect('/dashboard/billing');
   const allowedSections = (profile?.allowed_sections as string[] | null) ?? null;
   // Overview itself has no gate — everyone lands here — but its cards
   // and shortcuts shouldn't route a restricted staff member somewhere

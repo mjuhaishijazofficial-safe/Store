@@ -25,6 +25,18 @@ create table if not exists shops (
 -- thermal) falls back to its existing default when either is null.
 alter table shops add column if not exists receipt_phone text;
 alter table shops add column if not exists receipt_footer text;
+-- Master Spec §17/§33: a Cashier's own discount is capped by an
+-- Owner-set percentage of the bill, 0 by default (no discount at all
+-- until an Owner deliberately opens one up) — see app/dashboard/billing
+-- for where this is enforced and Settings for where the Owner sets it.
+alter table shops add column if not exists cashier_discount_cap_percent numeric not null default 0;
+-- Master Spec §25-H: a failed Stripe payment starts a 3–5 day grace
+-- period (status stays whatever Stripe reported, e.g. past_due) before
+-- the shop actually gets suspended — see app/api/stripe/webhook (sets
+-- this) and app/api/cron/check-grace-periods (the Vercel Cron job that
+-- flips status to 'suspended' once this passes). Null = no grace period
+-- currently running (never failed, or already resolved).
+alter table shops add column if not exists grace_ends_at timestamptz;
 
 -- 2. PROFILES (one row per auth user, links user -> shop) -----------
 create table if not exists profiles (
@@ -994,4 +1006,389 @@ as $$
   having sum(case when t.type = 'sale' then t.qty else -t.qty end) > 0
   order by sum(case when t.type = 'sale' then t.qty else -t.qty end) desc
   limit p_limit
+$$;
+
+-- ============================================================
+-- 13. ROLE RENAME (staff → cashier)
+--
+-- Master Handoff Spec §2/§17: 'staff' is renamed to 'cashier' to match
+-- the spec's naming and P0 permission matrix. Deliberately staying a
+-- 2-role model (owner/cashier) for now — Manager + multi-branch is
+-- spec §30's own P2 item, not part of this pass; nothing here (branch
+-- tables, branch_id columns) is added, so this is a pure rename plus a
+-- CHECK constraint the role column never actually had before.
+-- ============================================================
+
+update profiles set role = 'cashier' where role = 'staff';
+alter table profiles drop constraint if exists profiles_role_check;
+alter table profiles add constraint profiles_role_check check (role in ('owner', 'cashier'));
+
+-- ============================================================
+-- 14. KHATA SALES VISIBILITY (Master Handoff Spec §11 Reports, §14
+--     History, §25-B Returns, §29 Smart Reorder)
+--
+-- record_khata_entry never wrote to `transactions` — a Khata-mode sale
+-- (Billing §15's 4th payment tab) only ever showed up in that one
+-- customer's own ledger, invisible to History, Reports' Total Sales,
+-- Dashboard's Top Selling, and reorder_predictions' sell-through rate.
+-- Those all read `transactions` only. This makes a linked-item Khata
+-- purchase/return also log a plain transactions row (no stock effect —
+-- record_khata_entry already moved stock above; this is reporting-only,
+-- same "log without re-triggering the atomic RPC" pattern
+-- receive_po_lines already uses for its own transactions insert).
+-- customer_id on transactions marks which rows came from Khata, so
+-- History's Return action (below) can reverse the debt, not just the
+-- stock, when it undoes one of these.
+-- ============================================================
+
+alter table transactions add column if not exists customer_id uuid references customers(id) on delete set null;
+alter table transactions add column if not exists note text;
+
+create or replace function record_khata_entry(
+  p_customer_id uuid,
+  p_type text,
+  p_item_id uuid,
+  p_item_name text,
+  p_qty numeric,
+  p_amount numeric,
+  p_note text,
+  p_payment_method text default 'cash'
+)
+returns void
+language plpgsql
+security invoker
+as $$
+declare
+  v_shop_id uuid := my_shop_id();
+  v_unit text;
+begin
+  if p_type not in ('purchase', 'payment', 'return') then
+    raise exception 'invalid type: %', p_type;
+  end if;
+  if p_amount is null or p_amount <= 0 then
+    raise exception 'amount must be positive';
+  end if;
+
+  insert into khata_entries (shop_id, customer_id, type, item_id, item_name, qty, amount, note, created_by, payment_method)
+  values (v_shop_id, p_customer_id, p_type, p_item_id, p_item_name, p_qty, p_amount, p_note, auth.uid(), coalesce(p_payment_method, 'cash'));
+
+  if p_type = 'purchase' and p_item_id is not null then
+    select unit into v_unit from items where id = p_item_id;
+    update items set stock = greatest(0, stock - coalesce(p_qty, 0)) where id = p_item_id;
+    insert into transactions (shop_id, item_id, item_name, type, qty, unit, amount, created_by, customer_id, note)
+    values (v_shop_id, p_item_id, p_item_name, 'sale', coalesce(p_qty, 0), v_unit, p_amount, auth.uid(), p_customer_id, p_note);
+  elsif p_type = 'return' and p_item_id is not null then
+    select unit into v_unit from items where id = p_item_id;
+    update items set stock = stock + coalesce(p_qty, 0) where id = p_item_id;
+    insert into transactions (shop_id, item_id, item_name, type, qty, unit, amount, created_by, customer_id, note)
+    values (v_shop_id, p_item_id, p_item_name, 'return', coalesce(p_qty, 0), v_unit, p_amount, auth.uid(), p_customer_id, p_note);
+  end if;
+end;
+$$;
+
+-- record_stock_move grows an optional reason/note (spec §25-B: Returns
+-- get an optional Reason field) — trailing param with a default, every
+-- existing caller (SaleCartModal, Inventory's Stock In/Out, the new
+-- Billing POS page) keeps working unchanged.
+create or replace function record_stock_move(
+  p_item_id uuid,
+  p_type text,
+  p_qty numeric,
+  p_amount numeric default 0,
+  p_sale_ref uuid default null,
+  p_note text default null
+)
+returns void
+language plpgsql
+security invoker
+as $$
+declare
+  v_shop_id uuid;
+  v_item_name text;
+  v_unit text;
+begin
+  if p_type not in ('purchase', 'sale', 'return') then
+    raise exception 'invalid type: %', p_type;
+  end if;
+  if p_qty is null or p_qty <= 0 then
+    raise exception 'qty must be positive';
+  end if;
+
+  select shop_id, name, unit into v_shop_id, v_item_name, v_unit
+  from items where id = p_item_id;
+
+  if v_shop_id is null then
+    raise exception 'item not found';
+  end if;
+
+  if p_type = 'purchase' or p_type = 'return' then
+    update items set stock = stock + p_qty where id = p_item_id;
+  else
+    update items set stock = greatest(0, stock - p_qty) where id = p_item_id;
+  end if;
+
+  insert into transactions (shop_id, item_id, item_name, type, qty, unit, amount, created_by, sale_ref, note)
+  values (v_shop_id, p_item_id, v_item_name, p_type, p_qty, v_unit, coalesce(p_amount, 0), auth.uid(), p_sale_ref, p_note);
+end;
+$$;
+
+create index if not exists idx_transactions_customer on transactions(customer_id) where customer_id is not null;
+
+-- ============================================================
+-- 15. MULTI-BRANCH + MANAGER ROLE (spec §2/§17/§20/§25-E)
+--
+-- A shop with only ever one branch is unaffected end to end: branches
+-- gets exactly one row (is_main), every existing item/customer/etc.
+-- backfills to it, and branch_id being null on new rows going forward
+-- (nobody's forced to pick a branch) still means "the shop's one and
+-- only branch" everywhere it's read. Branch-scoping for Manager/Cashier
+-- is enforced at the query level in each page, same convention
+-- allowed_sections already used — not a hard RLS boundary (see the note
+-- further down on why).
+-- ============================================================
+
+create table if not exists branches (
+  id uuid primary key default gen_random_uuid(),
+  shop_id uuid not null references shops(id) on delete cascade,
+  name text not null default 'Main Branch',
+  address text,
+  is_main boolean not null default false,
+  created_at timestamptz not null default now()
+);
+alter table branches enable row level security;
+drop policy if exists "branches_select_own_shop" on branches;
+create policy "branches_select_own_shop" on branches for select using (shop_id = my_shop_id());
+-- Only the Owner restructures the branch list itself — a Manager can be
+-- scoped to a branch but never add/rename/remove one.
+drop policy if exists "branches_write_owner" on branches;
+create policy "branches_write_owner" on branches for all
+  using (shop_id = my_shop_id() and my_role() = 'owner')
+  with check (shop_id = my_shop_id() and my_role() = 'owner');
+
+insert into branches (shop_id, name, is_main)
+select id, 'Main Branch', true from shops
+where not exists (select 1 from branches b where b.shop_id = shops.id);
+
+alter table profiles add column if not exists branch_id uuid references branches(id) on delete set null;
+
+alter table profiles drop constraint if exists profiles_role_check;
+alter table profiles add constraint profiles_role_check check (role in ('owner', 'manager', 'cashier'));
+
+update profiles p set branch_id = b.id
+from branches b
+where b.shop_id = p.shop_id and b.is_main and p.branch_id is null and p.role <> 'owner';
+
+-- branch_id on every shop-scoped operational table — nullable, meaning
+-- "the shop's main/only branch" until a shop actually splits (see the
+-- read-side fallback in each page: `branch_id = my branch OR branch_id
+-- is null`).
+alter table items add column if not exists branch_id uuid references branches(id) on delete set null;
+alter table customers add column if not exists branch_id uuid references branches(id) on delete set null;
+alter table khata_entries add column if not exists branch_id uuid references branches(id) on delete set null;
+alter table suppliers add column if not exists branch_id uuid references branches(id) on delete set null;
+alter table supplier_entries add column if not exists branch_id uuid references branches(id) on delete set null;
+alter table purchase_orders add column if not exists branch_id uuid references branches(id) on delete set null;
+alter table expenses add column if not exists branch_id uuid references branches(id) on delete set null;
+alter table transactions add column if not exists branch_id uuid references branches(id) on delete set null;
+
+create index if not exists idx_branches_shop on branches(shop_id);
+create index if not exists idx_profiles_branch on profiles(branch_id);
+create index if not exists idx_items_branch on items(branch_id);
+
+create or replace function my_branch_id()
+returns uuid
+language sql
+security definer
+stable
+as $$
+  select branch_id from profiles where id = auth.uid()
+$$;
+
+-- NOTE on why this stays app-level, not RLS-level: items.stock is a
+-- single number per row (this schema never split one SKU into
+-- independent per-branch counts — see stock_transfers below for how a
+-- branch actually gets its own stock instead: a transfer moves qty from
+-- one item row to another, matched/created at the destination branch).
+-- A hard RLS branch filter would have to special-case every table's
+-- "null branch_id = visible everywhere" fallback identically to the
+-- app-level filter anyway, so there's no safety left on the table by
+-- duplicating it in Postgres too — shop_id (the real security boundary,
+-- unchanged) already stays RLS-enforced above.
+
+-- 15b. STOCK TRANSFERS (spec §25-E) — a transfer is 'pending' until the
+-- destination branch confirms receipt; confirming is the one moment
+-- stock actually moves — decrement the source item, increment (or
+-- create, matched by barcode/name) the equivalent item at the
+-- destination branch. Same "match existing or create" pattern AI
+-- Slip-Scan already uses for a brand-new item.
+create table if not exists stock_transfers (
+  id uuid primary key default gen_random_uuid(),
+  shop_id uuid not null references shops(id) on delete cascade,
+  source_branch_id uuid not null references branches(id) on delete cascade,
+  destination_branch_id uuid not null references branches(id) on delete cascade,
+  status text not null default 'pending' check (status in ('pending', 'confirmed', 'cancelled')),
+  note text,
+  initiated_by uuid references auth.users(id),
+  confirmed_by uuid references auth.users(id),
+  created_at timestamptz not null default now(),
+  confirmed_at timestamptz
+);
+create table if not exists stock_transfer_items (
+  id uuid primary key default gen_random_uuid(),
+  shop_id uuid not null references shops(id) on delete cascade,
+  transfer_id uuid not null references stock_transfers(id) on delete cascade,
+  item_id uuid not null references items(id) on delete cascade,
+  item_name text not null,
+  qty numeric not null
+);
+alter table stock_transfers enable row level security;
+alter table stock_transfer_items enable row level security;
+drop policy if exists "stock_transfers_own_shop" on stock_transfers;
+create policy "stock_transfers_own_shop" on stock_transfers for all
+  using (shop_id = my_shop_id() and my_role() in ('owner', 'manager'))
+  with check (shop_id = my_shop_id() and my_role() in ('owner', 'manager'));
+drop policy if exists "stock_transfer_items_own_shop" on stock_transfer_items;
+create policy "stock_transfer_items_own_shop" on stock_transfer_items for all
+  using (shop_id = my_shop_id() and my_role() in ('owner', 'manager'))
+  with check (shop_id = my_shop_id() and my_role() in ('owner', 'manager'));
+
+create index if not exists idx_stock_transfers_shop on stock_transfers(shop_id, created_at desc);
+create index if not exists idx_stock_transfer_items_transfer on stock_transfer_items(transfer_id);
+
+create or replace function initiate_stock_transfer(
+  p_source_branch_id uuid,
+  p_destination_branch_id uuid,
+  p_items jsonb,
+  p_note text default null
+)
+returns uuid
+language plpgsql
+security invoker
+as $$
+declare
+  v_shop_id uuid := my_shop_id();
+  v_transfer_id uuid;
+  v_line jsonb;
+begin
+  if p_source_branch_id = p_destination_branch_id then
+    raise exception 'source and destination must be different branches';
+  end if;
+  if jsonb_array_length(p_items) = 0 then
+    raise exception 'at least one item is required';
+  end if;
+
+  insert into stock_transfers (shop_id, source_branch_id, destination_branch_id, note, initiated_by)
+  values (v_shop_id, p_source_branch_id, p_destination_branch_id, p_note, auth.uid())
+  returning id into v_transfer_id;
+
+  for v_line in select * from jsonb_array_elements(p_items) loop
+    insert into stock_transfer_items (shop_id, transfer_id, item_id, item_name, qty)
+    values (v_shop_id, v_transfer_id, (v_line->>'item_id')::uuid, v_line->>'item_name', (v_line->>'qty')::numeric);
+  end loop;
+
+  return v_transfer_id;
+end;
+$$;
+
+create or replace function confirm_stock_transfer(p_transfer_id uuid)
+returns void
+language plpgsql
+security invoker
+as $$
+declare
+  v_shop_id uuid := my_shop_id();
+  v_transfer record;
+  v_line record;
+  v_dest_item_id uuid;
+  v_source_item record;
+begin
+  select * into v_transfer from stock_transfers where id = p_transfer_id and shop_id = v_shop_id;
+  if v_transfer is null then raise exception 'transfer not found'; end if;
+  if v_transfer.status <> 'pending' then raise exception 'transfer already %', v_transfer.status; end if;
+
+  for v_line in select * from stock_transfer_items where transfer_id = p_transfer_id loop
+    select * into v_source_item from items where id = v_line.item_id and shop_id = v_shop_id;
+    if v_source_item is null then continue; end if;
+
+    update items set stock = greatest(0, stock - v_line.qty) where id = v_line.item_id;
+
+    -- Match the destination branch's existing item by barcode (if this
+    -- item has one) or exact name, same lookup order Slip-Scan uses —
+    -- create a new row there only if genuinely nothing matches.
+    select id into v_dest_item_id from items
+    where shop_id = v_shop_id and branch_id = v_transfer.destination_branch_id
+      and ((v_source_item.barcode is not null and barcode = v_source_item.barcode) or name = v_source_item.name)
+    limit 1;
+
+    if v_dest_item_id is null then
+      insert into items (shop_id, branch_id, name, category, unit, stock, min_stock, price, cost_price, barcode)
+      values (v_shop_id, v_transfer.destination_branch_id, v_source_item.name, v_source_item.category, v_source_item.unit, v_line.qty, v_source_item.min_stock, v_source_item.price, v_source_item.cost_price, null)
+      returning id into v_dest_item_id;
+    else
+      update items set stock = stock + v_line.qty where id = v_dest_item_id;
+    end if;
+
+    insert into transactions (shop_id, branch_id, item_id, item_name, type, qty, unit, amount, created_by)
+    values (v_shop_id, v_transfer.source_branch_id, v_line.item_id, v_line.item_name, 'sale', v_line.qty, v_source_item.unit, 0, auth.uid());
+    insert into transactions (shop_id, branch_id, item_id, item_name, type, qty, unit, amount, created_by)
+    values (v_shop_id, v_transfer.destination_branch_id, v_dest_item_id, v_line.item_name, 'purchase', v_line.qty, v_source_item.unit, 0, auth.uid());
+  end loop;
+
+  update stock_transfers set status = 'confirmed', confirmed_by = auth.uid(), confirmed_at = now() where id = p_transfer_id;
+end;
+$$;
+
+create or replace function cancel_stock_transfer(p_transfer_id uuid)
+returns void
+language plpgsql
+security invoker
+as $$
+begin
+  update stock_transfers set status = 'cancelled'
+  where id = p_transfer_id and shop_id = my_shop_id() and status = 'pending';
+end;
+$$;
+
+-- handle_new_user(): supports invited_role ('manager' | 'cashier',
+-- app_metadata — same trust boundary as invited_shop_id) and lands an
+-- invited user on their shop's Main Branch by default; Owner's
+-- branch_id stays null (org-wide).
+create or replace function handle_new_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  new_shop_id uuid;
+  invited_shop_id uuid;
+  invited_role text;
+  invited_branch_id uuid;
+begin
+  invited_shop_id := nullif(new.raw_app_meta_data->>'invited_shop_id', '')::uuid;
+
+  if invited_shop_id is not null then
+    invited_role := coalesce(nullif(new.raw_app_meta_data->>'invited_role', ''), 'cashier');
+    if invited_role not in ('manager', 'cashier') then
+      invited_role := 'cashier';
+    end if;
+
+    select id into invited_branch_id from branches where shop_id = invited_shop_id and is_main limit 1;
+
+    insert into profiles (id, shop_id, branch_id, full_name, email, role)
+    values (new.id, invited_shop_id, invited_branch_id, new.raw_user_meta_data->>'full_name', new.email, invited_role);
+  else
+    insert into shops (name, owner_id)
+    values (coalesce(new.raw_user_meta_data->>'shop_name', 'Meri Dukaan'), new.id)
+    returning id into new_shop_id;
+
+    insert into branches (shop_id, name, is_main)
+    values (new_shop_id, 'Main Branch', true);
+
+    insert into profiles (id, shop_id, full_name, email, role)
+    values (new.id, new_shop_id, new.raw_user_meta_data->>'full_name', new.email, 'owner');
+  end if;
+
+  return new;
+end;
 $$;

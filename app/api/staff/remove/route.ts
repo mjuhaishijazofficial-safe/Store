@@ -29,7 +29,7 @@ export async function POST(req: Request) {
     .eq('id', staffId)
     .single();
 
-  if (!target || target.shop_id !== profile.shop_id || target.role !== 'staff') {
+  if (!target || target.shop_id !== profile.shop_id || target.role === 'owner') {
     return NextResponse.json({ error: 'not found' }, { status: 404 });
   }
 

@@ -24,7 +24,7 @@ function fmt(n: number) {
 export default function KhataPage() {
   const supabase = createClient();
   const { t } = useLang();
-  const { shopId } = useShop();
+  const { shopId, role, branchId } = useShop();
   const { showToast } = useToast();
   useSectionGuard('khata');
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -35,6 +35,7 @@ export default function KhataPage() {
   const [loading, setLoading] = useState(true);
   const [showingStale, setShowingStale] = useState(false);
   const [form, setForm] = useState({ name: '', phone: '', credit_limit: '' });
+  const [duplicateOf, setDuplicateOf] = useState<Customer | null>(null);
 
   useEffect(() => { loadAll(); }, [shopId]);
 
@@ -48,8 +49,14 @@ export default function KhataPage() {
     // pulling every ledger row across every customer to sum in JS —
     // this is what keeps the list fast no matter how many customers or
     // how much history a shop has.
+    // Manager sees their own branch's customers (spec §17/§20) — the
+    // balance/top-customer RPCs stay shop-wide for now (a small,
+    // disclosed gap: they're aggregates, not a list of records, lower
+    // risk than showing customer rows across branches).
+    let custQuery = supabase.from('customers').select('*').eq('shop_id', shopId);
+    if (role === 'manager' && branchId) custQuery = custQuery.or(`branch_id.eq.${branchId},branch_id.is.null`);
     const [{ data: custs, error: custErr }, { data: bals, error: balErr }, { data: top }] = await Promise.all([
-      supabase.from('customers').select('*').eq('shop_id', shopId).order('name'),
+      custQuery.order('name'),
       supabase.rpc('khata_balances', { p_shop_id: shopId }),
       supabase.rpc('khata_top_customers', { p_shop_id: shopId, p_limit: 5 })
     ]);
@@ -83,11 +90,25 @@ export default function KhataPage() {
 
   function openAdd() {
     setForm({ name: '', phone: '', credit_limit: '' });
+    setDuplicateOf(null);
     setModalOpen(true);
   }
 
-  async function saveCustomer() {
+  // Spec §33 edge case: suggest the existing customer instead of
+  // silently creating a second "Ali Traders" — same name (case/space
+  // insensitive) is the signal, not an exact string match, since that's
+  // how a shopkeeper would actually recognize a duplicate.
+  function findDuplicate(name: string) {
+    const q = name.trim().toLowerCase();
+    return customers.find(c => c.name.trim().toLowerCase() === q) || null;
+  }
+
+  async function saveCustomer(force = false) {
     if (!form.name.trim()) return;
+    if (!force) {
+      const dup = findDuplicate(form.name);
+      if (dup) { setDuplicateOf(dup); return; }
+    }
     const { error: err } = await supabase.from('customers').insert({
       shop_id: shopId,
       name: form.name.trim(),
@@ -96,6 +117,7 @@ export default function KhataPage() {
     });
     if (err) { showToast(t('common.error'), 'error'); return; }
     setModalOpen(false);
+    setDuplicateOf(null);
     await loadAll();
   }
 
@@ -169,8 +191,11 @@ export default function KhataPage() {
                 <div className="text-xs text-chalkdim">{c.phone || '—'}</div>
               </div>
               <div className="text-right">
+                {/* Spec §33 edge case: never rely on the +/- sign alone —
+                    label which direction the balance runs, same as the
+                    Customer Detail page already does. */}
+                <div className="text-[10px] text-chalkdim uppercase">{bal > 0 ? t('khataDetail.totalUdhaar') : bal < 0 ? t('khataDetail.advanceBalance') : ''}</div>
                 <div className={`font-mono font-700 ${bal > 0 ? 'text-mirch' : bal < 0 ? 'text-dhania' : 'text-chalkdim'}`}>{fmt(Math.abs(bal))}</div>
-                {bal < 0 && <div className="text-[10px] text-dhania">{t('khataDetail.advanceBalance')}</div>}
                 {over && <div className="text-[10px] text-mirch">{t('khata.overLimit')}</div>}
               </div>
             </Link>
@@ -188,10 +213,25 @@ export default function KhataPage() {
             <label className="block text-xs text-chalkdim mb-1">{t('khata.phone')}</label>
             <input className="input mb-3" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="03xx-xxxxxxx" />
             <label className="block text-xs text-chalkdim mb-1">{t('khata.creditLimit')}</label>
-            <input type="number" inputMode="decimal" className="input mb-5" value={form.credit_limit} onChange={e => setForm({ ...form, credit_limit: e.target.value })} />
+            <input type="number" inputMode="decimal" className="input mb-3" value={form.credit_limit} onChange={e => setForm({ ...form, credit_limit: e.target.value })} />
+
+            {duplicateOf && (
+              <div className="card p-3 mb-3 bg-board3">
+                <p className="text-xs text-haldi mb-2">{t('khata.duplicateWarning')}</p>
+                <div className="flex gap-2">
+                  <Link href={`/dashboard/khata/${duplicateOf.id}`} className="btn-secondary flex-1 text-center text-xs py-2">
+                    {t('khata.duplicateUseExisting')}
+                  </Link>
+                  <button onClick={() => saveCustomer(true)} className="btn-secondary flex-1 text-xs py-2">
+                    {t('khata.duplicateAddAnyway')}
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="flex gap-2">
               <button onClick={() => setModalOpen(false)} className="btn-secondary flex-1">{t('khata.cancel')}</button>
-              <button onClick={saveCustomer} className="btn-primary flex-1">{t('khata.save')}</button>
+              <button onClick={() => saveCustomer(false)} className="btn-primary flex-1">{t('khata.save')}</button>
             </div>
           </div>
         </div>

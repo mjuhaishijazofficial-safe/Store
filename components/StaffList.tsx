@@ -46,9 +46,9 @@ export default function StaffList({ staff }: { staff: StaffRow[] }) {
               </div>
               <div className="flex items-center gap-2">
                 <div className="text-xs px-2 py-1 rounded-full bg-board3 text-chalkdim">
-                  {s.role === 'owner' ? t('staff.roleOwner') : t('staff.roleStaff')}
+                  {s.role === 'owner' ? t('staff.roleOwner') : s.role === 'manager' ? t('staff.roleManager') : t('staff.roleCashier')}
                 </div>
-                {s.role === 'staff' && (
+                {s.role !== 'owner' && (
                   <button
                     onClick={e => { e.preventDefault(); setConfirming(s); }}
                     className="text-chalkdim text-xs hover:text-mirch"
@@ -60,7 +60,7 @@ export default function StaffList({ staff }: { staff: StaffRow[] }) {
             </>
           );
 
-          return s.role === 'staff' ? (
+          return s.role !== 'owner' ? (
             <Link key={s.id} href={`/dashboard/staff/${s.id}`} className="card p-3 px-4 flex justify-between items-center">
               {body}
             </Link>

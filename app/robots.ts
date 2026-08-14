@@ -10,7 +10,7 @@ export default function robots(): MetadataRoute.Robots {
       allow: '/',
       // Everything behind auth is per-shop data, not content — no reason
       // for a crawler to hit it, and the API routes are POST-only anyway.
-      disallow: ['/dashboard/', '/api/']
+      disallow: ['/dashboard/', '/admin/', '/api/']
     },
     sitemap: `${base}/sitemap.xml`
   };

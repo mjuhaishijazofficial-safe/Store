@@ -27,7 +27,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('shop_id, full_name, role, allowed_sections, shops(name, subscription_status, trial_ends_at, receipt_phone, receipt_footer)')
+    .select('shop_id, branch_id, full_name, role, allowed_sections, shops(name, subscription_status, trial_ends_at, receipt_phone, receipt_footer, cashier_discount_cap_percent, grace_ends_at)')
     .eq('id', user.id)
     .single();
 
@@ -38,11 +38,22 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   const shop: any = profile.shops;
   const isOwner = profile.role === 'owner';
+  const isManager = profile.role === 'manager';
+  const { data: branches } = await supabase.from('branches').select('id, name').eq('shop_id', profile.shop_id).order('is_main', { ascending: false });
+  const multiBranch = (branches || []).length > 1;
   const allowedSections = (profile.allowed_sections as string[] | null) ?? null;
   const trialExpired =
     shop?.subscription_status === 'trialing' &&
     new Date(shop?.trial_ends_at) < new Date();
-  const locked = shop?.subscription_status === 'canceled' || shop?.subscription_status === 'past_due' || shop?.subscription_status === 'suspended' || trialExpired;
+  // past_due on its own is the grace period itself (spec §25-H) — the
+  // shop stays fully functional, just warned, until either the payment
+  // recovers or app/api/cron/check-grace-periods flips it to
+  // 'suspended' once grace_ends_at passes. Only canceled/suspended/an
+  // expired trial actually go view-only.
+  const locked = shop?.subscription_status === 'canceled' || shop?.subscription_status === 'suspended' || trialExpired;
+  const graceDaysLeft = shop?.subscription_status === 'past_due' && shop?.grace_ends_at
+    ? Math.max(0, Math.ceil((new Date(shop.grace_ends_at).getTime() - Date.now()) / 86400000))
+    : null;
 
   const t = await getServerT();
 
@@ -50,7 +61,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   // The WhatsApp ping when someone taps "I've Paid" is real-time, but
   // it's easy to lose a message in a busy chat — this makes the count
   // visible every time the operator opens the dashboard for anything
-  // else, not just when they remember to check /dashboard/admin.
+  // else, not just when they remember to check /admin.
   let adminPendingCount = 0;
   if (isAdmin(user.email)) {
     const admin = createAdminClient();
@@ -66,6 +77,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
   // against (UI/workflow gating, not an RLS-level restriction).
   const nav = [
     { href: '/dashboard', label: t('nav.overview') },
+    // Billing/POS (Master Spec §17): the one screen every role gets,
+    // never section-gated — Owner, Manager and Cashier all bill a sale.
+    { href: '/dashboard/billing', label: t('nav.pos') },
     ...(hasSection(profile.role, allowedSections, 'inventory') ? [{ href: '/dashboard/inventory', label: t('nav.inventory') }] : []),
     ...(hasSection(profile.role, allowedSections, 'reorder') ? [{ href: '/dashboard/reorder', label: t('nav.reorder') }] : []),
     ...(hasSection(profile.role, allowedSections, 'khata') ? [{ href: '/dashboard/khata', label: t('nav.khata') }] : []),
@@ -75,27 +89,30 @@ export default async function DashboardLayout({ children }: { children: React.Re
     ] : []),
     ...(hasSection(profile.role, allowedSections, 'history') ? [{ href: '/dashboard/history', label: t('nav.history') }] : []),
     ...(hasSection(profile.role, allowedSections, 'expenses') ? [{ href: '/dashboard/expenses', label: t('nav.expenses') }] : []),
-    // billing/settings/staff/bank-reconciliation are owner-only — staff
+    // settings/staff/bank-reconciliation are owner-only — manager/cashier
     // never even see the tabs. Bank reconciliation isn't in the
     // allowed_sections list at all (see lib/permissions.ts) — it's the
-    // shop's real bank statement figures, role-gated like billing, not
-    // something a permission toggle should ever be able to hand to staff.
+    // shop's real bank statement figures, role-gated like subscription,
+    // not something a permission toggle should ever be able to hand out.
+    // Stock Transfer only once a shop actually has 2+ branches — a
+    // single-branch shop (the common case) never sees it at all.
+    ...((isOwner || isManager) && multiBranch ? [{ href: '/dashboard/stock-transfers', label: t('nav.stockTransfers') }] : []),
     ...(isOwner ? [
+      { href: '/dashboard/branches', label: t('nav.branches') },
       { href: '/dashboard/staff', label: t('nav.staff') },
-      { href: '/dashboard/billing', label: t('nav.billing') },
       { href: '/dashboard/bank-reconciliation', label: t('nav.bankReconciliation') },
       { href: '/dashboard/settings', label: t('nav.settings') }
     ] : []),
     // Not a shop role — this is the one link only the SaaS operator
     // (matched by ADMIN_EMAIL) ever sees, regardless of which shop
     // they're logged into or what role they hold in it.
-    ...(isAdmin(user.email) ? [{ href: '/dashboard/admin', label: t('nav.admin'), badge: adminPendingCount }] : [])
+    ...(isAdmin(user.email) ? [{ href: '/admin', label: t('nav.admin'), badge: adminPendingCount }] : [])
   ];
 
   const trialLabel = shop?.subscription_status === 'trialing' && !trialExpired ? t('billing.statusTrialing') : undefined;
 
   return (
-    <ShopProvider value={{ shopId: profile.shop_id, role: profile.role as 'owner' | 'staff', shopName: shop?.name || '', allowedSections, receiptPhone: shop?.receipt_phone || null, receiptFooter: shop?.receipt_footer || null }}>
+    <ShopProvider value={{ shopId: profile.shop_id, role: profile.role as 'owner' | 'manager' | 'cashier', shopName: shop?.name || '', allowedSections, receiptPhone: shop?.receipt_phone || null, receiptFooter: shop?.receipt_footer || null, cashierDiscountCapPercent: shop?.cashier_discount_cap_percent || 0, locked, branchId: profile.branch_id || null, branches: branches || [] }}>
       <ConnectionBanner />
       {/* Sidebar + main are flex siblings (not fixed+margin) so the
           sidebar's own collapse toggle reflows main content with no
@@ -117,7 +134,14 @@ export default async function DashboardLayout({ children }: { children: React.Re
             <div className="card p-5 mb-6 border-mirch">
               <div className="font-display text-lg text-mirch font-700 mb-1">{t('lock.title')}</div>
               <div className="text-chalkdim text-sm mb-3">{t('lock.body')}</div>
-              <Link href="/dashboard/billing" className="btn-primary inline-block">{t('lock.cta')}</Link>
+              <Link href="/dashboard/settings/subscription" className="btn-primary inline-block">{t('lock.cta')}</Link>
+            </div>
+          )}
+          {graceDaysLeft !== null && (
+            <div className="card p-5 mb-6 border-haldi">
+              <div className="font-display text-lg text-haldi font-700 mb-1">{t('lock.graceTitle')}</div>
+              <div className="text-chalkdim text-sm mb-3">{t('lock.graceBody').replace('{days}', String(graceDaysLeft))}</div>
+              <Link href="/dashboard/settings/subscription" className="btn-primary inline-block">{t('lock.cta')}</Link>
             </div>
           )}
           <AppLockGate>{children}</AppLockGate>

@@ -16,11 +16,16 @@ function fmt(n: number) {
 export default function NewPurchaseOrderModal({
   suppliers,
   items,
+  initialLine,
   onClose,
   onCreated
 }: {
   suppliers: Supplier[];
   items: SourceItem[];
+  // Smart Reorder's "1-tap send to stock-in" (spec §29) pre-fills one
+  // line so the owner lands here with the suggested item/quantity
+  // already in the cart, instead of having to search for it again.
+  initialLine?: { itemId: string; name: string; unit: string | null; qty: number; costPrice: number };
   onClose: () => void;
   onCreated: (poId: string) => void;
 }) {
@@ -31,7 +36,7 @@ export default function NewPurchaseOrderModal({
   const [supplierId, setSupplierId] = useState(suppliers[0]?.id || '');
   const [note, setNote] = useState('');
   const [search, setSearch] = useState('');
-  const [lines, setLines] = useState<Line[]>([]);
+  const [lines, setLines] = useState<Line[]>(() => initialLine ? [initialLine] : []);
   // A line typed by hand (not picked from inventory) — covers a brand
   // new item the shop has never stocked before; it lands on the PO with
   // item_id null, so mark_po_received records its ledger amount but

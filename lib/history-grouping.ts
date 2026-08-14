@@ -15,6 +15,12 @@ export type HistoryLog = {
   amount: number;
   created_at: string;
   sale_ref: string | null;
+  // Set only on a row logged by a Khata-mode sale (see
+  // record_khata_entry in supabase/schema.sql) — marks that returning
+  // this row needs to reverse the customer's owed balance too, not just
+  // restock the item. Optional so existing call sites/tests that don't
+  // care about Khata still construct a valid HistoryLog.
+  customer_id?: string | null;
 };
 
 export type HistoryGroup = { key: string; rows: HistoryLog[] };

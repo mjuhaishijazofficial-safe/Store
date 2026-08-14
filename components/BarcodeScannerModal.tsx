@@ -23,12 +23,27 @@ export default function BarcodeScannerModal({
   const videoRef = useRef<HTMLVideoElement>(null);
   const [error, setError] = useState('');
   const [manualCode, setManualCode] = useState('');
+  // Spec §33 edge case: a barcode scanned twice in quick succession
+  // shouldn't fire onDetected twice. Every call site closes this modal
+  // the instant it fires (unmounting stops the scan loop), which
+  // handles it in practice — this guard only covers the narrow race
+  // where the ZXing fallback path (continuous decode, used on
+  // Firefox/Safari where the native BarcodeDetector doesn't exist)
+  // decodes the same still-in-frame code again before that unmount
+  // actually lands.
+  const firedRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
     let rafId: number | undefined;
     let stream: MediaStream | null = null;
     let zxingControls: IScannerControls | undefined;
+
+    function fireOnce(code: string) {
+      if (firedRef.current) return;
+      firedRef.current = true;
+      onDetected(code);
+    }
 
     // Chrome/Edge ship a native BarcodeDetector — it's the browser's own
     // ML-based scanner (on Chrome this is backed by the same detection
@@ -49,7 +64,7 @@ export default function BarcodeScannerModal({
         try {
           const codes = await detector.detect(videoRef.current);
           if (codes && codes.length > 0) {
-            onDetected(codes[0].rawValue);
+            fireOnce(codes[0].rawValue);
             return;
           }
         } catch {
@@ -66,7 +81,7 @@ export default function BarcodeScannerModal({
       await reader.decodeFromConstraints(CAMERA_CONSTRAINTS, videoRef.current!, (result, err, ctrls) => {
         zxingControls = ctrls;
         if (cancelled) return;
-        if (result) onDetected(result.getText());
+        if (result) fireOnce(result.getText());
       });
     }
 
