@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useLang } from '@/lib/i18n-context';
 import { useShop } from '@/lib/shop-context';
 import { useToast } from '@/lib/toast-context';
-import { downloadCsv } from '@/lib/csv';
+import { downloadCsv, parseCsv } from '@/lib/csv';
 import { saveCache, loadCache } from '@/lib/offline-cache';
 import { useSectionGuard } from '@/lib/use-section-guard';
 
@@ -36,6 +36,12 @@ export default function KhataPage() {
   const [showingStale, setShowingStale] = useState(false);
   const [form, setForm] = useState({ name: '', phone: '', credit_limit: '' });
   const [duplicateOf, setDuplicateOf] = useState<Customer | null>(null);
+  // Bulk import (spec §25-J): parsed rows sit in a preview the Owner
+  // must confirm before anything is written — never insert straight off
+  // a file select, since a mis-mapped column would otherwise silently
+  // create wrong opening balances for every customer at once.
+  const [importPreview, setImportPreview] = useState<{ name: string; phone: string; opening_balance: number }[] | null>(null);
+  const [importing, setImporting] = useState(false);
 
   useEffect(() => { loadAll(); }, [shopId]);
 
@@ -137,6 +143,67 @@ export default function KhataPage() {
     );
   }
 
+  // Purane register/Excel se switch karne walon ke liye (spec §25-J) —
+  // parses into a preview only, nothing written until confirmImport.
+  function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+
+    file.text().then(text => {
+      const rows = parseCsv(text);
+      const preview = rows
+        .map(row => ({
+          name: (row.name || '').trim(),
+          phone: (row.phone || '').trim(),
+          opening_balance: Number(row.opening_balance || row.balance) || 0
+        }))
+        .filter(r => r.name);
+      if (preview.length === 0) {
+        showToast(t('khata.importEmpty'), 'error');
+        return;
+      }
+      setImportPreview(preview);
+    });
+  }
+
+  async function confirmImport() {
+    if (!importPreview || !shopId) return;
+    setImporting(true);
+    let ok = 0;
+    let failed = 0;
+    for (const row of importPreview) {
+      const { data: created, error: custErr } = await supabase
+        .from('customers')
+        .insert({ shop_id: shopId, branch_id: branchId, name: row.name, phone: row.phone || null })
+        .select('id')
+        .single();
+      if (custErr || !created) { failed++; continue; }
+
+      // Balance itself is never a stored column (see khata_balances RPC)
+      // — an opening balance is just the customer's first ledger entry.
+      // Positive = they owe (purchase), negative = they're paid ahead
+      // (payment), same sign convention khata_balances already sums.
+      if (row.opening_balance !== 0) {
+        await supabase.from('khata_entries').insert({
+          shop_id: shopId,
+          customer_id: created.id,
+          type: row.opening_balance > 0 ? 'purchase' : 'payment',
+          amount: Math.abs(row.opening_balance),
+          note: t('khata.importedOpeningBalance')
+        });
+      }
+      ok++;
+    }
+    setImporting(false);
+    setImportPreview(null);
+    await loadAll();
+
+    if (ok > 0 && failed === 0) showToast(t('inventory.importDone').replace('{n}', String(ok)), 'success');
+    else if (ok > 0 && failed > 0) showToast(t('inventory.importPartial').replace('{ok}', String(ok)).replace('{fail}', String(failed)), 'error');
+    else showToast(t('inventory.importFailed'), 'error');
+  }
+
   return (
     <div>
       <div className="flex gap-2 mb-2">
@@ -144,9 +211,15 @@ export default function KhataPage() {
         <button onClick={openAdd} className="btn-primary whitespace-nowrap">{t('khata.addCustomer')}</button>
       </div>
 
-      {customers.length > 0 && (
-        <button onClick={exportCsv} className="text-chalkdim text-xs underline mb-4 block">{t('common.exportCsv')}</button>
-      )}
+      <div className="flex gap-4 mb-4">
+        {customers.length > 0 && (
+          <button onClick={exportCsv} className="text-chalkdim text-xs underline">{t('common.exportCsv')}</button>
+        )}
+        <label className="text-chalkdim text-xs underline cursor-pointer">
+          {t('khata.importCsv')}
+          <input type="file" accept=".csv" className="hidden" onChange={handleImportFile} />
+        </label>
+      </div>
 
       {!loading && topCustomers.length > 0 && (
         <>
@@ -232,6 +305,33 @@ export default function KhataPage() {
             <div className="flex gap-2">
               <button onClick={() => setModalOpen(false)} className="btn-secondary flex-1">{t('khata.cancel')}</button>
               <button onClick={() => saveCustomer(false)} className="btn-primary flex-1">{t('khata.save')}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Import preview (spec §25-J) — nothing is written until confirmed */}
+      {importPreview && (
+        <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50" onClick={() => !importing && setImportPreview(null)}>
+          <div className="card w-full max-w-md p-5 rounded-b-none sm:rounded-b-2xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="font-display text-lg text-haldi font-700 mb-1">{t('khata.importPreviewTitle')}</div>
+            <p className="text-chalkdim text-xs mb-3">{t('khata.importPreviewCount').replace('{n}', String(importPreview.length))}</p>
+            <div className="flex-1 overflow-y-auto -mx-1 px-1 mb-3">
+              <div className="card divide-y divide-chalk/10">
+                {importPreview.map((r, i) => (
+                  <div key={i} className="p-2.5 px-3 flex justify-between items-center text-sm">
+                    <div>
+                      <div className="font-600">{r.name}</div>
+                      <div className="text-xs text-chalkdim">{r.phone || '—'}</div>
+                    </div>
+                    <div className={`font-mono text-xs ${r.opening_balance > 0 ? 'text-mirch' : r.opening_balance < 0 ? 'text-dhania' : 'text-chalkdim'}`}>{fmt(r.opening_balance)}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => setImportPreview(null)} disabled={importing} className="btn-secondary flex-1">{t('khata.cancel')}</button>
+              <button onClick={confirmImport} disabled={importing} className="btn-primary flex-1">{importing ? t('inventory.importing') : t('khata.importConfirm')}</button>
             </div>
           </div>
         </div>

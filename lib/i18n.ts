@@ -436,6 +436,12 @@ export const dict = {
   'khata.duplicateWarning': { ur: 'Ye customer already system mein hai — wahi select karein?', en: 'This customer already exists — select them instead?' },
   'khata.duplicateUseExisting': { ur: 'Existing Customer Kholein', en: 'Open Existing Customer' },
   'khata.duplicateAddAnyway': { ur: 'Phir Bhi Naya Add Karein', en: 'Add as New Anyway' },
+  'khata.importCsv': { ur: 'Purana Data Import Karein (CSV)', en: 'Import Old Data (CSV)' },
+  'khata.importEmpty': { ur: 'File mein koi valid row nahi mili', en: 'No valid rows found in the file' },
+  'khata.importedOpeningBalance': { ur: 'Opening Balance (Imported)', en: 'Opening Balance (Imported)' },
+  'khata.importPreviewTitle': { ur: 'Import Preview', en: 'Import Preview' },
+  'khata.importPreviewCount': { ur: '{n} customer(s) import honge — confirm karein data sahi hai', en: '{n} customer(s) will be imported — confirm the data looks right' },
+  'khata.importConfirm': { ur: 'Import Confirm Karein', en: 'Confirm Import' },
 
   // khata detail
   'khataDetail.back': { ur: '← Sab Customers', en: '← All Customers' },
