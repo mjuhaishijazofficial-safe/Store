@@ -14,6 +14,7 @@ import SaleCartModal from '@/components/SaleCartModal';
 import { saveCache, loadCache } from '@/lib/offline-cache';
 import { generateInternalBarcode, isValidEan13 } from '@/lib/barcode';
 import { useSectionGuard } from '@/lib/use-section-guard';
+import { CartIcon } from '@/components/icons';
 
 type Item = {
   id: string;
@@ -54,6 +55,7 @@ export default function InventoryPage() {
   const [printLabel, setPrintLabel] = useState<{ code: string; name: string } | null>(null);
   const [cartOpen, setCartOpen] = useState(false);
   const [savingItem, setSavingItem] = useState(false);
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
 
   const [form, setForm] = useState({ name: '', category: '', unit: '', stock: 0, min_stock: 0, price: 0, cost_price: 0, barcode: '', expiry_date: '' });
   const [moveForm, setMoveForm] = useState({ qty: 0, amount: 0 });
@@ -246,7 +248,16 @@ export default function InventoryPage() {
     }
   }
 
-  const filtered = items.filter(i => i.name.toLowerCase().includes(search.toLowerCase()));
+  // Figma match (Mobile UI brief Inventory screen) — category pill row
+  // above the list, derived from whatever categories this shop's own
+  // items actually use rather than a fixed list, since every shop's
+  // categories are different.
+  const categories = [...new Set(items.map(i => i.category?.trim()).filter((c): c is string => !!c))].sort();
+  const filtered = items
+    .filter(i => i.name.toLowerCase().includes(search.toLowerCase()))
+    .filter(i => !categoryFilter || i.category === categoryFilter);
+  const lowStockCount = items.filter(i => i.stock > 0 && i.stock <= i.min_stock).length;
+  const outOfStockCount = items.filter(i => i.stock <= 0).length;
 
   function exportCsv() {
     downloadCsv(
@@ -318,16 +329,36 @@ export default function InventoryPage() {
 
   return (
     <div>
+      <div className="flex justify-between items-center mb-4">
+        <h1 className="font-display text-xl font-700">{t('nav.inventory')}</h1>
+        <button onClick={() => openAdd()} className="btn-primary text-sm px-4 py-2">{t('inventory.addNew')}</button>
+      </div>
+
+      {/* Figma stat row — Total Products / Low Stock / Out of Stock */}
+      <div className="grid grid-cols-3 gap-2 mb-4">
+        <div className="card p-3 text-center"><div className="font-mono font-700 text-lg">{items.length}</div><div className="text-[10px] text-chalkdim mt-0.5">{t('inventory.totalProducts')}</div></div>
+        <div className="card p-3 text-center"><div className="font-mono font-700 text-lg text-haldi">{lowStockCount}</div><div className="text-[10px] text-chalkdim mt-0.5">{t('inventory.lowStock')}</div></div>
+        <div className="card p-3 text-center"><div className="font-mono font-700 text-lg text-mirch">{outOfStockCount}</div><div className="text-[10px] text-chalkdim mt-0.5">{t('inventory.outOfStock')}</div></div>
+      </div>
+
       {/* A real customer visit is almost never one item — this is the
           primary "ring up a sale" path; the per-item Stock Out button
           further down stays for quick single-item corrections. */}
       <button onClick={() => setCartOpen(true)} className="btn-primary w-full mb-3 text-base py-3">{t('cart.newSale')}</button>
 
-      <div className="flex gap-2 mb-2">
+      <div className="flex gap-2 mb-3">
         <input className="input flex-1" placeholder={t('inventory.search')} value={search} onChange={e => setSearch(e.target.value)} />
         <button onClick={() => setScannerOpen(true)} className="btn-secondary whitespace-nowrap">{t('inventory.scan')}</button>
-        <button onClick={() => openAdd()} className="btn-primary whitespace-nowrap">{t('inventory.addNew')}</button>
       </div>
+
+      {categories.length > 0 && (
+        <div className="flex gap-2 mb-3 overflow-x-auto pb-1">
+          <button onClick={() => setCategoryFilter(null)} className={`text-xs px-3 py-1.5 rounded-full border whitespace-nowrap shrink-0 ${!categoryFilter ? 'border-haldi text-haldi font-700' : 'border-chalk/15 text-chalkdim'}`}>{t('inventory.allCategories')}</button>
+          {categories.map(c => (
+            <button key={c} onClick={() => setCategoryFilter(c)} className={`text-xs px-3 py-1.5 rounded-full border whitespace-nowrap shrink-0 ${categoryFilter === c ? 'border-haldi text-haldi font-700' : 'border-chalk/15 text-chalkdim'}`}>{c}</button>
+          ))}
+        </div>
+      )}
 
       <div className="flex gap-4 mb-4">
         {items.length > 0 && (
@@ -352,30 +383,39 @@ export default function InventoryPage() {
 
       <div className="space-y-2">
         {filtered.map(it => {
-          const low = it.stock <= it.min_stock;
+          const low = it.stock > 0 && it.stock <= it.min_stock;
+          const out = it.stock <= 0;
           const daysToExpiry = it.expiry_date ? Math.ceil((new Date(it.expiry_date).getTime() - Date.now()) / 86400000) : null;
           const expiringSoon = daysToExpiry != null && daysToExpiry <= 30;
           return (
-            <div key={it.id} className={`card p-4 ${low || expiringSoon ? 'border-mirch' : ''}`}>
-              <div className="flex justify-between items-start">
-                <div>
-                  <div className="font-700">{it.name}</div>
-                  <div className="text-xs text-chalkdim">
-                    {it.category || '—'}
-                    {it.barcode && isValidEan13(it.barcode) && (
-                      <button onClick={() => setPrintLabel({ code: it.barcode!, name: it.name })} className="ml-2 text-chalkdim hover:text-haldi underline">
-                        {t('inventory.printLabel')}
-                      </button>
-                    )}
+            <div key={it.id} className={`card p-4 ${low || out || expiringSoon ? 'border-mirch' : ''}`}>
+              <div className="flex justify-between items-start gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-10 h-10 rounded-full bg-haldi/15 text-haldi flex items-center justify-center shrink-0">
+                    <CartIcon className="w-5 h-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="font-700 truncate">{it.name}</div>
+                    <div className="text-xs text-chalkdim truncate">
+                      {it.category || '—'} · {t('inventory.stockLabel')}:{it.stock}
+                      {it.barcode && isValidEan13(it.barcode) && (
+                        <button onClick={() => setPrintLabel({ code: it.barcode!, name: it.name })} className="ml-2 text-chalkdim hover:text-haldi underline">
+                          {t('inventory.printLabel')}
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
-                <div className={`font-mono font-700 text-right ${low ? 'text-mirch' : ''}`}>
-                  {it.stock} <span className="block text-[10px] font-normal text-chalkdim">{it.unit}</span>
+                <div className="text-right shrink-0">
+                  <div className="font-mono font-700">{fmt(it.price)}</div>
+                  {out ? (
+                    <div className="text-[10px] text-mirch font-700">{t('inventory.outOfStock')}</div>
+                  ) : low ? (
+                    <div className="text-[10px] text-haldi font-700">{t('inventory.lowStock')}</div>
+                  ) : (
+                    <div className="text-[10px] text-chalkdim">{t('inventory.buyLabel')}:{fmt(it.cost_price)}</div>
+                  )}
                 </div>
-              </div>
-              <div className="flex justify-between text-xs text-chalkdim mt-2">
-                <span>{t('inventory.alertLevel')}: {it.min_stock}</span>
-                <span>{fmt(it.price)} / {it.unit}</span>
               </div>
               {expiringSoon && (
                 <div className="text-[11px] text-mirch mt-1">

@@ -295,6 +295,12 @@ export const dict = {
   // inventory
   'inventory.search': { ur: 'Saman dhoondein...', en: 'Search items...' },
   'inventory.addNew': { ur: '+ Naya', en: '+ New' },
+  'inventory.totalProducts': { ur: 'Total Products', en: 'Total Products' },
+  'inventory.lowStock': { ur: 'Low Stock', en: 'Low Stock' },
+  'inventory.outOfStock': { ur: 'Out of Stock', en: 'Out of Stock' },
+  'inventory.allCategories': { ur: 'All', en: 'All' },
+  'inventory.stockLabel': { ur: 'Stock', en: 'Stock' },
+  'inventory.buyLabel': { ur: 'Buy', en: 'Buy' },
   'inventory.loading': { ur: 'Load ho raha hai...', en: 'Loading...' },
   'inventory.emptyTitle': { ur: 'Koi saman nahi mila', en: 'No items found' },
   'inventory.emptyBody': { ur: '"+ Naya" par tap kar ke item add karein', en: 'Tap "+ New" to add an item' },
