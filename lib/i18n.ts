@@ -32,6 +32,7 @@ export const dict = {
   'nav.bankReconciliation': { ur: 'Bank Milaan', en: 'Bank Reconciliation' },
   'nav.menu': { ur: 'Menu', en: 'Menu' },
   'nav.collapse': { ur: 'Sidebar Chhota Karein', en: 'Collapse sidebar' },
+  'nav.more': { ur: 'More', en: 'More' },
   'nav.admin': { ur: 'Admin', en: 'Admin' },
   'nav.expenses': { ur: 'Kharche', en: 'Expenses' },
   'nav.settings': { ur: 'Settings', en: 'Settings' },

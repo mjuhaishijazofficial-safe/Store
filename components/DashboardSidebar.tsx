@@ -7,7 +7,7 @@ import { useLang } from '@/lib/i18n-context';
 import SignOutButton from './SignOutButton';
 import {
   StoreIcon, ChartIcon, CartIcon, ReceiptIcon, WalletIcon, CashIcon, ClockIcon,
-  TrendDownIcon, WarningIcon, PersonIcon, GearIcon, MenuIcon, CollapseIcon
+  TrendDownIcon, WarningIcon, PersonIcon, GearIcon, CollapseIcon, MoreIcon
 } from './icons';
 
 type NavItem = { href: string; label: string; badge?: number };
@@ -119,22 +119,20 @@ export default function DashboardSidebar({ items, shopName, trialLabel }: { item
     );
   }
 
+  // Bottom tab bar (Figma mobile brief §5/§6) replaces the old top
+  // hamburger bar as mobile's primary nav — a native-app bottom bar
+  // reads truer to the mockups than a slide-in drawer for the handful
+  // of screens someone actually jumps between constantly. First 4 nav
+  // items (already role-filtered — Dashboard/Billing lead for a
+  // Cashier, Dashboard/Inventory/Khata/Reports for an Owner) get their
+  // own tab; everything else (Suppliers, Staff, Settings, Admin, ...)
+  // stays reachable through "More", which opens the exact same drawer
+  // the old hamburger did — nothing lost, just re-prioritized.
+  const primaryItems = items.slice(0, 4);
+  const overflowItems = items.slice(4);
+
   return (
     <>
-      {/* Mobile top bar — hamburger opens the drawer version of this
-          same sidebar content below 1024px. */}
-      <div className="lg:hidden flex items-center justify-between px-3 py-2 border-b border-chalk/10 no-print">
-        <button
-          onClick={() => setMobileOpen(true)}
-          aria-label={t('nav.menu')}
-          className="w-11 h-11 flex items-center justify-center -ml-1 shrink-0"
-        >
-          <MenuIcon className="w-6 h-6" />
-        </button>
-        <div className="font-display font-800 text-haldi truncate">{shopName || 'Dukaan ERP'}</div>
-        <div className="w-11 shrink-0" />
-      </div>
-
       {mobileOpen && (
         <div className="lg:hidden fixed inset-0 z-50 flex no-print">
           <div className="absolute inset-0 bg-black/60" onClick={() => setMobileOpen(false)} />
@@ -161,6 +159,37 @@ export default function DashboardSidebar({ items, shopName, trialLabel }: { item
           <CollapseIcon className={`w-3.5 h-3.5 transition-transform ${collapsed ? 'rotate-180' : ''}`} />
         </button>
       </aside>
+
+      {/* Mobile bottom tab bar — id used by app/dashboard/layout.tsx to
+          size main's bottom padding so the last card never sits behind
+          this fixed bar. */}
+      <nav id="mobile-bottom-nav" className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-board2 border-t border-chalk/10 no-print flex items-stretch" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+        {primaryItems.map(n => {
+          const active = isActive(n.href);
+          const Icon = iconFor(n.href);
+          return (
+            <Link
+              key={n.href}
+              href={n.href}
+              className={`relative flex-1 flex flex-col items-center justify-center gap-0.5 py-2 min-h-[56px] ${active ? 'text-haldi' : 'text-chalkdim'}`}
+            >
+              <Icon className="w-5 h-5" />
+              <span className={`text-[10px] truncate max-w-full px-1 ${active ? 'font-700' : ''}`}>{n.label}</span>
+              {!!n.badge && <span className="absolute top-1 right-1/4 w-2 h-2 rounded-full bg-mirch" />}
+            </Link>
+          );
+        })}
+        {overflowItems.length > 0 && (
+          <button
+            onClick={() => setMobileOpen(true)}
+            className="relative flex-1 flex flex-col items-center justify-center gap-0.5 py-2 min-h-[56px] text-chalkdim"
+          >
+            <MoreIcon className="w-5 h-5" />
+            <span className="text-[10px]">{t('nav.more')}</span>
+            {overflowItems.some(n => !!n.badge) && <span className="absolute top-1 right-1/4 w-2 h-2 rounded-full bg-mirch" />}
+          </button>
+        )}
+      </nav>
     </>
   );
 }

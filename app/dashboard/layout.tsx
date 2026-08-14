@@ -140,7 +140,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <div className="lg:flex min-h-screen">
         <DashboardSidebar items={nav} shopName={shop?.name || ''} trialLabel={trialLabel} />
 
-        <main className="flex-1 min-w-0 px-4 sm:px-6 py-6 max-w-5xl mx-auto w-full">
+        {/* pb-24 clears the fixed mobile bottom tab bar (DashboardSidebar's
+            #mobile-bottom-nav) — lg:pb-6 drops it back to normal on
+            desktop, where that bar doesn't render at all. */}
+        <main className="flex-1 min-w-0 px-4 sm:px-6 py-6 pb-24 lg:pb-6 max-w-5xl mx-auto w-full">
           {/* Theme/language toggles live here — top-right of every
               dashboard page's content — rather than in the sidebar
               footer, which now stays just the trial badge + a centered
