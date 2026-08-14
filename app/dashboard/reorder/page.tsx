@@ -63,10 +63,20 @@ export default async function ReorderPage() {
     .filter((i: any) => i.daysLeft <= EXPIRY_WARNING_DAYS)
     .sort((a: any, b: any) => a.daysLeft - b.daysLeft);
 
+  const itemsById = new Map((items || []).map((i: any) => [i.id, i]));
+  const urgentCount = low.length + smart.length;
+
   return (
     <div>
       <h1 className="font-display text-xl font-700 mb-1">{t('reorder.title')}</h1>
-      <p className="text-chalkdim text-sm mb-5">{low.length} {t('reorder.subtitle')}</p>
+      <p className="text-chalkdim text-sm mb-4">{t('reorder.aiSubtitle')}</p>
+
+      {urgentCount > 0 && (
+        <div className="card p-3 mb-5 flex items-center gap-2 border-haldi/40 bg-haldi/5">
+          <span className="text-haldi">⚡</span>
+          <span className="text-sm font-700 text-haldi">{t('reorder.urgentBanner').replace('{n}', String(urgentCount))}</span>
+        </div>
+      )}
 
       {low.length === 0 && smart.length === 0 && expiring.length === 0 && (
         <div className="text-center py-14 text-chalkdim text-sm">
@@ -75,6 +85,7 @@ export default async function ReorderPage() {
         </div>
       )}
 
+      {low.length > 0 && <div className="text-[11px] text-chalkdim uppercase tracking-wide mb-2">{t('reorder.needsRestocking')}</div>}
       <div className="space-y-2">
         {low.map((it: any) => {
           const needed = Math.max(it.min_stock * 2 - it.stock, it.min_stock);
@@ -104,44 +115,50 @@ export default async function ReorderPage() {
           <h2 className="font-display text-lg font-700 mb-1 text-haldi">{t('reorder.smartTitle')}</h2>
           <p className="text-chalkdim text-xs mb-3">{t('reorder.smartSubtitle')}</p>
           <div className="space-y-2">
-            {smart.map((p: any) => (
-              <div key={p.item_id} className="card p-4 border-haldi/40">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <div className="font-700">{p.item_name}</div>
-                    <div className="text-xs text-chalkdim">
-                      {p.stock} {p.unit} · {Number(p.avg_daily_sale).toFixed(1)}{t('reorder.dailyRate')}
+            {smart.map((p: any) => {
+              const daysLeft = Math.max(0, Math.floor(p.days_remaining));
+              // Figma's Fast/Medium speed badge — a direct read of the
+              // same days-remaining prediction already driving this
+              // section, not a separate signal.
+              const speed = daysLeft <= 3 ? 'fast' : 'medium';
+              const lastPrice = itemsById.get(p.item_id)?.cost_price;
+              return (
+                <div key={p.item_id} className="card p-4 border-haldi/40">
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <div className="font-700">{p.item_name}</div>
+                      <div className="text-xs text-chalkdim">{t('reorder.lowStockLabel')}:{p.stock} {p.unit}</div>
                     </div>
+                    <span className={`text-[10px] uppercase px-2 py-0.5 rounded-full border shrink-0 ${speed === 'fast' ? 'border-mirch/40 text-mirch' : 'border-haldi/40 text-haldi'}`}>
+                      {speed === 'fast' ? t('reorder.speedFast') : t('reorder.speedMedium')}
+                    </span>
                   </div>
-                  <div className="font-mono font-700 text-right text-haldi">
-                    {Math.max(0, Math.floor(p.days_remaining))}
-                    <span className="block text-[10px] font-normal text-chalkdim">{t('reorder.daysLeft')}</span>
+
+                  {/* Reason line (spec §29 UI requirement) — explains the
+                      suggestion instead of showing a bare number. */}
+                  <div className="text-[11px] text-chalkdim mb-2">
+                    {t('reorder.reasonLine')
+                      .replace('{rate}', Number(p.avg_daily_sale).toFixed(1))
+                      .replace('{unit}', p.unit || '')
+                      .replace('{stock}', String(p.stock))}
                   </div>
-                </div>
-                {/* Reason line (spec §29 UI requirement) — explains the
-                    suggestion instead of showing a bare number. */}
-                <div className="text-[11px] text-chalkdim mt-2">
-                  {t('reorder.reasonLine')
-                    .replace('{rate}', Number(p.avg_daily_sale).toFixed(1))
-                    .replace('{unit}', p.unit || '')
-                    .replace('{stock}', String(p.stock))}
-                </div>
-                {p.suggestedQty > 0 && (
-                  <div className="flex justify-between items-center mt-3 pt-2 border-t border-chalk/10">
-                    <div className="text-xs">
-                      <span className="text-chalkdim">{t('reorder.suggestedQty')}: </span>
-                      <span className="font-mono font-700">{p.suggestedQty} {p.unit}</span>
-                    </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs mb-3">
+                    <div><div className="text-chalkdim">{t('reorder.suggestedQty')}</div><div className="font-mono font-700">{p.suggestedQty} {p.unit}</div></div>
+                    {lastPrice != null && <div><div className="text-chalkdim">{t('reorder.lastPrice')}</div><div className="font-mono font-700">{fmt(lastPrice)}</div></div>}
+                  </div>
+
+                  {p.suggestedQty > 0 && (
                     <Link
                       href={`/dashboard/purchase-orders?reorderItem=${p.item_id}&reorderQty=${p.suggestedQty}`}
-                      className="text-xs text-haldi hover:underline shrink-0"
+                      className="btn-primary w-full text-center text-sm py-2 block"
                     >
-                      {t('reorder.sendToStockIn')}
+                      {t('reorder.orderNow')}
                     </Link>
-                  </div>
-                )}
-              </div>
-            ))}
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

@@ -449,6 +449,14 @@ export const dict = {
   'reorder.reasonLine': { ur: 'Pichle 30 din mein roz {rate} {unit} bike, sirf {stock} baki hain', en: 'Sold ~{rate} {unit}/day over the last 30 days — only {stock} left' },
   'reorder.suggestedQty': { ur: 'Suggested Order', en: 'Suggested Order' },
   'reorder.sendToStockIn': { ur: 'Stock-in Bhejein →', en: 'Send to Stock-in →' },
+  'reorder.aiSubtitle': { ur: 'AI suggestions bikri ki raftaar ke hisaab se', en: 'AI suggestions based on sales velocity' },
+  'reorder.urgentBanner': { ur: '{n} products ko turant restock karna hai', en: '{n} products need urgent restocking' },
+  'reorder.needsRestocking': { ur: 'RESTOCK KARNA HAI', en: 'NEEDS RESTOCKING' },
+  'reorder.lowStockLabel': { ur: 'Low Stock', en: 'Low Stock' },
+  'reorder.speedFast': { ur: 'Fast', en: 'Fast' },
+  'reorder.speedMedium': { ur: 'Medium', en: 'Medium' },
+  'reorder.lastPrice': { ur: 'Last Price', en: 'Last Price' },
+  'reorder.orderNow': { ur: 'Order Now', en: 'Order Now' },
 
   // history
   'history.title': { ur: 'History — Purchases & Bikri', en: 'History — Purchases & Sales' },
