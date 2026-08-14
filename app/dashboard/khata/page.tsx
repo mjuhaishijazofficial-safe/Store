@@ -43,6 +43,18 @@ export default function KhataPage() {
   // create wrong opening balances for every customer at once.
   const [importPreview, setImportPreview] = useState<{ name: string; phone: string; opening_balance: number }[] | null>(null);
   const [importing, setImporting] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'unpaid' | 'paid'>('all');
+  // Figma match — "Add Credit"/"Record Payment" at the top of the list
+  // itself, not buried behind opening a customer's own detail page
+  // first. Reuses record_khata_entry (no item_id — this isn't linked to
+  // a specific inventory line), same RPC the customer detail page's own
+  // "Naya Udhaar Entry"/"Payment Wasool Hui" already call.
+  const [quickEntry, setQuickEntry] = useState<'credit' | 'payment' | null>(null);
+  const [quickCustomerId, setQuickCustomerId] = useState('');
+  const [quickCustomerSearch, setQuickCustomerSearch] = useState('');
+  const [quickAmount, setQuickAmount] = useState('');
+  const [quickNote, setQuickNote] = useState('');
+  const [savingQuickEntry, setSavingQuickEntry] = useState(false);
 
   useEffect(() => { loadAll(); }, [shopId]);
 
@@ -137,7 +149,44 @@ export default function KhataPage() {
 
   const filtered = customers
     .filter(c => c.name.toLowerCase().includes(search.toLowerCase()))
+    .filter(c => {
+      if (statusFilter === 'all') return true;
+      const bal = balances[c.id] || 0;
+      return statusFilter === 'unpaid' ? bal > 0 : bal <= 0;
+    })
     .sort((a, b) => (balances[b.id] || 0) - (balances[a.id] || 0));
+
+  function openQuickEntry(kind: 'credit' | 'payment') {
+    setQuickEntry(kind);
+    setQuickCustomerId('');
+    setQuickCustomerSearch('');
+    setQuickAmount('');
+    setQuickNote('');
+  }
+
+  const quickCustomerResults = quickCustomerSearch.trim()
+    ? customers.filter(c => c.name.toLowerCase().includes(quickCustomerSearch.trim().toLowerCase())).slice(0, 8)
+    : [];
+
+  async function saveQuickEntry() {
+    const amount = Number(quickAmount);
+    if (!quickCustomerId || !amount || amount <= 0 || savingQuickEntry) return;
+    setSavingQuickEntry(true);
+    const { error: err } = await supabase.rpc('record_khata_entry', {
+      p_customer_id: quickCustomerId,
+      p_type: quickEntry === 'credit' ? 'purchase' : 'payment',
+      p_item_id: null,
+      p_item_name: null,
+      p_qty: null,
+      p_amount: amount,
+      p_note: quickNote.trim() || null
+    });
+    setSavingQuickEntry(false);
+    if (err) { showToast(t('common.error'), 'error'); return; }
+    setQuickEntry(null);
+    showToast(t('settings.saved'), 'success');
+    await loadAll();
+  }
 
   function exportCsv() {
     downloadCsv(
@@ -212,11 +261,29 @@ export default function KhataPage() {
     else showToast(t('inventory.importFailed'), 'error');
   }
 
+  const initials = (name: string) => name.trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase();
+  const AVATAR_COLORS = ['#0B5E56', '#B8791A', '#7A2E1D', '#1E7A4C', '#8A6747'];
+  const avatarColor = (id: string) => AVATAR_COLORS[[...id].reduce((s, c) => s + c.charCodeAt(0), 0) % AVATAR_COLORS.length];
+
   return (
     <div>
+      {/* Figma match — Add Credit / Record Payment lead the Khata list */}
+      <div className="grid grid-cols-2 gap-2 mb-3">
+        <button onClick={() => openQuickEntry('credit')} className="btn-primary text-sm py-2.5">{t('khata.addCredit')}</button>
+        <button onClick={() => openQuickEntry('payment')} className="btn-secondary text-sm py-2.5">{t('khata.recordPayment')}</button>
+      </div>
+
       <div className="flex gap-2 mb-2">
         <input className="input flex-1" placeholder={t('khata.search')} value={search} onChange={e => setSearch(e.target.value)} />
-        <button onClick={openAdd} className="btn-primary whitespace-nowrap">{t('khata.addCustomer')}</button>
+        <button onClick={openAdd} className="btn-secondary whitespace-nowrap">{t('khata.addCustomer')}</button>
+      </div>
+
+      <div className="flex gap-2 mb-3">
+        {(['all', 'unpaid', 'paid'] as const).map(f => (
+          <button key={f} onClick={() => setStatusFilter(f)} className={`text-xs px-3 py-1.5 rounded-full border whitespace-nowrap ${statusFilter === f ? 'border-haldi text-haldi font-700' : 'border-chalk/15 text-chalkdim'}`}>
+            {f === 'all' ? t('khata.filterAll') : f === 'unpaid' ? t('khata.filterUnpaid') : t('khata.filterPaid')}
+          </button>
+        ))}
       </div>
 
       <div className="flex gap-4 mb-4">
@@ -266,23 +333,68 @@ export default function KhataPage() {
           const bal = balances[c.id] || 0;
           const over = c.credit_limit != null && bal > c.credit_limit;
           return (
-            <Link key={c.id} href={`/dashboard/khata/${c.id}`} className={`card p-4 flex justify-between items-center ${over ? 'border-mirch' : ''}`}>
-              <div>
-                <div className="font-700">{c.name}</div>
-                <div className="text-xs text-chalkdim">{c.phone || '—'}</div>
+            <Link key={c.id} href={`/dashboard/khata/${c.id}`} className={`card p-4 flex justify-between items-center gap-3 ${over ? 'border-mirch' : ''}`}>
+              <div className="flex items-center gap-3 min-w-0">
+                <span className="w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-700 shrink-0" style={{ background: avatarColor(c.id) }}>{initials(c.name)}</span>
+                <div className="min-w-0">
+                  <div className="font-700 truncate">{c.name}</div>
+                  <div className="text-xs text-chalkdim truncate">{c.phone || '—'}</div>
+                </div>
               </div>
-              <div className="text-right">
+              <div className="text-right shrink-0">
                 {/* Spec §33 edge case: never rely on the +/- sign alone —
                     label which direction the balance runs, same as the
                     Customer Detail page already does. */}
-                <div className="text-[10px] text-chalkdim uppercase">{bal > 0 ? t('khataDetail.totalUdhaar') : bal < 0 ? t('khataDetail.advanceBalance') : ''}</div>
                 <div className={`font-mono font-700 ${bal > 0 ? 'text-mirch' : bal < 0 ? 'text-dhania' : 'text-chalkdim'}`}>{fmt(Math.abs(bal))}</div>
+                <div className="text-[10px] text-chalkdim uppercase">{bal > 0 ? t('khata.filterUnpaid') : bal < 0 ? t('khataDetail.advanceBalance') : t('khata.filterPaid')}</div>
                 {over && <div className="text-[10px] text-mirch">{t('khata.overLimit')}</div>}
               </div>
             </Link>
           );
         })}
       </div>
+
+      {/* Quick Add Credit / Record Payment — customer picker + amount */}
+      {quickEntry && (
+        <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50" onClick={() => !savingQuickEntry && setQuickEntry(null)}>
+          <div className="card w-full max-w-md p-5 rounded-b-none sm:rounded-b-2xl" onClick={e => e.stopPropagation()}>
+            <div className="font-display text-lg text-haldi font-700 mb-4">{quickEntry === 'credit' ? t('khata.addCredit') : t('khata.recordPayment')}</div>
+
+            {quickCustomerId ? (
+              <div className="card p-3 mb-3 flex justify-between items-center">
+                <span className="text-sm font-600">{customers.find(c => c.id === quickCustomerId)?.name}</span>
+                <button onClick={() => setQuickCustomerId('')} className="text-chalkdim hover:text-mirch text-xs">✕</button>
+              </div>
+            ) : (
+              <>
+                <label className="block text-xs text-chalkdim mb-1">{t('khata.search')}</label>
+                <input className="input mb-1" value={quickCustomerSearch} onChange={e => setQuickCustomerSearch(e.target.value)} />
+                {quickCustomerResults.length > 0 && (
+                  <div className="card divide-y divide-chalk/10 mb-3 max-h-32 overflow-y-auto">
+                    {quickCustomerResults.map(c => (
+                      <button key={c.id} onClick={() => { setQuickCustomerId(c.id); setQuickCustomerSearch(''); }} className="w-full text-left p-2.5 px-3 text-sm hover:bg-board3">
+                        {c.name}{c.phone ? ` · ${c.phone}` : ''}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+
+            <label className="block text-xs text-chalkdim mb-1 mt-3">{t('khataDetail.amount')}</label>
+            <input type="number" inputMode="decimal" className="input mb-3" value={quickAmount} onChange={e => setQuickAmount(e.target.value)} />
+            <label className="block text-xs text-chalkdim mb-1">{t('khataDetail.noteOptional')}</label>
+            <input className="input mb-5" value={quickNote} onChange={e => setQuickNote(e.target.value)} />
+
+            <div className="flex gap-2">
+              <button onClick={() => setQuickEntry(null)} disabled={savingQuickEntry} className="btn-secondary flex-1">{t('khata.cancel')}</button>
+              <button onClick={saveQuickEntry} disabled={savingQuickEntry || !quickCustomerId || !quickAmount} className="btn-primary flex-1">
+                {savingQuickEntry ? t('settings.saving') : t('khataDetail.save')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Add Customer Modal */}
       {modalOpen && (

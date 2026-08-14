@@ -486,6 +486,11 @@ export const dict = {
   'khata.importPreviewTitle': { ur: 'Import Preview', en: 'Import Preview' },
   'khata.importPreviewCount': { ur: '{n} customer(s) import honge — confirm karein data sahi hai', en: '{n} customer(s) will be imported — confirm the data looks right' },
   'khata.importConfirm': { ur: 'Import Confirm Karein', en: 'Confirm Import' },
+  'khata.addCredit': { ur: '+ Udhaar Add Karein', en: '+ Add Credit' },
+  'khata.recordPayment': { ur: '✓ Payment Record Karein', en: '✓ Record Payment' },
+  'khata.filterAll': { ur: 'Sab', en: 'All' },
+  'khata.filterUnpaid': { ur: 'Unpaid', en: 'Unpaid' },
+  'khata.filterPaid': { ur: 'Clear', en: 'Paid' },
 
   // khata detail
   'khataDetail.back': { ur: '← Sab Customers', en: '← All Customers' },
