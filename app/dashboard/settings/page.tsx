@@ -33,6 +33,8 @@ export default function SettingsPage() {
   const [ticketSubject, setTicketSubject] = useState('');
   const [ticketMessage, setTicketMessage] = useState('');
   const [sendingTicket, setSendingTicket] = useState(false);
+  const [ownerName, setOwnerName] = useState('');
+  const [ownerEmail, setOwnerEmail] = useState('');
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
@@ -56,6 +58,13 @@ export default function SettingsPage() {
 
       const { data: tix } = await supabase.from('support_tickets').select('id, subject, status, created_at').eq('shop_id', shopId).order('created_at', { ascending: false }).limit(10);
       setTickets(tix || []);
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setOwnerEmail(user.email || '');
+        const { data: prof } = await supabase.from('profiles').select('full_name').eq('id', user.id).single();
+        setOwnerName(prof?.full_name || '');
+      }
     }
     setLoading(false);
   }
@@ -157,6 +166,17 @@ export default function SettingsPage() {
 
       {isOwner && (
         <>
+          {/* Figma match — profile card leads Settings */}
+          <div className="card p-4 mb-4 flex items-center gap-3">
+            <span className="w-12 h-12 rounded-full flex items-center justify-center text-white font-700 shrink-0" style={{ background: '#0B5E56' }}>
+              {(ownerName || ownerEmail || '?').trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase()}
+            </span>
+            <div className="min-w-0">
+              <div className="font-700 truncate">{ownerName || ownerEmail}</div>
+              <div className="text-xs text-chalkdim truncate">{name} · {t('staff.roleOwner')}</div>
+            </div>
+          </div>
+
           <Link href="/dashboard/settings/subscription" className="card p-4 mb-6 flex items-center justify-between hover:border-haldi">
             <span className="font-600 text-sm">{t('billing.title')}</span>
             <span className="text-chalkdim text-xs">›</span>
