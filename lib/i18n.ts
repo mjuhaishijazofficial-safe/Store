@@ -653,6 +653,7 @@ export const dict = {
   'staff.inviting': { ur: 'Bhej rahe hain...', en: 'Sending...' },
   'staff.invited': { ur: 'Invite bhej diya gaya ✓', en: 'Invite sent ✓' },
   'staff.roleOwner': { ur: 'Owner', en: 'Owner' },
+  'staff.you': { ur: 'Aap', en: 'You' },
   'staff.roleCashier': { ur: 'Cashier', en: 'Cashier' },
   'staff.removed': { ur: 'Staff member hata diya gaya ✓', en: 'Staff member removed ✓' },
   'staff.removeTitle': { ur: 'Staff Hatayein?', en: 'Remove Staff Member?' },

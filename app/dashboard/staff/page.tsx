@@ -14,7 +14,7 @@ export default async function StaffPage() {
 
   const { data: staff } = await supabase
     .from('profiles')
-    .select('id, full_name, email, role')
+    .select('id, full_name, email, role, allowed_sections')
     .eq('shop_id', profile.shop_id)
     .order('created_at');
 
