@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useLang } from '@/lib/i18n-context';
 import { useShop } from '@/lib/shop-context';
@@ -17,7 +17,15 @@ import { useToast } from '@/lib/toast-context';
 
 type Supplier = { id: string; name: string };
 type Row = { name: string; qty: number; unit_price: number; matched_item_id: string | null };
-type Step = 'capture' | 'loading' | 'confirm' | 'error';
+// 'camera' is a live getUserMedia preview (see openCamera below) — a
+// plain <input capture> only hints the OS to prefer its camera app, and
+// several real browsers (every desktop browser by design, plus some
+// Android WebViews) ignore that hint entirely and fall back to the
+// generic file/gallery picker regardless of the "Photo Lein" vs
+// "Gallery Se Chunein" button pressed. A real preview always opens an
+// actual camera when one exists, on desktop and mobile alike, the same
+// getUserMedia approach BarcodeScannerModal already uses.
+type Step = 'capture' | 'camera' | 'loading' | 'confirm' | 'error';
 
 function fmt(n: number) {
   return '₨' + Number(n || 0).toLocaleString('en-IN');
@@ -49,8 +57,9 @@ export default function SlipScanModal({
   const { t } = useLang();
   const { shopId, branchId } = useShop();
   const { showToast } = useToast();
-  const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
   const [supplierId, setSupplierId] = useState(suppliers[0]?.id || '');
   const [step, setStep] = useState<Step>('capture');
@@ -61,11 +70,61 @@ export default function SlipScanModal({
 
   const total = rows.reduce((s, r) => s + r.qty * r.unit_price, 0);
 
+  function stopCamera() {
+    streamRef.current?.getTracks().forEach(tr => tr.stop());
+    streamRef.current = null;
+  }
+
+  // Safety net for a parent-driven unmount (e.g. the shop-wide "app
+  // locked" gate rendering something else in this slot) that never
+  // routes through onClose above — a still-running stream otherwise
+  // keeps the camera's hardware light on with no UI left to stop it.
+  useEffect(() => stopCamera, []);
+
+  async function openCamera() {
+    if (!supplierId) { showToast(t('slipScan.supplierFirst'), 'error'); return; }
+    setStep('camera');
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }
+      });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+    } catch {
+      // No camera, permission denied, or a desktop with none attached —
+      // Gallery Se Chunein (a plain file picker, always available) is
+      // the fallback this screen was always meant to have.
+      stopCamera();
+      setErrorMsg(t('slipScan.cameraUnavailable'));
+      setStep('error');
+    }
+  }
+
+  function capturePhoto() {
+    const video = videoRef.current;
+    if (!video || !video.videoWidth) return;
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d')?.drawImage(video, 0, 0);
+    stopCamera();
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+    const [, base64] = dataUrl.split(',');
+    processImage(base64, 'image/jpeg');
+  }
+
   async function handleFile(file: File | undefined) {
     if (!file || !supplierId) return;
+    const { data: base64, mediaType } = await fileToBase64(file);
+    processImage(base64, mediaType);
+  }
+
+  async function processImage(base64: string, mediaType: string) {
     setStep('loading');
     try {
-      const { data: base64, mediaType } = await fileToBase64(file);
       const res = await fetch('/api/stock-in/slip-scan', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -166,7 +225,7 @@ export default function SlipScanModal({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50" onClick={() => { stopCamera(); onClose(); }}>
       <div className="card w-full max-w-md p-5 rounded-b-none sm:rounded-b-2xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
         <div className="font-display text-lg text-haldi font-700 mb-4">{t('slipScan.title')}</div>
 
@@ -179,10 +238,7 @@ export default function SlipScanModal({
 
             <p className="text-chalkdim text-sm mb-5 text-center">{t('slipScan.captureHint')}</p>
 
-            <button
-              onClick={() => supplierId ? cameraInputRef.current?.click() : showToast(t('slipScan.supplierFirst'), 'error')}
-              className="btn-primary w-full mb-2 text-base py-3"
-            >
+            <button onClick={openCamera} className="btn-primary w-full mb-2 text-base py-3">
               {t('slipScan.takePhoto')}
             </button>
             <button
@@ -193,8 +249,21 @@ export default function SlipScanModal({
             </button>
             <button onClick={onClose} className="text-chalkdim text-xs underline mt-2 mx-auto block">{t('inventory.cancel')}</button>
 
-            <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={e => handleFile(e.target.files?.[0])} />
             <input ref={galleryInputRef} type="file" accept="image/*" className="hidden" onChange={e => handleFile(e.target.files?.[0])} />
+          </>
+        )}
+
+        {step === 'camera' && (
+          <>
+            <div className="relative">
+              <video ref={videoRef} className="w-full rounded-lg bg-board3" muted playsInline />
+              <div className="absolute inset-4 border-2 border-haldi/70 rounded pointer-events-none" />
+            </div>
+            <p className="text-chalkdim text-xs mt-3 text-center">{t('slipScan.framingHint')}</p>
+            <div className="flex gap-2 mt-3">
+              <button onClick={() => { stopCamera(); setStep('capture'); }} className="btn-secondary flex-1">{t('inventory.cancel')}</button>
+              <button onClick={capturePhoto} className="btn-primary flex-1 text-base py-3">{t('slipScan.shutter')}</button>
+            </div>
           </>
         )}
 
