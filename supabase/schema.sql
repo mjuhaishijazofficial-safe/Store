@@ -30,6 +30,18 @@ alter table shops add column if not exists receipt_footer text;
 -- until an Owner deliberately opens one up) — see app/dashboard/billing
 -- for where this is enforced and Settings for where the Owner sets it.
 alter table shops add column if not exists cashier_discount_cap_percent numeric not null default 0;
+-- FBR Tax Compliance hook (spec §25-F) — "architecture-ready, MVP mein
+-- optional": off by default for every shop, no effect anywhere unless
+-- an Owner turns it on from Settings. Deliberately doesn't fabricate a
+-- government-format invoice number — a real FBR invoice number is
+-- assigned by FBR's own e-invoicing API in response to a submitted
+-- sale, not something safe to generate locally and imply is real tax
+-- compliance. This is the tax-breakdown-on-the-bill half only; actual
+-- e-invoicing submission is a separate integration for whenever a shop
+-- genuinely needs it.
+alter table shops add column if not exists fbr_enabled boolean not null default false;
+alter table shops add column if not exists fbr_ntn text;
+alter table shops add column if not exists tax_rate_percent numeric not null default 0;
 -- Master Spec §25-H: a failed Stripe payment starts a 3–5 day grace
 -- period (status stays whatever Stripe reported, e.g. past_due) before
 -- the shop actually gets suspended — see app/api/stripe/webhook (sets

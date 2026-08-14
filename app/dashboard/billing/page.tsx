@@ -30,7 +30,7 @@ function fmt(n: number) {
 export default function BillingPage() {
   const supabase = createClient();
   const { t } = useLang();
-  const { shopId, shopName, role, receiptPhone, receiptFooter, cashierDiscountCapPercent, locked } = useShop();
+  const { shopId, shopName, role, receiptPhone, receiptFooter, cashierDiscountCapPercent, locked, fbrEnabled, taxRatePercent } = useShop();
   const { showToast } = useToast();
   const isOwner = role === 'owner';
 
@@ -118,6 +118,11 @@ export default function BillingPage() {
   // Discount never drives a line's amount negative — the same floor
   // record_stock_move already applies to stock itself.
   const total = Math.max(0, subtotal - Math.min(discount, maxDiscount));
+  // FBR hook (spec §25-F) — display/receipt only, on top of `total`;
+  // the amount each line RPC records for revenue stays pre-tax (see
+  // `factor` in checkout() below), tax collected isn't shop profit.
+  const taxAmount = fbrEnabled ? total * (taxRatePercent / 100) : 0;
+  const payableTotal = total + taxAmount;
   const selectedCustomer = customers.find(c => c.id === customerId);
 
   function addItem(it: Item) {
@@ -328,9 +333,15 @@ export default function BillingPage() {
                 <span className="font-mono">{fmt(subtotal)}</span>
               </div>
             )}
+            {taxAmount > 0 && (
+              <div className="flex justify-between text-xs text-chalkdim mb-1">
+                <span>{t('receipt.tax').replace('{rate}', String(taxRatePercent))}</span>
+                <span className="font-mono">{fmt(taxAmount)}</span>
+              </div>
+            )}
             <div className="flex justify-between items-center">
               <span className="text-sm text-chalkdim">{t('pos.total')}</span>
-              <span className="font-mono font-800 text-xl text-dhania">{fmt(total)}</span>
+              <span className="font-mono font-800 text-xl text-dhania">{fmt(payableTotal)}</span>
             </div>
           </div>
 
@@ -400,6 +411,7 @@ export default function BillingPage() {
           createdAt={new Date().toISOString()}
           phone={receiptPhone}
           footer={receiptFooter}
+          taxRatePercent={fbrEnabled ? taxRatePercent : undefined}
           onClose={() => { setReceiptLines(null); resetBill(); }}
         />
       )}

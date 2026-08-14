@@ -19,7 +19,8 @@ export default function CartReceiptModal({
   createdAt,
   onClose,
   phone,
-  footer
+  footer,
+  taxRatePercent
 }: {
   shopName: string;
   lines: ReceiptLine[];
@@ -27,11 +28,19 @@ export default function CartReceiptModal({
   onClose: () => void;
   phone?: string | null;
   footer?: string | null;
+  // FBR Tax Compliance hook (spec §25-F) — undefined/0 (every existing
+  // call site) means no tax line at all, unchanged from before. Applied
+  // on top of the lines' own total, which already reflects any discount
+  // — the recorded per-line `amount` (what Reports/profit sum from)
+  // stays untouched, tax is display-only here, never revenue.
+  taxRatePercent?: number;
 }) {
   const { t } = useLang();
   const d = new Date(createdAt);
   const when = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) + ' • ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-  const total = lines.reduce((s, l) => s + l.amount, 0);
+  const subtotal = lines.reduce((s, l) => s + l.amount, 0);
+  const taxAmount = taxRatePercent ? subtotal * (taxRatePercent / 100) : 0;
+  const total = subtotal + taxAmount;
   const thanksMsg = footer || t('receipt.thanks');
 
   useEffect(() => {
@@ -60,6 +69,18 @@ export default function CartReceiptModal({
             );
           })}
           <div className="border-t border-dashed border-chalk/30 my-2" />
+          {taxAmount > 0 && (
+            <>
+              <div className="flex justify-between text-xs text-chalkdim">
+                <span>{t('receipt.subtotal')}</span>
+                <span>{fmt(subtotal)}</span>
+              </div>
+              <div className="flex justify-between text-xs text-chalkdim mb-1">
+                <span>{t('receipt.tax').replace('{rate}', String(taxRatePercent))}</span>
+                <span>{fmt(taxAmount)}</span>
+              </div>
+            </>
+          )}
           <div className="flex justify-between font-700 text-base">
             <span>{t('receipt.total')}</span>
             <span>{fmt(total)}</span>

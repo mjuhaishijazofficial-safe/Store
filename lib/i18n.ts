@@ -334,6 +334,11 @@ export const dict = {
   'settings.defaultPalette': { ur: 'Default', en: 'Default' },
   'settings.cashierDiscountCap': { ur: 'Cashier Discount Limit', en: 'Cashier Discount Limit' },
   'settings.cashierDiscountCapHint': { ur: 'Cashier bill par zyada se zyada kitne % discount de sakta hai (0 = bilkul nahi)', en: 'Maximum % discount a Cashier can apply on a bill (0 = none at all)' },
+  'settings.fbrTitle': { ur: 'FBR Integration', en: 'FBR Integration' },
+  'settings.fbrHint': { ur: 'Sirf un dukaanon ke liye jinhe tax invoicing chahiye — chhoti dukaan ke liye default off. Ye sirf bill par tax breakdown dikhata hai; FBR ko real-time invoice submit karna alag, aage ka integration hai.', en: 'Only for shops that need tax invoicing — off by default. This only shows a tax breakdown on the bill; actually submitting invoices to FBR in real time is a separate, later integration.' },
+  'settings.fbrEnable': { ur: 'Bill par tax breakdown dikhayein', en: 'Show tax breakdown on bills' },
+  'settings.fbrNtn': { ur: 'NTN (optional, record ke liye)', en: 'NTN (optional, for your records)' },
+  'settings.taxRate': { ur: 'Tax Rate (%)', en: 'Tax Rate (%)' },
 
   // POS / Billing counter (Master Handoff Spec §15) — the shared
   // checkout screen every role uses, distinct from cart.* above (the
@@ -489,6 +494,8 @@ export const dict = {
   'contact.edit': { ur: 'Edit', en: 'Edit' },
 
   'receipt.total': { ur: 'Total', en: 'Total' },
+  'receipt.subtotal': { ur: 'Subtotal', en: 'Subtotal' },
+  'receipt.tax': { ur: 'Tax ({rate}%)', en: 'Tax ({rate}%)' },
   'receipt.thanks': { ur: 'Shukriya! Dobara Tashreef Layein', en: 'Thank you! Please visit again' },
   'receipt.print': { ur: 'Receipt Print Karein', en: 'Print Receipt' },
   'receipt.bluetoothPrint': { ur: '🖨 Bluetooth Printer', en: '🖨 Bluetooth Printer' },

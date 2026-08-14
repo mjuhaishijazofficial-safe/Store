@@ -35,6 +35,10 @@ export type ShopInfo = {
   // restriction, same convention as allowedSections above.
   branchId: string | null;
   branches: { id: string; name: string }[];
+  // FBR Tax Compliance hook (spec §25-F) — off by default, no effect
+  // anywhere in the app unless an Owner turns it on from Settings.
+  fbrEnabled: boolean;
+  taxRatePercent: number;
 };
 
 const ShopContext = createContext<ShopInfo | null>(null);

@@ -25,6 +25,10 @@ export default function SettingsPage() {
   const [receiptPhone, setReceiptPhone] = useState('');
   const [receiptFooter, setReceiptFooter] = useState('');
   const [discountCap, setDiscountCap] = useState(0);
+  const [fbrEnabled, setFbrEnabled] = useState(false);
+  const [fbrNtn, setFbrNtn] = useState('');
+  const [taxRate, setTaxRate] = useState(0);
+  const [savingFbr, setSavingFbr] = useState(false);
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
@@ -36,12 +40,15 @@ export default function SettingsPage() {
 
   async function init() {
     if (isOwner) {
-      const { data: shop } = await supabase.from('shops').select('name, budget, receipt_phone, receipt_footer, cashier_discount_cap_percent').eq('id', shopId).single();
+      const { data: shop } = await supabase.from('shops').select('name, budget, receipt_phone, receipt_footer, cashier_discount_cap_percent, fbr_enabled, fbr_ntn, tax_rate_percent').eq('id', shopId).single();
       setName(shop?.name || '');
       setBudget(shop?.budget || 0);
       setReceiptPhone(shop?.receipt_phone || '');
       setReceiptFooter(shop?.receipt_footer || '');
       setDiscountCap(shop?.cashier_discount_cap_percent || 0);
+      setFbrEnabled(shop?.fbr_enabled || false);
+      setFbrNtn(shop?.fbr_ntn || '');
+      setTaxRate(shop?.tax_rate_percent || 0);
     }
     setLoading(false);
   }
@@ -56,6 +63,19 @@ export default function SettingsPage() {
     const { error: err } = await supabase.from('shops').update({ cashier_discount_cap_percent: discountCap }).eq('id', shopId);
     if (err) { showToast(t('common.error'), 'error'); return; }
     showToast(t('settings.saved'), 'success');
+  }
+
+  async function saveFbr() {
+    setSavingFbr(true);
+    const { error: err } = await supabase.from('shops').update({
+      fbr_enabled: fbrEnabled,
+      fbr_ntn: fbrNtn.trim() || null,
+      tax_rate_percent: taxRate
+    }).eq('id', shopId);
+    setSavingFbr(false);
+    if (err) { showToast(t('common.error'), 'error'); return; }
+    showToast(t('settings.saved'), 'success');
+    router.refresh();
   }
 
   async function saveReceiptBranding() {
@@ -163,6 +183,24 @@ export default function SettingsPage() {
               <input type="number" inputMode="decimal" min={0} max={100} className="input flex-1" value={discountCap || ''} onChange={e => setDiscountCap(Math.max(0, Math.min(100, Number(e.target.value))))} placeholder="0" />
               <button onClick={saveDiscountCap} className="btn-secondary whitespace-nowrap">{t('settings.save')}</button>
             </div>
+          </div>
+
+          <div className="mt-10 pt-6 border-t border-chalk/10">
+            <div className="text-xs text-chalkdim uppercase tracking-wide font-700 mb-1">{t('settings.fbrTitle')}</div>
+            <div className="text-chalkdim text-xs mb-3">{t('settings.fbrHint')}</div>
+            <label className="flex items-center gap-2 text-sm mb-3">
+              <input type="checkbox" checked={fbrEnabled} onChange={e => setFbrEnabled(e.target.checked)} />
+              <span className="font-600">{t('settings.fbrEnable')}</span>
+            </label>
+            {fbrEnabled && (
+              <>
+                <label className="block text-xs text-chalkdim mb-1">{t('settings.fbrNtn')}</label>
+                <input className="input mb-3" value={fbrNtn} onChange={e => setFbrNtn(e.target.value)} placeholder="1234567-8" />
+                <label className="block text-xs text-chalkdim mb-1">{t('settings.taxRate')}</label>
+                <input type="number" inputMode="decimal" min={0} max={100} className="input mb-3" value={taxRate || ''} onChange={e => setTaxRate(Math.max(0, Math.min(100, Number(e.target.value))))} placeholder="17" />
+              </>
+            )}
+            <button onClick={saveFbr} disabled={savingFbr} className="btn-secondary w-full">{savingFbr ? t('settings.saving') : t('settings.save')}</button>
           </div>
 
           <div className="mt-10 pt-6 border-t border-chalk/10">
