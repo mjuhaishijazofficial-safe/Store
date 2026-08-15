@@ -23,8 +23,9 @@ const CLIENT_TIMEOUT_MS = 20000;
 type Stage = 'idle' | 'listening' | 'transcribing' | 'processing' | 'confirm' | 'error' | 'done';
 
 type ParsedIntent = {
-  action: 'khata_purchase' | 'khata_payment' | 'khata_return' | 'general_query' | 'unknown';
+  action: 'khata_purchase' | 'khata_payment' | 'khata_return' | 'add_customer' | 'check_balance' | 'check_stock' | 'general_query' | 'unknown';
   customer_name: string | null;
+  customer_phone: string | null;
   item_name: string | null;
   qty: number | null;
   unit: string | null;
@@ -34,7 +35,9 @@ type ParsedIntent = {
 
 type ResolvedCommand = {
   intent: ParsedIntent;
-  customerId: string;
+  // Null for add_customer — that action is what creates the customer,
+  // so there's nothing to resolve to beforehand.
+  customerId: string | null;
   customerName: string;
   itemId: string | null;
   amount: number;
@@ -249,9 +252,83 @@ export default function VoicePage() {
     }
   }
 
+  // Read-only lookups against the shop's own data — answered straight
+  // away with no confirm step, since nothing changes. These exist as
+  // real actions rather than being left to the general-question path
+  // precisely because that path can only guess; these read the actual
+  // records.
+  async function answerLookup(intent: ParsedIntent) {
+    if (intent.action === 'check_balance') {
+      if (!intent.customer_name) { await answerGeneralQuery(intent.query || ''); return; }
+      const customer = await findBestMatch('customers', intent.customer_name);
+      if (!customer) {
+        setStage('error');
+        setErrorMsg(t('voice.errCustomerNotFound').replace('{name}', intent.customer_name));
+        return;
+      }
+      const { data } = await supabase.rpc('khata_customer_totals', { p_customer_id: customer.id }).single();
+      const d = data as any;
+      const balance = (d?.given || 0) - (d?.paid || 0) - (d?.returned || 0);
+      setAnswerText(
+        (balance > 0 ? t('voice.answerBalanceOwes') : balance < 0 ? t('voice.answerBalanceAdvance') : t('voice.answerBalanceClear'))
+          .replace('{customer}', customer.name)
+          .replace('{amount}', fmt(Math.abs(balance)))
+      );
+      setStage('done');
+      return;
+    }
+
+    // check_stock
+    if (!intent.item_name) { await answerGeneralQuery(intent.query || ''); return; }
+    const item = await findBestMatch('items', intent.item_name);
+    if (!item) {
+      setStage('error');
+      setErrorMsg(t('voice.errItemNotFound').replace('{name}', intent.item_name));
+      return;
+    }
+    const { data: full } = await supabase.from('items').select('name, stock, unit').eq('id', item.id).single();
+    setAnswerText(
+      t('voice.answerStock')
+        .replace('{item}', full?.name || item.name)
+        .replace('{qty}', String(full?.stock ?? 0))
+        .replace('{unit}', full?.unit || '')
+    );
+    setStage('done');
+  }
+
   async function resolveIntent(intent: ParsedIntent, rawText: string) {
     if (intent.action === 'general_query') {
       await answerGeneralQuery(intent.query || rawText);
+      return;
+    }
+
+    if (intent.action === 'check_balance' || intent.action === 'check_stock') {
+      await answerLookup(intent);
+      return;
+    }
+
+    // Creating a customer changes real data, so it goes through the
+    // same confirm-before-acting step every money-affecting action uses.
+    if (intent.action === 'add_customer') {
+      const name = intent.customer_name?.trim();
+      if (!name) { await answerGeneralQuery(rawText); return; }
+      const existing = await findBestMatch('customers', name);
+      if (existing && existing.name.trim().toLowerCase() === name.toLowerCase()) {
+        setAnswerText(t('voice.answerCustomerExists').replace('{name}', existing.name));
+        setStage('done');
+        return;
+      }
+      setResolved({
+        intent,
+        customerId: null,
+        customerName: name,
+        itemId: null,
+        amount: 0,
+        summary: t('voice.summaryAddCustomer')
+          .replace('{name}', name)
+          .replace('{phone}', intent.customer_phone?.trim() || '—')
+      });
+      setStage('confirm');
       return;
     }
     // Never dead-end on "I didn't understand". If it isn't a Khata
@@ -300,6 +377,24 @@ export default function VoicePage() {
   async function confirmExecute() {
     if (!resolved || confirming) return;
     setConfirming(true);
+
+    if (resolved.intent.action === 'add_customer') {
+      const { error: addErr } = await supabase.from('customers').insert({
+        shop_id: shopId,
+        name: resolved.customerName,
+        phone: resolved.intent.customer_phone?.trim() || null
+      });
+      setConfirming(false);
+      if (addErr) {
+        setStage('error');
+        setErrorMsg(t('common.error'));
+        return;
+      }
+      setAnswerText(t('voice.doneCustomerAdded'));
+      setStage('done');
+      return;
+    }
+
     const p_type = resolved.intent.action === 'khata_purchase' ? 'purchase' : resolved.intent.action === 'khata_return' ? 'return' : 'payment';
     const { error: err } = await supabase.rpc('record_khata_entry', {
       p_customer_id: resolved.customerId,

@@ -18,7 +18,15 @@ const PLAIN_TIMEOUT_MS = 8000;
 // only ever answers out loud; it can't touch Khata/stock/anything else
 // — that's the whole reason it's a separate action from khata_* in
 // parse-command, kept on its own read-only path.
-const SYSTEM_PROMPT = 'You are Eagle, a helpful voice assistant inside a Pakistani kiryana shop\'s management app. Answer briefly and naturally — this will be read aloud, not displayed as a document, so keep it to a few sentences, no markdown/bullet points. Reply in the same language mix (Roman Urdu / Urdu / English) the question was asked in.';
+// The "never claim to have acted" rule below is not decoration — this
+// route CANNOT change anything (it only reads and answers), so any
+// "done, I've added it" reply is a lie the user will act on. That
+// happened for real: "naya customer add kar do" fell through to this
+// path and got answered with a confident "add kar diya" while no
+// customer existed. Refusing clearly is the only safe behavior here.
+const SYSTEM_PROMPT = `You are Eagle, a helpful voice assistant inside a Pakistani kiryana shop's management app. Answer briefly and naturally — this will be read aloud, not displayed as a document, so keep it to a few sentences, no markdown/bullet points. Reply in the same language mix (Roman Urdu / Urdu / English) the question was asked in.
+
+CRITICAL RULE: You can only answer questions and look things up. You CANNOT add, change, or delete anything in the app — you have no ability to do so. If the user asks you to perform an action (add a customer, record a sale, change stock, delete something), you MUST NOT claim you did it. Never say "done", "added", "kar diya", "ho gaya" or anything implying the action happened. Instead say plainly that you can't do that one yet and tell them which screen of the app to use for it. Claiming to have done something you did not do is the worst possible answer.`;
 
 async function callGemini(apiKey: string, model: string, query: string, withSearch: boolean): Promise<string | null> {
   try {
