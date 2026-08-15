@@ -322,19 +322,53 @@ export default function VoicePage() {
   }
 
   // Matches the spoken customer/item name against this shop's own real
-  // records. An exact case-insensitive match wins outright. More than
-  // one partial match with no exact one (two different "Ali"s) used to
-  // just silently take the first row — now it stops and asks which one,
-  // via the same clarify-card mechanism confirm uses, and only resolves
-  // once a real answer comes back. No match at all stays unresolved
-  // rather than guessing — this is money, guessing wrong is worse than
-  // asking again.
+  // records — tried a few ways, not just one literal substring:
+  //
+  // 1. The full phrase as spoken.
+  // 2. Singular/plural swap ("headphone" vs "headphones") — a plain
+  //    ILIKE '%headphones%' never matches a stored "Headphone" (the
+  //    stored name doesn't contain the spoken word as a substring when
+  //    they differ only by a trailing 's'), which is a real miss this
+  //    fixes directly.
+  // 3. Each individual word in what was spoken, dropping short/common
+  //    ones — catches a multi-word product name where only part of it
+  //    was heard clearly, or where the parsed name has words in a
+  //    different order than the stored one.
+  //
+  // The first strategy that returns anything wins; later ones never run
+  // once an earlier one finds rows. An exact case-insensitive match
+  // (against whichever strategy matched) always wins outright. More than
+  // one partial match with no exact one used to just silently take the
+  // first row — now it stops and asks which one via the clarify card,
+  // resolving only once a real answer comes back. No match at all across
+  // every strategy stays unresolved rather than guessing — this is
+  // money/stock, guessing wrong is worse than asking again.
   async function findBestMatch(table: 'customers' | 'items' | 'suppliers', spoken: string): Promise<MatchRow | null> {
     const cols = table === 'items' ? 'id, name, price' : 'id, name';
-    const { data } = await supabase.from(table).select(cols).eq('shop_id', shopId).ilike('name', `%${spoken.trim()}%`);
-    const rows = (data || []) as unknown as MatchRow[];
+    const clean = spoken.trim();
+
+    async function queryPattern(pattern: string): Promise<MatchRow[]> {
+      const { data } = await supabase.from(table).select(cols).eq('shop_id', shopId).ilike('name', `%${pattern}%`);
+      return (data || []) as unknown as MatchRow[];
+    }
+
+    let rows = await queryPattern(clean);
+
+    if (rows.length === 0) {
+      const swapped = clean.endsWith('s') ? clean.slice(0, -1) : `${clean}s`;
+      if (swapped) rows = await queryPattern(swapped);
+    }
+
+    if (rows.length === 0) {
+      const words = clean.split(/\s+/).filter(w => w.length > 2);
+      for (const word of words) {
+        rows = await queryPattern(word);
+        if (rows.length > 0) break;
+      }
+    }
+
     if (rows.length === 0) return null;
-    const exact = rows.find(r => r.name.trim().toLowerCase() === spoken.trim().toLowerCase());
+    const exact = rows.find(r => r.name.trim().toLowerCase() === clean.toLowerCase());
     if (exact) return exact;
     if (rows.length === 1) return rows[0];
 

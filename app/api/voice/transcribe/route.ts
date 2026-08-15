@@ -72,10 +72,26 @@ export async function POST(req: Request) {
   // itself per recording, so Urdu, English and the Roman-Urdu mix real
   // shopkeepers actually speak all transcribe correctly.
   //
-  // The prompt below is Whisper's own context hint — it biases spelling
-  // toward the vocabulary this app expects (Urdu shop terms and the
-  // wake word) without constraining the language.
-  upstream.append('prompt', 'Eagle, khata, udhaar, customer, stock, balance, rupay, kilo, packet, advance, payment.');
+  // Whisper's "prompt" is a vocabulary/spelling hint, not an instruction
+  // — it biases what words Whisper is likely to hear without
+  // constraining the language. A fixed generic list ('khata', 'stock'...)
+  // was still missing this SHOP's actual product/customer names, which
+  // is exactly what made real product words ("chocolate", "headphone")
+  // come out as something else — Whisper had never been told those
+  // words might appear at all. Pulling the shop's own inventory/
+  // customer names in here directly targets that: it's the single
+  // highest-leverage fix for real-word recognition accuracy, more than
+  // any generic tuning could be. Kept well under Whisper's ~224-token
+  // prompt budget by capping the joined string's length outright.
+  const [{ data: promptItems }, { data: promptCustomers }] = await Promise.all([
+    supabase.from('items').select('name').eq('shop_id', profile.shop_id).order('name').limit(150),
+    supabase.from('customers').select('name').eq('shop_id', profile.shop_id).order('name').limit(60)
+  ]);
+  const vocabNames = [...(promptItems || []), ...(promptCustomers || [])].map((r: any) => r.name).filter(Boolean);
+  let vocabStr = vocabNames.join(', ');
+  if (vocabStr.length > 700) vocabStr = vocabStr.slice(0, 700);
+  const basePrompt = 'Eagle, khata, udhaar, customer, stock, balance, rupay, kilo, packet, advance, payment.';
+  upstream.append('prompt', vocabStr ? `${basePrompt} This shop's products and customers include: ${vocabStr}.` : basePrompt);
 
   let res: Response;
   try {
