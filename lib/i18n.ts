@@ -522,6 +522,9 @@ export const dict = {
   'khataDetail.paymentReceived': { ur: '+ Payment Mili', en: '+ Payment Received' },
   'khataDetail.empty': { ur: 'Abhi tak koi entry nahi', en: 'No entries yet' },
   'khataDetail.paymentLabel': { ur: 'Payment mili', en: 'Payment received' },
+  'khataDetail.confirmReverse': { ur: 'Pakka Reverse?', en: 'Confirm reverse?' },
+  'khataDetail.reversedLabel': { ur: 'Reversed', en: 'Reversed' },
+  'khataDetail.reversedBadge': { ur: 'Reverse ho gaya', en: 'Reversed' },
   'khataDetail.itemDefault': { ur: 'Saman', en: 'Item' },
   'khataDetail.loading': { ur: 'Load ho raha hai...', en: 'Loading...' },
   'khataDetail.notFound': { ur: 'Customer nahi mila', en: 'Customer not found' },
@@ -567,6 +570,7 @@ export const dict = {
 
   'statement.title': { ur: 'Khata Statement', en: 'Khata Statement' },
   'statement.date': { ur: 'Date', en: 'Date' },
+  'statement.ref': { ur: 'Ref#', en: 'Ref#' },
   'statement.finalBalance': { ur: 'Mojooda Balance', en: 'Current Balance' },
   'khataDetail.printStatement': { ur: 'Statement Print Karein', en: 'Print Statement' },
 

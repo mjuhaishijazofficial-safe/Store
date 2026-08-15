@@ -1692,3 +1692,127 @@ where k.item_id is not null
   and k.type in ('purchase', 'return')
   and coalesce(k.qty, 0) > 0
   and not exists (select 1 from stock_movements sm where sm.reference_type = 'khata_entry' and sm.reference_id = k.id);
+
+-- ============================================================
+-- 17. KHATA ENTRY REVERSAL + INVOICE NUMBERS
+--
+-- Deleting a khata_entries row (old delete_khata_entry) hard-erased the
+-- audit trail — the row itself, the only place recording that a udhaar
+-- sale or a return ever happened, was just gone. Fix: a "reverse" op
+-- that inserts a mirror-image entry instead of removing anything.
+-- reversal_of links a reversal row back to what it reverses; reversed_at
+-- marks the original as no longer "live" (both are set together, inside
+-- one function) — every entry that ever existed is still in the table,
+-- forever, which is the whole point of a ledger.
+-- ============================================================
+
+alter table khata_entries add column if not exists entry_number bigint generated always as identity;
+alter table khata_entries add column if not exists reversal_of uuid references khata_entries(id) on delete set null;
+alter table khata_entries add column if not exists reversed_at timestamptz;
+create index if not exists idx_khata_entries_reversal_of on khata_entries(reversal_of);
+
+-- record_khata_entry grows a return value (the new row's id) so
+-- reverse_khata_entry below can link its reversal row back to it via
+-- reversal_of — a return-type change, which create-or-replace can't do
+-- in place, hence the drop.
+drop function if exists record_khata_entry(uuid, text, uuid, text, numeric, numeric, text, text);
+create function record_khata_entry(
+  p_customer_id uuid,
+  p_type text,
+  p_item_id uuid,
+  p_item_name text,
+  p_qty numeric,
+  p_amount numeric,
+  p_note text,
+  p_payment_method text default 'cash'
+)
+returns uuid
+language plpgsql
+security invoker
+as $$
+declare
+  v_shop_id uuid := my_shop_id();
+  v_unit text;
+  v_txn_id uuid;
+  v_entry_id uuid;
+begin
+  if p_type not in ('purchase', 'payment', 'return') then
+    raise exception 'invalid type: %', p_type;
+  end if;
+  if p_amount is null or p_amount <= 0 then
+    raise exception 'amount must be positive';
+  end if;
+
+  insert into khata_entries (shop_id, customer_id, type, item_id, item_name, qty, amount, note, created_by, payment_method)
+  values (v_shop_id, p_customer_id, p_type, p_item_id, p_item_name, p_qty, p_amount, p_note, auth.uid(), coalesce(p_payment_method, 'cash'))
+  returning id into v_entry_id;
+
+  -- Stock Ledger (spec: Stock Ledger Pattern) — record_stock_movement
+  -- below is now the only place items.stock is ever written; this just
+  -- logs the transactions row for reporting the same as before and
+  -- hands its id to the ledger as reference_id, so a stock_movements
+  -- row can be traced straight back to the sale/return that caused it.
+  if p_type = 'purchase' and p_item_id is not null then
+    select unit into v_unit from items where id = p_item_id;
+    insert into transactions (shop_id, item_id, item_name, type, qty, unit, amount, created_by, customer_id, note)
+    values (v_shop_id, p_item_id, p_item_name, 'sale', coalesce(p_qty, 0), v_unit, p_amount, auth.uid(), p_customer_id, p_note)
+    returning id into v_txn_id;
+    perform record_stock_movement(p_item_id, null, -coalesce(p_qty, 0), 'sale', 'transaction', v_txn_id, p_note);
+  elsif p_type = 'return' and p_item_id is not null then
+    select unit into v_unit from items where id = p_item_id;
+    insert into transactions (shop_id, item_id, item_name, type, qty, unit, amount, created_by, customer_id, note)
+    values (v_shop_id, p_item_id, p_item_name, 'return', coalesce(p_qty, 0), v_unit, p_amount, auth.uid(), p_customer_id, p_note)
+    returning id into v_txn_id;
+    perform record_stock_movement(p_item_id, null, coalesce(p_qty, 0), 'return', 'transaction', v_txn_id, p_note);
+  end if;
+
+  return v_entry_id;
+end;
+$$;
+
+-- Replaces delete_khata_entry (hard delete) entirely — nothing in this
+-- codebase should be able to permanently erase a khata entry anymore.
+drop function if exists delete_khata_entry(uuid);
+
+create or replace function reverse_khata_entry(p_entry_id uuid)
+returns void
+language plpgsql
+security invoker
+as $$
+declare
+  v_entry khata_entries%rowtype;
+  v_new_type text;
+  v_new_id uuid;
+begin
+  select * into v_entry from khata_entries where id = p_entry_id;
+  if v_entry is null then raise exception 'entry not found'; end if;
+  if v_entry.reversed_at is not null then raise exception 'entry already reversed'; end if;
+  if v_entry.reversal_of is not null then raise exception 'cannot reverse a reversal entry'; end if;
+
+  -- Opposite of what the original did to the balance — purchase (added
+  -- debt) reverses as a return (removes debt); return (removed debt)
+  -- reverses as a purchase (adds debt back); payment (removed debt, no
+  -- item) reverses as a purchase too, since there's no distinct
+  -- "un-pay" type in the domain — the item_id-is-null guards inside
+  -- record_khata_entry below mean it naturally skips any stock effect
+  -- for that case, only restoring the balance.
+  v_new_type := case v_entry.type
+    when 'purchase' then 'return'
+    when 'return' then 'purchase'
+    when 'payment' then 'purchase'
+  end;
+
+  -- Reuses record_khata_entry itself rather than duplicating its
+  -- insert+stock-movement logic — same code path, same stock behavior
+  -- (a purchase-type reversal decreases stock exactly the way a real
+  -- purchase entry would, a return-type reversal increases it exactly
+  -- the way a real return would), guaranteed to stay in sync with it.
+  v_new_id := record_khata_entry(
+    v_entry.customer_id, v_new_type, v_entry.item_id, v_entry.item_name, v_entry.qty, v_entry.amount,
+    'Reversal of #INV-' || v_entry.entry_number, v_entry.payment_method
+  );
+
+  update khata_entries set reversal_of = v_entry.id where id = v_new_id;
+  update khata_entries set reversed_at = now() where id = v_entry.id;
+end;
+$$;

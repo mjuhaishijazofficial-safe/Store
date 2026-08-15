@@ -4,7 +4,17 @@ import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useLang } from '@/lib/i18n-context';
 
-type Entry = { id: string; type: 'purchase' | 'payment' | 'return'; item_name: string | null; qty: number | null; amount: number; created_at: string };
+type Entry = {
+  id: string;
+  type: 'purchase' | 'payment' | 'return';
+  item_name: string | null;
+  qty: number | null;
+  amount: number;
+  created_at: string;
+  entry_number: number;
+  reversal_of: string | null;
+  reversed_at: string | null;
+};
 
 function fmt(n: number) {
   return '₨' + Number(n || 0).toLocaleString('en-IN');
@@ -37,7 +47,7 @@ export default function CustomerStatementModal({
     (async () => {
       const { data } = await supabase
         .from('khata_entries')
-        .select('id, type, item_name, qty, amount, created_at')
+        .select('id, type, item_name, qty, amount, created_at, entry_number, reversal_of, reversed_at')
         .eq('customer_id', customerId)
         .order('created_at', { ascending: true });
       setEntries(data || []);
@@ -88,6 +98,7 @@ export default function CustomerStatementModal({
                 <thead>
                   <tr className="border-b border-chalk/20 text-left text-[11px] text-chalkdim uppercase">
                     <th className="py-2 pr-2 font-500">{t('statement.date')}</th>
+                    <th className="py-2 pr-2 font-500">{t('statement.ref')}</th>
                     <th className="py-2 pr-2 font-500">{t('khataDetail.colDetail')}</th>
                     <th className="py-2 pr-2 text-right font-500">{t('khataDetail.colGiven')}</th>
                     <th className="py-2 pr-2 text-right font-500">{t('khataDetail.colPaid')}</th>
@@ -95,25 +106,31 @@ export default function CustomerStatementModal({
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map(r => (
-                    <tr key={r.id} className="border-b border-chalk/10">
-                      <td className="py-2 pr-2 text-xs text-chalkdim whitespace-nowrap">
-                        {new Date(r.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' })}
-                      </td>
-                      <td className="py-2 pr-2">
-                        {r.type === 'purchase' ? (r.item_name || t('khataDetail.itemDefault')) + (r.qty ? ` — ${r.qty}` : '')
-                          : r.type === 'return' ? (r.item_name || t('khataDetail.itemDefault')) + (r.qty ? ` — ${r.qty}` : '') + ` (${t('khataDetail.maalWapas')})`
-                          : t('khataDetail.paymentLabel')}
-                      </td>
-                      <td className="py-2 pr-2 text-right font-mono text-mirch tabular-nums">{r.type === 'purchase' ? fmt(r.amount) : ''}</td>
-                      {/* Return reduces the balance the same direction a
-                          payment does (no cash changed hands, but the
-                          debt still came down) — shown in the same
-                          column, distinguished by the "(Wapas)" label. */}
-                      <td className="py-2 pr-2 text-right font-mono text-dhania tabular-nums">{(r.type === 'payment' || r.type === 'return') ? fmt(r.amount) : ''}</td>
-                      <td className="py-2 text-right font-mono font-700 tabular-nums">{fmt(Math.abs(r.balance))}</td>
-                    </tr>
-                  ))}
+                  {rows.map(r => {
+                    const isReversal = !!r.reversal_of;
+                    const isReversed = !!r.reversed_at;
+                    return (
+                      <tr key={r.id} className={`border-b border-chalk/10 ${isReversed ? 'opacity-50' : ''}`}>
+                        <td className="py-2 pr-2 text-xs text-chalkdim whitespace-nowrap">
+                          {new Date(r.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' })}
+                        </td>
+                        <td className="py-2 pr-2 text-xs text-chalkdim font-mono whitespace-nowrap">#INV-{r.entry_number}</td>
+                        <td className={`py-2 pr-2 ${isReversed ? 'line-through' : ''} ${isReversal ? 'italic text-chalkdim' : ''}`}>
+                          {isReversal && `${t('khataDetail.reversedLabel')}: `}
+                          {r.type === 'purchase' ? (r.item_name || t('khataDetail.itemDefault')) + (r.qty ? ` — ${r.qty}` : '')
+                            : r.type === 'return' ? (r.item_name || t('khataDetail.itemDefault')) + (r.qty ? ` — ${r.qty}` : '') + ` (${t('khataDetail.maalWapas')})`
+                            : t('khataDetail.paymentLabel')}
+                        </td>
+                        <td className="py-2 pr-2 text-right font-mono text-mirch tabular-nums">{r.type === 'purchase' ? fmt(r.amount) : ''}</td>
+                        {/* Return reduces the balance the same direction a
+                            payment does (no cash changed hands, but the
+                            debt still came down) — shown in the same
+                            column, distinguished by the "(Wapas)" label. */}
+                        <td className="py-2 pr-2 text-right font-mono text-dhania tabular-nums">{(r.type === 'payment' || r.type === 'return') ? fmt(r.amount) : ''}</td>
+                        <td className="py-2 text-right font-mono font-700 tabular-nums">{fmt(Math.abs(r.balance))}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

@@ -13,7 +13,21 @@ import { useLang } from '@/lib/i18n-context';
 // actually delete, or it quietly disarms itself — no popup, no
 // navigation, matches the "fewer screens" philosophy the whole app
 // already leans on.
-export default function ConfirmDeleteButton({ onConfirm, className }: { onConfirm: () => void; className?: string }) {
+export default function ConfirmDeleteButton({
+  onConfirm,
+  className,
+  icon,
+  confirmLabel
+}: {
+  onConfirm: () => void;
+  className?: string;
+  // Khata's "reverse instead of delete" reuses this same tap-to-arm
+  // interaction (armed/confirm/auto-disarm) with a different icon and
+  // confirm-label — everything else about the two-tap safety pattern is
+  // identical, so this stays one component rather than a near-duplicate.
+  icon?: string;
+  confirmLabel?: string;
+}) {
   const { t } = useLang();
   const [confirming, setConfirming] = useState(false);
 
@@ -29,7 +43,7 @@ export default function ConfirmDeleteButton({ onConfirm, className }: { onConfir
         onClick={e => { e.stopPropagation(); setConfirming(false); onConfirm(); }}
         className="text-mirch text-xs font-700 shrink-0 whitespace-nowrap"
       >
-        {t('common.confirmDelete')}
+        {confirmLabel || t('common.confirmDelete')}
       </button>
     );
   }
@@ -39,7 +53,7 @@ export default function ConfirmDeleteButton({ onConfirm, className }: { onConfir
       onClick={e => { e.stopPropagation(); setConfirming(true); }}
       className={className || 'text-chalkdim text-xs hover:text-mirch shrink-0'}
     >
-      ✕
+      {icon || '✕'}
     </button>
   );
 }

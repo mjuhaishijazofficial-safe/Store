@@ -30,6 +30,9 @@ type Entry = {
   amount: number;
   note: string | null;
   created_at: string;
+  entry_number: number;
+  reversal_of: string | null;
+  reversed_at: string | null;
 };
 
 type ItemLite = { id: string; name: string; price: number; unit: string | null; stock: number };
@@ -235,9 +238,12 @@ export default function KhataDetailPage() {
     }
   }
 
-  async function deleteEntry(id: string) {
-    // Atomic: also restores any inventory stock this entry had deducted.
-    const { error: err } = await supabase.rpc('delete_khata_entry', { p_entry_id: id });
+  // Replaces the old hard-delete: inserts a mirror-image entry (opposite
+  // balance/stock effect) instead of erasing the original row, so the
+  // full history stays traceable — the original just gets marked
+  // reversed_at and stays visible (crossed out) in the list below.
+  async function reverseEntry(id: string) {
+    const { error: err } = await supabase.rpc('reverse_khata_entry', { p_entry_id: id });
     if (err) { showToast(t('common.error'), 'error'); return; }
     await loadAll();
     await reloadItems();
@@ -392,14 +398,27 @@ export default function KhataDetailPage() {
               isPurchase ? (e.item_name || t('khataDetail.itemDefault')) + (e.qty ? ` — ${e.qty}` : '')
               : e.type === 'return' ? (e.item_name || t('khataDetail.itemDefault')) + (e.qty ? ` — ${e.qty}` : '') + ` (${t('khataDetail.maalWapas')})`
               : t('khataDetail.paymentLabel');
+            // A reversal row (reversal_of set) is an administrative
+            // correction, not a real transaction — muted/italic so it
+            // never reads as "another sale". The original it reversed
+            // (reversed_at set) stays fully visible but struck through,
+            // and loses its own reverse button — you can't reverse a
+            // reversal, and re-reversing the original would double-undo it.
+            const isReversal = !!e.reversal_of;
+            const isReversed = !!e.reversed_at;
             return (
-              <div key={e.id} className="p-3 px-4 flex items-center gap-3">
+              <div key={e.id} className={`p-3 px-4 flex items-center gap-3 ${isReversed ? 'opacity-50' : ''}`}>
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${badgeBg}`}>
                   {icon}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="font-600 text-sm truncate">{label}</div>
-                  <div className="text-[11px] text-chalkdim mt-0.5 truncate">{when}{e.note ? ` • ${e.note}` : ''}</div>
+                  <div className={`font-600 text-sm truncate ${isReversed ? 'line-through' : ''} ${isReversal ? 'italic text-chalkdim' : ''}`}>
+                    {isReversal ? `${t('khataDetail.reversedLabel')}: ${label}` : label}
+                  </div>
+                  <div className="text-[11px] text-chalkdim mt-0.5 truncate">
+                    #INV-{e.entry_number} • {when}{e.note && !isReversal ? ` • ${e.note}` : ''}
+                    {isReversed && ` • ${t('khataDetail.reversedBadge')}`}
+                  </div>
                 </div>
                 <div className="text-right shrink-0">
                   <div className={`font-mono font-700 text-sm tabular-nums ${color}`}>
@@ -409,7 +428,13 @@ export default function KhataDetailPage() {
                     {t('khataDetail.colBalance')}: {fmt(Math.abs(bal))}
                   </div>
                 </div>
-                <ConfirmDeleteButton onConfirm={() => deleteEntry(e.id)} />
+                {!isReversal && !isReversed && (
+                  <ConfirmDeleteButton
+                    onConfirm={() => reverseEntry(e.id)}
+                    icon="↺"
+                    confirmLabel={t('khataDetail.confirmReverse')}
+                  />
+                )}
               </div>
             );
           })}
