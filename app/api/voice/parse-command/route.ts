@@ -29,6 +29,8 @@ Fields:
 - amount: a rupee amount only if one was explicitly spoken (null otherwise — the app calculates it from the item's own price when qty + item are known instead).
 - query: for "general_query" only — the question or request itself, cleaned up (wake word removed), as plain text. Null for every other action.
 
+You may be given the last few turns of this same conversation before the new command. Use them ONLY to resolve a vague reference in the new command — a pronoun ("usay", "ussi ko", "unhe") or an implied repeat ("aur 500 bhi de do", "wapas wahi karo") that refers to a customer or item named in a recent turn. Never carry a customer/item name forward when the new command already names someone/something different, and never use history to fill in a customer name for an action that doesn't mention a customer reference at all.
+
 Reply with JSON only.`;
 
 // Lowercase JSON Schema — what OpenAI's json_schema response format
@@ -59,12 +61,25 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'not_configured' }, { status: 503 });
   }
 
-  const { transcript } = await req.json().catch(() => ({ transcript: null }));
+  const { transcript, history } = await req.json().catch(() => ({ transcript: null, history: null }));
   if (!transcript || typeof transcript !== 'string' || !transcript.trim()) {
     return NextResponse.json({ error: 'transcript required' }, { status: 400 });
   }
 
-  const { text, rateLimited } = await askLlm(`${PROMPT}\n\nCommand: "${transcript.trim()}"`, RESPONSE_SCHEMA);
+  // Short-term memory: the last few exchanges, sent by the client
+  // (VoicePage keeps this in memory only — nothing persisted server-
+  // side). Capped defensively here too in case a caller ever sends
+  // more; each turn is one short line, so even the max cost is small.
+  const historyLines = Array.isArray(history)
+    ? history
+        .slice(-4)
+        .filter((h: any) => h && typeof h.user === 'string' && typeof h.eagle === 'string')
+        .map((h: any) => `User: ${h.user}\nEagle: ${h.eagle}`)
+        .join('\n')
+    : '';
+  const historyBlock = historyLines ? `\n\nRecent conversation:\n${historyLines}` : '';
+
+  const { text, rateLimited } = await askLlm(`${PROMPT}${historyBlock}\n\nNew command: "${transcript.trim()}"`, RESPONSE_SCHEMA);
 
   // A spent quota is a different problem from "the AI couldn't
   // understand you" — the user needs to know to wait, not to try

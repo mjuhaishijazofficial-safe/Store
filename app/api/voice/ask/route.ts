@@ -26,12 +26,25 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'not_configured' }, { status: 503 });
   }
 
-  const { query } = await req.json().catch(() => ({ query: null }));
+  const { query, history } = await req.json().catch(() => ({ query: null, history: null }));
   if (!query || typeof query !== 'string' || !query.trim()) {
     return NextResponse.json({ error: 'query required' }, { status: 400 });
   }
 
-  const prompt = `${SYSTEM_PROMPT}\n\nQuestion: ${query.trim()}`;
+  // Short-term memory (see parse-command's own copy of this) — lets a
+  // follow-up like "iska matlab kya hai" or "aur bhi batao" refer back
+  // to what Eagle just said instead of landing as a standalone,
+  // context-free question.
+  const historyLines = Array.isArray(history)
+    ? history
+        .slice(-4)
+        .filter((h: any) => h && typeof h.user === 'string' && typeof h.eagle === 'string')
+        .map((h: any) => `User: ${h.user}\nEagle: ${h.eagle}`)
+        .join('\n')
+    : '';
+  const historyBlock = historyLines ? `\n\nRecent conversation:\n${historyLines}` : '';
+
+  const prompt = `${SYSTEM_PROMPT}${historyBlock}\n\nNew question: ${query.trim()}`;
 
   // Both are fired together rather than one-then-the-other: web search
   // (Gemini's tool, the only live-results option here) is the slower
