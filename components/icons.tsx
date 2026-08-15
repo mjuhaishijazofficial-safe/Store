@@ -266,3 +266,23 @@ export function MicIcon({ className }: IconProps) {
     </svg>
   );
 }
+
+export function SpeakerOnIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} {...base}>
+      <path d="M4 9v6h4l5 4V5L8 9H4Z" />
+      <path d="M16.5 9a5 5 0 0 1 0 6" />
+      <path d="M19 6.5a9 9 0 0 1 0 11" />
+    </svg>
+  );
+}
+
+export function SpeakerOffIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} {...base}>
+      <path d="M4 9v6h4l5 4V5L8 9H4Z" />
+      <path d="M16 9l5 6" />
+      <path d="M21 9l-5 6" />
+    </svg>
+  );
+}

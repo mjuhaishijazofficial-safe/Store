@@ -8,7 +8,10 @@ import { useShop } from '@/lib/shop-context';
 import { useToast } from '@/lib/toast-context';
 import { useSectionGuard } from '@/lib/use-section-guard';
 import { getSttProvider } from '@/lib/voice/stt-provider';
-import { ArrowLeftIcon, MicIcon } from '@/components/icons';
+import { speak, stopSpeaking, isTtsSupported } from '@/lib/voice/tts';
+import { ArrowLeftIcon, MicIcon, SpeakerOnIcon, SpeakerOffIcon } from '@/components/icons';
+
+const VOICE_REPLY_KEY = 'eagle:voiceReplyEnabled';
 
 type Stage = 'idle' | 'listening' | 'processing' | 'confirm' | 'error' | 'done';
 
@@ -51,11 +54,44 @@ export default function VoicePage() {
   const [errorMsg, setErrorMsg] = useState('');
   const [resolved, setResolved] = useState<ResolvedCommand | null>(null);
   const [confirming, setConfirming] = useState(false);
+  // Persisted per-device (not per-shop) — a shop counter with customers
+  // standing around may not want Eagle talking out loud even if the
+  // owner does at home; localStorage keeps that a personal choice, not
+  // a setting that follows the account onto every device.
+  const [voiceReplyOn, setVoiceReplyOn] = useState(true);
   const stt = useRef(getSttProvider());
 
   useEffect(() => {
-    return () => { stt.current.stop(); };
+    const saved = localStorage.getItem(VOICE_REPLY_KEY);
+    if (saved !== null) setVoiceReplyOn(saved === '1');
   }, []);
+
+  useEffect(() => {
+    return () => { stt.current.stop(); stopSpeaking(); };
+  }, []);
+
+  function toggleVoiceReply() {
+    setVoiceReplyOn(prev => {
+      const next = !prev;
+      localStorage.setItem(VOICE_REPLY_KEY, next ? '1' : '0');
+      if (!next) stopSpeaking();
+      return next;
+    });
+  }
+
+  // Eagle speaks back at exactly the moments it has something to say —
+  // the confirm summary (so the shopkeeper hears what was understood,
+  // not just reads it), and the final result (done/error). Listening/
+  // processing stay silent on purpose — narrating "I'm listening" every
+  // single time would get old fast and adds nothing a human doesn't
+  // already see from the pulsing avatar.
+  useEffect(() => {
+    if (!voiceReplyOn) return;
+    if (stage === 'confirm' && resolved) speak(`${resolved.summary}. ${t('voice.confirmPrompt')}`, lang);
+    else if (stage === 'done') speak(t('voice.done'), lang);
+    else if (stage === 'error' && errorMsg) speak(errorMsg, lang);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stage]);
 
   function reset() {
     setStage('idle');
@@ -210,10 +246,21 @@ export default function VoicePage() {
 
   return (
     <div className="min-h-[80vh] flex flex-col">
-      <Link href="/dashboard/khata" className="text-xs text-chalkdim hover:text-haldi inline-flex items-center gap-1 mb-2">
-        <ArrowLeftIcon className="w-3.5 h-3.5" />
-        {t('khataDetail.back')}
-      </Link>
+      <div className="flex items-center justify-between mb-2">
+        <Link href="/dashboard/khata" className="text-xs text-chalkdim hover:text-haldi inline-flex items-center gap-1">
+          <ArrowLeftIcon className="w-3.5 h-3.5" />
+          {t('khataDetail.back')}
+        </Link>
+        {isTtsSupported() && (
+          <button
+            onClick={toggleVoiceReply}
+            title={voiceReplyOn ? t('voice.muteReply') : t('voice.unmuteReply')}
+            className="text-chalkdim hover:text-haldi"
+          >
+            {voiceReplyOn ? <SpeakerOnIcon className="w-4 h-4" /> : <SpeakerOffIcon className="w-4 h-4" />}
+          </button>
+        )}
+      </div>
 
       <div className="flex-1 flex flex-col items-center justify-center py-10 text-center">
         {/* The "Eagle" avatar — concentric rings pulse continuously while
