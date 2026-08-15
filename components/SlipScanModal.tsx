@@ -217,8 +217,15 @@ export default function SlipScanModal({
       if (receiveErr) throw receiveErr;
 
       onDone();
-    } catch {
-      showToast(t('common.error'), 'error');
+    } catch (e: any) {
+      // Surfaces the real Postgres/Supabase error text instead of a
+      // generic message — items already created in the loop above
+      // (before whichever step failed) stay in Inventory at stock 0
+      // rather than being rolled back, so knowing exactly what failed
+      // here is the difference between a one-line fix and guessing.
+      console.error('[SlipScanModal] confirmAndSave failed', e);
+      const detail = e?.message || e?.error_description || e?.hint || '';
+      showToast(detail ? `${t('common.error')}: ${detail}` : t('common.error'), 'error');
     } finally {
       setConfirming(false);
     }
