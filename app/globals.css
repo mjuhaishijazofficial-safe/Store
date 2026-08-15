@@ -191,14 +191,34 @@ body {
   font-family: 'JetBrains Mono', monospace;
 }
 
+/* Self-hosted Jameel Noori Nastaleeq. The font file is NOT in the repo
+   (it's proprietary — it has to be obtained and dropped in separately),
+   so this @font-face intentionally resolves to nothing until someone
+   places the file at public/fonts/. That is a no-op, not a breakage:
+   the browser silently moves to the next family in the stack below
+   (Noto Nastaliq Urdu), so Urdu still renders in proper Nastaliq
+   either way — adding the file only upgrades which Nastaliq face is
+   used, and needs no other change anywhere.
+
+   local() is tried first so a reader who already has the font
+   installed on their machine uses that copy and downloads nothing. */
+@font-face {
+  font-family: 'Jameel Noori Nastaleeq';
+  src: local('Jameel Noori Nastaleeq'),
+       url('/fonts/JameelNooriNastaleeq.woff2') format('woff2'),
+       url('/fonts/JameelNooriNastaleeq.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  /* swap: text shows immediately in the fallback face rather than
+     staying invisible while a large Nastaliq file downloads. */
+  font-display: swap;
+}
+
 /* Nastaliq typography for Urdu (spec: "Jameel Noori Nastaleeq").
-   Jameel Noori Nastaleeq itself is a proprietary font with no web-
-   licensed CDN copy, so it's listed FIRST to be picked up from the
-   reader's own machine when installed (common on Urdu-using Windows
-   systems) — and Noto Nastaliq Urdu, Google's open-licensed Nastaliq
-   face, carries everyone else. Self-hosting Jameel Noori later needs
-   nothing but an @font-face block declaring that exact family name;
-   this stack already prefers it.
+   Jameel Noori is listed FIRST — served by the @font-face above when
+   the file is present or the reader has it installed — with Noto
+   Nastaliq Urdu, Google's open-licensed Nastaliq face, carrying
+   everyone else.
 
    Scoped to the Urdu locale only (html[lang="ur"], set in
    app/layout.tsx) — the English UI keeps Inter/Baloo untouched. */
