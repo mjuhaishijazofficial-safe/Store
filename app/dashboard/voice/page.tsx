@@ -43,7 +43,7 @@ type PendingClarify = { candidates: MatchRow[]; resolve: (row: MatchRow) => void
 
 type ParsedIntent = {
   action:
-    | 'khata_purchase' | 'khata_payment' | 'khata_return' | 'add_customer' | 'check_balance' | 'check_stock' | 'print_statement'
+    | 'khata_purchase' | 'khata_payment' | 'khata_return' | 'add_customer' | 'check_balance' | 'check_stock' | 'inventory_summary' | 'print_statement'
     | 'stock_in' | 'stock_out' | 'add_expense' | 'check_expense_total' | 'check_sales_total' | 'check_supplier_balance' | 'supplier_payment'
     | 'general_query' | 'unknown';
   customer_name: string | null;
@@ -474,6 +474,26 @@ export default function VoicePage() {
       return;
     }
 
+    if (intent.action === 'inventory_summary') {
+      if (!requireSection('inventory', rawText)) return;
+      // Same low/out-of-stock definitions Inventory's own stat row uses
+      // (app/dashboard/inventory/page.tsx) — this answer can't disagree
+      // with what that page shows.
+      const { data: allItems } = await supabase.from('items').select('name, stock, min_stock').eq('shop_id', shopId);
+      const rows = allItems || [];
+      const outOfStock = rows.filter((i: any) => i.stock <= 0);
+      const lowStock = rows.filter((i: any) => i.stock > 0 && i.stock <= i.min_stock);
+      const NAMES_LIMIT = 6;
+      const nameList = (list: any[]) => list.slice(0, NAMES_LIMIT).map(i => i.name).join(', ') + (list.length > NAMES_LIMIT ? ` +${list.length - NAMES_LIMIT}` : '');
+      let answer = t('voice.answerInventorySummary').replace('{total}', String(rows.length)).replace('{low}', String(lowStock.length)).replace('{out}', String(outOfStock.length));
+      if (outOfStock.length > 0) answer += ' ' + t('voice.answerOutOfStockNames').replace('{names}', nameList(outOfStock));
+      if (lowStock.length > 0) answer += ' ' + t('voice.answerLowStockNames').replace('{names}', nameList(lowStock));
+      setAnswerText(answer);
+      setStage('done');
+      pushHistory(rawText, answer);
+      return;
+    }
+
     if (intent.action === 'check_expense_total') {
       if (!requireSection('expenses', rawText)) return;
       const { data: rows } = await supabase.from('expenses').select('amount').eq('shop_id', shopId).gte('created_at', startOfTodayPKT().toISOString());
@@ -529,7 +549,7 @@ export default function VoicePage() {
     }
 
     if (
-      intent.action === 'check_balance' || intent.action === 'check_stock'
+      intent.action === 'check_balance' || intent.action === 'check_stock' || intent.action === 'inventory_summary'
       || intent.action === 'check_expense_total' || intent.action === 'check_sales_total' || intent.action === 'check_supplier_balance'
     ) {
       await answerLookup(intent, rawText);
@@ -648,6 +668,22 @@ export default function VoicePage() {
       if (!name) { await answerGeneralQuery(rawText); return; }
       const existing = await findBestMatch('customers', name);
       if (existing && existing.name.trim().toLowerCase() === name.toLowerCase()) {
+        const newPhone = intent.customer_phone?.trim();
+        // A customer already existing isn't the end of it if a phone
+        // number was actually spoken this time — "Irshad Khan ka
+        // contact add karo, 03049444902" for someone already in Khata
+        // (added earlier with no number, say) is a real, useful edit,
+        // not a no-op. Only offers the update when the number actually
+        // differs from what's on file — repeating the same command
+        // twice doesn't prompt a pointless "confirm" a second time.
+        const { data: current } = await supabase.from('customers').select('phone').eq('id', existing.id).single();
+        if (newPhone && current?.phone !== newPhone) {
+          const summary = t('voice.summaryUpdatePhone').replace('{name}', existing.name).replace('{phone}', newPhone);
+          setResolved({ intent, rawText, customerId: existing.id, supplierId: null, customerName: existing.name, itemId: null, amount: 0, summary });
+          setStage('confirm');
+          pushHistory(rawText, summary);
+          return;
+        }
         const answer = t('voice.answerCustomerExists').replace('{name}', existing.name);
         setAnswerText(answer);
         setStage('done');
@@ -715,24 +751,30 @@ export default function VoicePage() {
     setConfirming(true);
 
     if (resolved.intent.action === 'add_customer') {
-      const { error: addErr } = await supabase.from('customers').insert({
-        shop_id: shopId,
-        name: resolved.customerName,
-        phone: resolved.intent.customer_phone?.trim() || null
-      });
+      // customerId set means resolveIntent found this exact name already
+      // existing and this confirm is really "update their phone", not
+      // "create a new row" — see the add_customer branch above.
+      const { error: addErr } = resolved.customerId
+        ? await supabase.from('customers').update({ phone: resolved.intent.customer_phone?.trim() || null }).eq('id', resolved.customerId)
+        : await supabase.from('customers').insert({
+            shop_id: shopId,
+            name: resolved.customerName,
+            phone: resolved.intent.customer_phone?.trim() || null
+          });
       setConfirming(false);
       if (addErr) {
         setStage('error');
         setErrorMsg(t('common.error'));
         return;
       }
-      setAnswerText(t('voice.doneCustomerAdded'));
+      const done = resolved.customerId ? t('voice.donePhoneUpdated') : t('voice.doneCustomerAdded');
+      setAnswerText(done);
       setStage('done');
       // Overwrites the "about to add" note pushed when the confirm card
       // first appeared with what actually happened — a later "usay
       // 500 rupay bhi de do" then resolves against a customer who
       // genuinely exists now, not one still theoretical at that point.
-      pushHistory(resolved.rawText, t('voice.doneCustomerAdded'));
+      pushHistory(resolved.rawText, done);
       return;
     }
 

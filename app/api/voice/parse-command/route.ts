@@ -12,9 +12,10 @@ Recognize exactly these actions:
 - "khata_purchase": a customer received/bought goods on credit (e.g. "Zuhair ke khata mein 4 kilo cheeni add karo", "Ali ko 2 packet biscuit diye", "Zuhair se 500 rupay ka saman gaya")
 - "khata_payment": the shop RECEIVED money from a customer — a repayment, a part payment, or an advance paid up front (e.g. "Zuhair ne 500 rupay diye", "Ali se payment mil gayi 1000 rupay", "Ali ne mujhe 1000 rupay advance diya", "Bilal ne 2000 jama karaye"). An advance counts here exactly like any other payment: money came in. "Zuhair ne paisa nahi diya" is NOT a payment — only a clearly stated amount actually received counts.
 - "khata_return": a customer returned goods (e.g. "Ali ne cheeni wapas ki", "Zuhair ka saman return ho gaya")
-- "add_customer": create a NEW customer record (e.g. "naya customer add karo Zuhair", "Ali naam ka customer bana do", "naya khata kholo Bilal ka", "add a new customer named Ahmed"). A phone number may or may not be spoken.
+- "add_customer": create a NEW customer record, OR set/update an existing customer's phone number — both go through this same action (e.g. "naya customer add karo Zuhair", "Ali naam ka customer bana do", "Irshad Khan ka contact add karo, 03049444902", "Zuhair ka number update karo 0300xxxxxxx"). A phone number may or may not be spoken.
 - "check_balance": asking how much a customer owes (e.g. "Zuhair ka balance kitna hai", "Ali kitne ka udhaar hai", "how much does Bilal owe")
-- "check_stock": asking how much of an item is in stock (e.g. "cheeni kitni bachi hai", "Dalda ka stock kya hai", "how much rice do we have")
+- "check_stock": asking how much of one specific item is in stock (e.g. "cheeni kitni bachi hai", "Dalda ka stock kya hai", "how much rice do we have")
+- "inventory_summary": asking about overall inventory health rather than one item — how many products, what's low/out of stock (e.g. "poori inventory ka haal batao", "kitne items kam stock mein hain", "kya kya khatam ho gaya hai", "stock ki overall situation kya hai")
 - "print_statement": print / show / open a customer's full khata statement (e.g. "Ahsan ka khata nikal ke sara data print kar do", "Zuhair ka statement print karo", "Ali ka poora hisaab nikalo", "print Bilal's account statement")
 - "stock_in": new stock arrived for an item already (or about to be) in inventory — a purchase into the shop's own stock, NOT a customer's khata (e.g. "Dalda cooking oil ka 10 piece stock mein add karo", "cheeni ke 5 bori aaye hain add kar do", "20 packet biscuit stock in karo")
 - "stock_out": stock leaving inventory for a reason OTHER than a normal counter sale — damage, personal use, a correction (e.g. "2 packet biscuit kharab ho gaye, stock se nikal do", "5 piece cheeni adjust kar do stock mein se"). A normal walk-in cash sale belongs on the Billing/POS screen, not here — if the command sounds like ringing up a sale rather than removing damaged/miscounted stock, treat it as "unknown".
@@ -51,7 +52,7 @@ const RESPONSE_SCHEMA = {
     action: {
       type: 'string',
       enum: [
-        'khata_purchase', 'khata_payment', 'khata_return', 'add_customer', 'check_balance', 'check_stock', 'print_statement',
+        'khata_purchase', 'khata_payment', 'khata_return', 'add_customer', 'check_balance', 'check_stock', 'inventory_summary', 'print_statement',
         'stock_in', 'stock_out', 'add_expense', 'check_expense_total', 'check_sales_total', 'check_supplier_balance', 'supplier_payment',
         'general_query', 'unknown'
       ]
