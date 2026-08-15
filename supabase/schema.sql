@@ -402,6 +402,18 @@ $$;
 
 -- Khata purchase/payment entry, atomic with the inventory stock deduction
 -- when the item was picked from inventory.
+--
+-- record_khata_entry later grows a return type change (void -> uuid, see
+-- the reverse_khata_entry section far below) — on a database that has
+-- already run this file once and picked up that change, re-running the
+-- whole file from the top hits this exact `create or replace` and fails
+-- with "cannot change return type of existing function" the instant it
+-- tries to redefine the now-uuid-returning function back to void.
+-- Dropping unconditionally right here, every run, keeps this file safe
+-- to re-run any number of times regardless of which version is already
+-- live — the drop is a no-op on a truly fresh database (nothing exists
+-- yet to drop) and a fix on one that's already been upgraded.
+drop function if exists record_khata_entry(uuid, text, uuid, text, numeric, numeric, text, text);
 create or replace function record_khata_entry(
   p_customer_id uuid,
   p_type text,
