@@ -2,24 +2,26 @@
 
 import type { SttProvider } from './types';
 
-// Paid upgrade path (once there's budget): records raw audio and sends
-// it to /api/voice/transcribe, which calls OpenAI Whisper server-side
-// (OPENAI_API_KEY). Same SttProvider shape as webSpeechStt — swapping
-// the active provider is a one-line env change
+// Records mic audio and sends it to /api/voice/transcribe, which calls
+// OpenAI Whisper server-side (OPENAI_API_KEY). Same SttProvider shape as
+// webSpeechStt — swapping the active provider is a one-line env change
 // (NEXT_PUBLIC_VOICE_STT_PROVIDER), nothing else in the voice-command
 // feature has to change.
 //
-// Auto-stops on its own once the speaker goes quiet, via a Web Audio
-// AnalyserNode watching the mic's own volume level — MediaRecorder has
-// no built-in "stopped talking" signal the way SpeechRecognition does,
-// so this is hand-rolled. stop() is still exposed for an early manual
-// cut-off (a second tap on the mic button), but nobody should actually
-// need it in normal use — that's the whole fix for "it just sits there
-// listening and never responds" (silence used to require a second tap
-// the UI only hinted at in small text under the button).
-const SILENCE_THRESHOLD = 10; // 0-255 volume scale (analyser byte data) — below this counts as quiet. Tune up if a noisy shop floor trips silence detection while someone is still mid-sentence.
-const SILENCE_DURATION_MS = 900; // how long it has to stay quiet after real speech was heard before auto-stopping. Was 1400ms — trimmed since every extra ms here is pure dead air on top of the transcribe+parse round trips that follow, and 900ms is still comfortably longer than a natural mid-sentence breath.
-const MAX_RECORDING_MS = 20000; // hard ceiling regardless of silence detection — never records forever even if silence detection somehow never fires.
+// Voice-activity detection is hand-rolled (MediaRecorder has no
+// "stopped talking" signal the way SpeechRecognition does) and modelled
+// on how Google's mic behaves: calibrate the room's own noise floor
+// first, treat anything meaningfully above it as speech, and stop
+// shortly after the speaker goes quiet. A fixed absolute threshold
+// (what this used to do) can't work across a silent room and a busy
+// shop floor at once — too high and a soft speaker never registers at
+// all, too low and background hum reads as endless speech.
+const CALIBRATION_MS = 350;        // ambient-noise sampling window at the very start, before speech is expected.
+const NOISE_MARGIN = 0.012;        // how far above the measured noise floor RMS must rise to count as speech.
+const MIN_SPEECH_RMS = 0.015;      // absolute floor — protects against a near-silent calibration making the threshold hair-trigger.
+const SILENCE_DURATION_MS = 900;   // quiet time after speech before auto-stopping.
+const NO_SPEECH_TIMEOUT_MS = 7000; // if nothing is ever heard, give up rather than recording (and later uploading) 20s of silence.
+const MAX_RECORDING_MS = 20000;    // hard ceiling regardless of everything above.
 
 let mediaRecorder: MediaRecorder | null = null;
 let activeStream: MediaStream | null = null;
@@ -37,7 +39,13 @@ export const whisperStt: SttProvider = {
     // open", and "this page isn't secure enough to even ask" from each
     // other; VoicePage maps each to its own message.
     try {
-      activeStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      activeStream = await navigator.mediaDevices.getUserMedia({
+        // Browser-side cleanup before the audio ever reaches the
+        // detector below — the same processing that makes a laptop mic
+        // usable on a video call, and what keeps the noise floor low
+        // enough for a soft speaker to clear it.
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+      });
     } catch (e: any) {
       throw new Error(`mic_${e?.name || 'unknown'}`);
     }
@@ -45,18 +53,29 @@ export const whisperStt: SttProvider = {
     // Everything from here on is NOT a mic-access problem even though
     // it happens right after getting the mic — a bug here used to fall
     // through to the same generic "could not access microphone" message
-    // as an actual getUserMedia denial, which is actively misleading
-    // (that's exactly what made this hard to diagnose from a user
-    // report alone). Each stage below now throws its own distinct code.
+    // as an actual getUserMedia denial, which is actively misleading.
+    // Each stage below now throws its own distinct code.
     let blob: Blob;
+    let heardSpeech = false;
     try {
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
       const audioCtx = new AudioCtx();
+      // Safari/iOS hands back a suspended context when it wasn't opened
+      // directly inside a user gesture — without this the analyser
+      // silently reads pure zeros forever, which looks exactly like
+      // "it never hears me".
+      if (audioCtx.state === 'suspended') await audioCtx.resume().catch(() => {});
       const source = audioCtx.createMediaStreamSource(activeStream);
       const analyser = audioCtx.createAnalyser();
-      analyser.fftSize = 512;
+      analyser.fftSize = 2048;
       source.connect(analyser);
-      const levelData = new Uint8Array(analyser.frequencyBinCount);
+      // Time-domain samples, not frequency bins: RMS over the raw
+      // waveform tracks how loud someone actually is, whereas averaging
+      // frequency magnitudes across every bin dilutes a voice (which
+      // occupies a narrow band) into the noise around it — the reason
+      // normal speech could sit under a fixed frequency-average
+      // threshold and never register.
+      const samples = new Uint8Array(analyser.fftSize);
 
       const chunks: BlobPart[] = [];
       mediaRecorder = new MediaRecorder(activeStream);
@@ -69,7 +88,8 @@ export const whisperStt: SttProvider = {
 
       let rafId = 0;
       let silenceStartedAt: number | null = null;
-      let speechHeard = false;
+      let noiseFloor = 0;
+      let calibrationSamples = 0;
       const startedAt = Date.now();
 
       stopFn = () => {
@@ -79,18 +99,39 @@ export const whisperStt: SttProvider = {
       };
 
       function watchLevel() {
-        analyser.getByteFrequencyData(levelData);
-        const avg = levelData.reduce((sum, v) => sum + v, 0) / levelData.length;
+        analyser.getByteTimeDomainData(samples);
+        let sumSquares = 0;
+        for (let i = 0; i < samples.length; i++) {
+          const centered = (samples[i] - 128) / 128; // byte range is 0-255 centered on 128
+          sumSquares += centered * centered;
+        }
+        const rms = Math.sqrt(sumSquares / samples.length);
         const now = Date.now();
+        const elapsed = now - startedAt;
 
-        if (avg > SILENCE_THRESHOLD) {
-          speechHeard = true;
+        if (elapsed < CALIBRATION_MS) {
+          // Rolling average of the room before anyone speaks.
+          noiseFloor = (noiseFloor * calibrationSamples + rms) / (calibrationSamples + 1);
+          calibrationSamples++;
+          rafId = requestAnimationFrame(watchLevel);
+          return;
+        }
+
+        const threshold = Math.max(noiseFloor + NOISE_MARGIN, MIN_SPEECH_RMS);
+        if (rms > threshold) {
+          heardSpeech = true;
           silenceStartedAt = null;
-        } else if (speechHeard) {
+        } else if (heardSpeech) {
           if (silenceStartedAt === null) silenceStartedAt = now;
           else if (now - silenceStartedAt > SILENCE_DURATION_MS) { stopFn?.(); return; }
+        } else if (elapsed > NO_SPEECH_TIMEOUT_MS) {
+          // Nothing was ever heard — stop now instead of running out the
+          // full ceiling and then uploading 20s of silence to Whisper.
+          stopFn?.();
+          return;
         }
-        if (now - startedAt > MAX_RECORDING_MS) { stopFn?.(); return; }
+
+        if (elapsed > MAX_RECORDING_MS) { stopFn?.(); return; }
         rafId = requestAnimationFrame(watchLevel);
       }
       watchLevel();
@@ -106,6 +147,13 @@ export const whisperStt: SttProvider = {
 
     activeStream?.getTracks().forEach(t => t.stop());
     activeStream = null;
+
+    // Skip the upload entirely when the detector never heard anyone —
+    // Whisper happily "transcribes" silence into a plausible-looking
+    // hallucinated sentence, which is far worse than admitting nothing
+    // was heard, and it costs an API call to get that wrong answer.
+    if (!heardSpeech) throw new Error('no_speech');
+
     onPhase?.('transcribing');
 
     try {
