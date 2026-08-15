@@ -141,7 +141,14 @@ export default function VoicePage() {
         : reason === 'mic_NotFoundError' ? t('voice.errMicNotFound')
         : reason === 'mic_NotReadableError' ? t('voice.errMicBusy')
         : reason.startsWith('mic_') ? `${t('voice.errMic')} (${reason.slice(4)})`
-        : t('voice.errMic')
+        : reason === 'network_error' ? t('voice.errNetwork')
+        // Anything from the recording/upload pipeline that isn't
+        // actually a mic-access problem (AudioContext, MediaRecorder,
+        // an unexpected server response) — shown with its own detail
+        // instead of being mislabeled as "could not access microphone",
+        // which used to hide what was actually wrong.
+        : reason.startsWith('recording_failed') ? `${t('voice.errRecording')} (${reason.slice(18).trim()})`
+        : t('voice.errGeneric')
       );
     }
   }

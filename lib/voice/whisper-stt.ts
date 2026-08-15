@@ -42,67 +42,90 @@ export const whisperStt: SttProvider = {
       throw new Error(`mic_${e?.name || 'unknown'}`);
     }
 
-    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-    const audioCtx = new AudioCtx();
-    const source = audioCtx.createMediaStreamSource(activeStream);
-    const analyser = audioCtx.createAnalyser();
-    analyser.fftSize = 512;
-    source.connect(analyser);
-    const levelData = new Uint8Array(analyser.frequencyBinCount);
+    // Everything from here on is NOT a mic-access problem even though
+    // it happens right after getting the mic — a bug here used to fall
+    // through to the same generic "could not access microphone" message
+    // as an actual getUserMedia denial, which is actively misleading
+    // (that's exactly what made this hard to diagnose from a user
+    // report alone). Each stage below now throws its own distinct code.
+    let blob: Blob;
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      const audioCtx = new AudioCtx();
+      const source = audioCtx.createMediaStreamSource(activeStream);
+      const analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 512;
+      source.connect(analyser);
+      const levelData = new Uint8Array(analyser.frequencyBinCount);
 
-    const chunks: BlobPart[] = [];
-    mediaRecorder = new MediaRecorder(activeStream);
-    mediaRecorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+      const chunks: BlobPart[] = [];
+      mediaRecorder = new MediaRecorder(activeStream);
+      mediaRecorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
 
-    const recorded = new Promise<Blob>(resolve => {
-      mediaRecorder!.onstop = () => resolve(new Blob(chunks, { type: 'audio/webm' }));
-    });
-    mediaRecorder.start();
+      const recorded = new Promise<Blob>(resolve => {
+        mediaRecorder!.onstop = () => resolve(new Blob(chunks, { type: 'audio/webm' }));
+      });
+      mediaRecorder.start();
 
-    let rafId = 0;
-    let silenceStartedAt: number | null = null;
-    let speechHeard = false;
-    const startedAt = Date.now();
+      let rafId = 0;
+      let silenceStartedAt: number | null = null;
+      let speechHeard = false;
+      const startedAt = Date.now();
 
-    stopFn = () => {
-      cancelAnimationFrame(rafId);
-      audioCtx.close().catch(() => {});
-      if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
-    };
+      stopFn = () => {
+        cancelAnimationFrame(rafId);
+        audioCtx.close().catch(() => {});
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+      };
 
-    function watchLevel() {
-      analyser.getByteFrequencyData(levelData);
-      const avg = levelData.reduce((sum, v) => sum + v, 0) / levelData.length;
-      const now = Date.now();
+      function watchLevel() {
+        analyser.getByteFrequencyData(levelData);
+        const avg = levelData.reduce((sum, v) => sum + v, 0) / levelData.length;
+        const now = Date.now();
 
-      if (avg > SILENCE_THRESHOLD) {
-        speechHeard = true;
-        silenceStartedAt = null;
-      } else if (speechHeard) {
-        if (silenceStartedAt === null) silenceStartedAt = now;
-        else if (now - silenceStartedAt > SILENCE_DURATION_MS) { stopFn?.(); return; }
+        if (avg > SILENCE_THRESHOLD) {
+          speechHeard = true;
+          silenceStartedAt = null;
+        } else if (speechHeard) {
+          if (silenceStartedAt === null) silenceStartedAt = now;
+          else if (now - silenceStartedAt > SILENCE_DURATION_MS) { stopFn?.(); return; }
+        }
+        if (now - startedAt > MAX_RECORDING_MS) { stopFn?.(); return; }
+        rafId = requestAnimationFrame(watchLevel);
       }
-      if (now - startedAt > MAX_RECORDING_MS) { stopFn?.(); return; }
-      rafId = requestAnimationFrame(watchLevel);
-    }
-    watchLevel();
+      watchLevel();
 
-    const blob = await recorded;
-    stopFn = null;
-    activeStream.getTracks().forEach(t => t.stop());
+      blob = await recorded;
+      stopFn = null;
+    } catch (e: any) {
+      stopFn = null;
+      activeStream?.getTracks().forEach(t => t.stop());
+      activeStream = null;
+      throw new Error(`recording_failed: ${e?.message || e?.name || 'unknown'}`);
+    }
+
+    activeStream?.getTracks().forEach(t => t.stop());
     activeStream = null;
 
-    const form = new FormData();
-    form.append('audio', blob, 'command.webm');
-    form.append('lang', lang);
-    const res = await fetch('/api/voice/transcribe', { method: 'POST', body: form });
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      throw new Error(body.error === 'not_configured' ? 'whisper_not_configured' : 'transcribe_failed');
+    try {
+      const form = new FormData();
+      form.append('audio', blob, 'command.webm');
+      form.append('lang', lang);
+      const res = await fetch('/api/voice/transcribe', { method: 'POST', body: form });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error === 'not_configured' ? 'whisper_not_configured' : 'transcribe_failed');
+      }
+      const data = await res.json();
+      if (!data.transcript || !String(data.transcript).trim()) throw new Error('no_speech');
+      return String(data.transcript).trim();
+    } catch (e: any) {
+      if (e?.message === 'whisper_not_configured' || e?.message === 'transcribe_failed' || e?.message === 'no_speech') throw e;
+      // fetch() itself throwing (offline, DNS, CORS...) rather than
+      // resolving with a non-ok response — a genuinely different
+      // problem from "Whisper said no".
+      throw new Error('network_error');
     }
-    const data = await res.json();
-    if (!data.transcript || !String(data.transcript).trim()) throw new Error('no_speech');
-    return String(data.transcript).trim();
   },
 
   stop() {
