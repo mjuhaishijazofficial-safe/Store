@@ -16,12 +16,13 @@ const VOICE_REPLY_KEY = 'eagle:voiceReplyEnabled';
 type Stage = 'idle' | 'listening' | 'processing' | 'confirm' | 'error' | 'done';
 
 type ParsedIntent = {
-  action: 'khata_purchase' | 'khata_payment' | 'khata_return' | 'unknown';
+  action: 'khata_purchase' | 'khata_payment' | 'khata_return' | 'general_query' | 'unknown';
   customer_name: string | null;
   item_name: string | null;
   qty: number | null;
   unit: string | null;
   amount: number | null;
+  query: string | null;
 };
 
 type ResolvedCommand = {
@@ -37,11 +38,12 @@ function fmt(n: number) {
   return '₨' + Number(n || 0).toLocaleString('en-IN');
 }
 
-// "Eagle" — a voice command is always Khata-shaped (spec: the example
-// the whole feature was scoped from was "Zuhair ke khata mein 4kg sugar
-// add karo"), so this reuses record_khata_entry, the exact same RPC
-// every manual Khata entry already goes through. Nothing new executes —
-// voice is just another way to fill in that one form.
+// "Eagle" — a Khata-shaped command (the feature's original scope:
+// "Zuhair ke khata mein 4kg sugar add karo") reuses record_khata_entry,
+// the exact same RPC every manual Khata entry already goes through.
+// Anything else spoken to it — a question, a search, "shukriya" — is
+// answered read-only via /api/voice/ask (Gemini, optionally grounded
+// with a live Google Search) and never touches the ledger at all.
 export default function VoicePage() {
   const supabase = createClient();
   const { t, lang } = useLang();
@@ -54,6 +56,9 @@ export default function VoicePage() {
   const [errorMsg, setErrorMsg] = useState('');
   const [resolved, setResolved] = useState<ResolvedCommand | null>(null);
   const [confirming, setConfirming] = useState(false);
+  // Set only for a general_query answer — a plain spoken/read reply,
+  // no confirm step, nothing written anywhere (see /api/voice/ask).
+  const [answerText, setAnswerText] = useState('');
   // Persisted per-device (not per-shop) — a shop counter with customers
   // standing around may not want Eagle talking out loud even if the
   // owner does at home; localStorage keeps that a personal choice, not
@@ -88,7 +93,7 @@ export default function VoicePage() {
   useEffect(() => {
     if (!voiceReplyOn) return;
     if (stage === 'confirm' && resolved) speak(`${resolved.summary}. ${t('voice.confirmPrompt')}`, lang);
-    else if (stage === 'done') speak(t('voice.done'), lang);
+    else if (stage === 'done') speak(answerText || t('voice.done'), lang);
     else if (stage === 'error' && errorMsg) speak(errorMsg, lang);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stage]);
@@ -98,6 +103,7 @@ export default function VoicePage() {
     setTranscript('');
     setErrorMsg('');
     setResolved(null);
+    setAnswerText('');
   }
 
   async function toggleListening() {
@@ -176,7 +182,35 @@ export default function VoicePage() {
     return exact || rows[0];
   }
 
+  // Read-only leg — a question/search/general chat, never touches
+  // Khata/stock. No confirm step: nothing here is reversible-because-
+  // nothing-happened, so there's nothing to confirm before doing.
+  async function answerGeneralQuery(query: string) {
+    try {
+      const res = await fetch('/api/voice/ask', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ query })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.answer) {
+        setStage('error');
+        setErrorMsg(data.error === 'not_configured' ? t('voice.errGeminiNotConfigured') : t('voice.errParse'));
+        return;
+      }
+      setAnswerText(data.answer);
+      setStage('done');
+    } catch {
+      setStage('error');
+      setErrorMsg(t('voice.errParse'));
+    }
+  }
+
   async function resolveIntent(intent: ParsedIntent, rawText: string) {
+    if (intent.action === 'general_query') {
+      await answerGeneralQuery(intent.query || rawText);
+      return;
+    }
     if (intent.action === 'unknown' || !intent.customer_name) {
       setStage('error');
       setErrorMsg(t('voice.errUnclear').replace('{text}', rawText));
@@ -287,7 +321,9 @@ export default function VoicePage() {
           {listening && (transcript ? `"${transcript}"` : t('voice.listening'))}
           {processing && t('voice.thinking')}
           {stage === 'error' && <span className="text-mirch">{errorMsg}</span>}
-          {stage === 'done' && <span className="text-dhania">{t('voice.done')}</span>}
+          {stage === 'done' && (
+            <span className={answerText ? 'text-chalk' : 'text-dhania'}>{answerText || t('voice.done')}</span>
+          )}
         </div>
 
         {stage === 'confirm' && resolved && (
