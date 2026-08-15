@@ -34,7 +34,16 @@ function iconFor(href: string) {
 
 export default function DashboardSidebar({ items, shopName, trialLabel }: { items: NavItem[]; shopName: string; trialLabel?: string }) {
   const pathname = usePathname();
-  const { t } = useLang();
+  const { t, lang } = useLang();
+  // Spec §18/§7 (RTL): active-item accent border and the desktop
+  // sidebar's own divider both read as "left" in the design system's
+  // LTR description — under Urdu they mirror to the right. The
+  // flex-row containers around both <aside>s (here and in
+  // app/dashboard/layout.tsx) already reverse automatically under
+  // dir="rtl" on <html> (a real CSS behavior, not something built by
+  // hand) — this only fixes the two physical border-side utilities
+  // Tailwind doesn't flip on its own.
+  const rtl = lang === 'ur';
   // Tablet (768–1023px) defaults to icon-only; desktop (1024px+) starts
   // expanded. Read once at mount (client-only — window isn't available
   // during the server render, so that pass always defaults to expanded,
@@ -69,7 +78,7 @@ export default function DashboardSidebar({ items, shopName, trialLabel }: { item
               href={n.href}
               onClick={onNavigate}
               title={iconOnly ? n.label : undefined}
-              className={`flex items-center gap-3 mx-2 my-0.5 rounded-lg text-sm min-h-[44px] px-3 border-l-2 ${
+              className={`flex items-center gap-3 mx-2 my-0.5 rounded-lg text-sm min-h-[44px] px-3 ${rtl ? 'border-r-2' : 'border-l-2'} ${
                 active
                   ? 'bg-haldi/15 text-haldi font-700 border-haldi'
                   : 'text-chalkdim border-transparent hover:bg-board3 hover:text-chalk'
@@ -147,16 +156,19 @@ export default function DashboardSidebar({ items, shopName, trialLabel }: { item
       {/* Desktop/tablet sidebar — a normal flex sibling of <main> (see
           layout.tsx), not fixed-positioned, so collapsing it reflows the
           content next to it with zero manual margin syncing. */}
-      <aside className={`relative hidden lg:flex flex-col shrink-0 h-screen sticky top-0 border-r border-chalk/10 bg-board2 no-print transition-[width] duration-150 ${collapsed ? 'w-[72px]' : 'w-[220px]'}`}>
+      <aside className={`relative hidden lg:flex flex-col shrink-0 h-screen sticky top-0 ${rtl ? 'border-l' : 'border-r'} border-chalk/10 bg-board2 no-print transition-[width] duration-150 ${collapsed ? 'w-[72px]' : 'w-[220px]'}`}>
         <Header iconOnly={collapsed} />
         <NavList iconOnly={collapsed} />
         <Footer iconOnly={collapsed} />
         <button
           onClick={() => setCollapsed(c => !c)}
-          className="absolute -right-3 top-16 w-6 h-6 rounded-full bg-board2 border border-chalk/15 flex items-center justify-center text-chalkdim hover:text-haldi"
+          className={`absolute ${rtl ? '-left-3' : '-right-3'} top-16 w-6 h-6 rounded-full bg-board2 border border-chalk/15 flex items-center justify-center text-chalkdim hover:text-haldi`}
           aria-label={t('nav.collapse')}
         >
-          <CollapseIcon className={`w-3.5 h-3.5 transition-transform ${collapsed ? 'rotate-180' : ''}`} />
+          {/* Points toward whichever action the click performs — "collapse
+              this way" vs "expand back" — which flips under RTL since the
+              sidebar itself sits on the opposite edge of the screen. */}
+          <CollapseIcon className={`w-3.5 h-3.5 transition-transform ${(rtl ? !collapsed : collapsed) ? 'rotate-180' : ''}`} />
         </button>
       </aside>
 
