@@ -16,7 +16,8 @@ Recognize exactly these actions:
 - "check_balance": asking how much a customer owes (e.g. "Zuhair ka balance kitna hai", "Ali kitne ka udhaar hai", "how much does Bilal owe")
 - "check_stock": asking how much of one specific item is in stock (e.g. "cheeni kitni bachi hai", "Dalda ka stock kya hai", "how much rice do we have")
 - "inventory_summary": asking about overall inventory health rather than one item — how many products, what's low/out of stock (e.g. "poori inventory ka haal batao", "kitne items kam stock mein hain", "kya kya khatam ho gaya hai", "stock ki overall situation kya hai")
-- "print_statement": print / show / open a customer's full khata statement (e.g. "Ahsan ka khata nikal ke sara data print kar do", "Zuhair ka statement print karo", "Ali ka poora hisaab nikalo", "print Bilal's account statement")
+- "print_statement": print / show / open a customer's full khata statement, no mention of WhatsApp/sending (e.g. "Ahsan ka khata nikal ke sara data print kar do", "Zuhair ka statement print karo", "Ali ka poora hisaab nikalo", "print Bilal's account statement")
+- "send_statement_whatsapp": send a customer's khata summary over WhatsApp (e.g. "Ali Abdullah ka khata print karke is number pe WhatsApp kar do, 03001234567", "Zuhair ka hisaab whatsapp kar do", "Bilal ke number par uska statement bhej do"). If a phone number was spoken in the command, put it in target_phone; if none was spoken, leave target_phone null (the app falls back to the customer's own saved number).
 - "stock_in": new stock arrived for an item already (or about to be) in inventory — a purchase into the shop's own stock, NOT a customer's khata (e.g. "Dalda cooking oil ka 10 piece stock mein add karo", "cheeni ke 5 bori aaye hain add kar do", "20 packet biscuit stock in karo")
 - "stock_out": stock leaving inventory for a reason OTHER than a normal counter sale — damage, personal use, a correction (e.g. "2 packet biscuit kharab ho gaye, stock se nikal do", "5 piece cheeni adjust kar do stock mein se"). A normal walk-in cash sale belongs on the Billing/POS screen, not here — if the command sounds like ringing up a sale rather than removing damaged/miscounted stock, treat it as "unknown".
 - "add_expense": a shop expense being logged (e.g. "500 rupay bijli ka bill add karo", "2000 rupay dukaan ka kiraya expense mein daal do", "salary ka 5000 add karo"). expense_category must be one of: rent, salary, utility, marketing, other — pick the closest match, default "other" if unclear.
@@ -31,6 +32,7 @@ If a command sounds like it's trying to be a money- or stock-affecting action (m
 Fields:
 - customer_name: the customer's name exactly as spoken, not invented. Used by khata_* actions, add_customer, check_balance and print_statement.
 - customer_phone: a phone number if one was spoken for add_customer, null otherwise.
+- target_phone: a phone number if one was spoken for send_statement_whatsapp, null otherwise.
 - supplier_name: the supplier's name exactly as spoken. Used by check_supplier_balance and supplier_payment, null otherwise.
 - item_name: product name — for khata_purchase/khata_return/check_stock/stock_in/stock_out, null otherwise.
 - qty: the numeric quantity spoken, null if not mentioned.
@@ -52,13 +54,14 @@ const RESPONSE_SCHEMA = {
     action: {
       type: 'string',
       enum: [
-        'khata_purchase', 'khata_payment', 'khata_return', 'add_customer', 'check_balance', 'check_stock', 'inventory_summary', 'print_statement',
+        'khata_purchase', 'khata_payment', 'khata_return', 'add_customer', 'check_balance', 'check_stock', 'inventory_summary', 'print_statement', 'send_statement_whatsapp',
         'stock_in', 'stock_out', 'add_expense', 'check_expense_total', 'check_sales_total', 'check_supplier_balance', 'supplier_payment',
         'general_query', 'unknown'
       ]
     },
     customer_name: { type: ['string', 'null'] },
     customer_phone: { type: ['string', 'null'] },
+    target_phone: { type: ['string', 'null'] },
     supplier_name: { type: ['string', 'null'] },
     item_name: { type: ['string', 'null'] },
     qty: { type: ['number', 'null'] },

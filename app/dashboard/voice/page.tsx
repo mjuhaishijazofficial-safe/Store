@@ -43,11 +43,12 @@ type PendingClarify = { candidates: MatchRow[]; resolve: (row: MatchRow) => void
 
 type ParsedIntent = {
   action:
-    | 'khata_purchase' | 'khata_payment' | 'khata_return' | 'add_customer' | 'check_balance' | 'check_stock' | 'inventory_summary' | 'print_statement'
+    | 'khata_purchase' | 'khata_payment' | 'khata_return' | 'add_customer' | 'check_balance' | 'check_stock' | 'inventory_summary' | 'print_statement' | 'send_statement_whatsapp'
     | 'stock_in' | 'stock_out' | 'add_expense' | 'check_expense_total' | 'check_sales_total' | 'check_supplier_balance' | 'supplier_payment'
     | 'general_query' | 'unknown';
   customer_name: string | null;
   customer_phone: string | null;
+  target_phone: string | null;
   supplier_name: string | null;
   item_name: string | null;
   qty: number | null;
@@ -69,6 +70,13 @@ type ResolvedCommand = {
   itemId: string | null;
   amount: number;
   summary: string;
+  // Set only for send_statement_whatsapp — pre-built here (during
+  // resolveIntent, before the confirm card even shows) rather than at
+  // confirm time, so confirmExecute's window.open() call happens with
+  // no await in between it and the tap that triggered it. Browsers
+  // silently block a popup opened outside a user gesture's own call
+  // stack, and every await in between risks losing that.
+  waUrl?: string;
 };
 
 function fmt(n: number) {
@@ -84,7 +92,7 @@ function fmt(n: number) {
 export default function VoicePage() {
   const supabase = createClient();
   const { t, lang } = useLang();
-  const { shopId, role, allowedSections } = useShop();
+  const { shopId, shopName, role, allowedSections } = useShop();
   const router = useRouter();
   const { showToast } = useToast();
   useSectionGuard('khata');
@@ -694,6 +702,57 @@ export default function VoicePage() {
       return;
     }
 
+    // WhatsApp has no free "send it for me" API — wa.me only opens a
+    // chat with the message already typed in, the same way the
+    // customer detail page's own Remind button works (see
+    // remindWhatsapp there). This is a text summary, not the actual
+    // printed statement — genuinely attaching a document over WhatsApp
+    // needs a paid WhatsApp Business API integration this app doesn't
+    // have. The one manual step left (tapping Send inside WhatsApp) is
+    // a real limit of the free approach, not something skipped here.
+    if (intent.action === 'send_statement_whatsapp') {
+      if (!intent.customer_name) { await answerGeneralQuery(rawText); return; }
+      const customer = await findBestMatch('customers', intent.customer_name);
+      if (!customer) {
+        const msg = t('voice.errCustomerNotFound').replace('{name}', intent.customer_name);
+        setStage('error');
+        setErrorMsg(msg);
+        pushHistory(rawText, msg);
+        return;
+      }
+      const { data: full } = await supabase.from('customers').select('phone').eq('id', customer.id).single();
+      const rawPhone = (intent.target_phone || full?.phone || '').replace(/\D/g, '');
+      if (!rawPhone) {
+        const msg = t('voice.errNoPhone').replace('{name}', customer.name);
+        setStage('error');
+        setErrorMsg(msg);
+        pushHistory(rawText, msg);
+        return;
+      }
+      // Pakistani local (03xx...) -> international (923xx...), same
+      // conversion remindWhatsapp already does — wa.me needs the
+      // country code, nobody actually speaks/saves numbers with it.
+      const digits = rawPhone.startsWith('0') ? `92${rawPhone.slice(1)}` : rawPhone;
+
+      const { data: totals } = await supabase.rpc('khata_customer_totals', { p_customer_id: customer.id }).single();
+      const tt = totals as any;
+      const balance = (tt?.given || 0) - (tt?.paid || 0) - (tt?.returned || 0);
+      const balanceLine = (balance > 0 ? t('voice.answerBalanceOwes') : balance < 0 ? t('voice.answerBalanceAdvance') : t('voice.answerBalanceClear'))
+        .replace('{customer}', customer.name)
+        .replace('{amount}', fmt(Math.abs(balance)));
+      const message = t('voice.whatsappStatementMsg')
+        .replace('{customer}', customer.name)
+        .replace('{shop}', shopName || 'Dukaan')
+        .replace('{balanceLine}', balanceLine);
+      const waUrl = `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
+
+      const summary = t('voice.summarySendWhatsapp').replace('{name}', customer.name).replace('{phone}', rawPhone);
+      setResolved({ intent, rawText, customerId: customer.id, supplierId: null, customerName: customer.name, itemId: null, amount: 0, summary, waUrl });
+      setStage('confirm');
+      pushHistory(rawText, summary);
+      return;
+    }
+
     // Creating a customer changes real data, so it goes through the
     // same confirm-before-acting step every money-affecting action uses.
     if (intent.action === 'add_customer') {
@@ -781,6 +840,20 @@ export default function VoicePage() {
 
   async function confirmExecute() {
     if (!resolved || confirming) return;
+
+    // Opened first, synchronously, before any await — a popup opened
+    // after even one await has run risks the browser deciding it's no
+    // longer inside the click's own gesture and silently blocking it.
+    // Nothing here needs to wait on the network first: the message and
+    // number were already fully built back in resolveIntent.
+    if (resolved.intent.action === 'send_statement_whatsapp' && resolved.waUrl) {
+      window.open(resolved.waUrl, '_blank');
+      setAnswerText(t('voice.doneWhatsappOpened'));
+      setStage('done');
+      pushHistory(resolved.rawText, t('voice.doneWhatsappOpened'));
+      return;
+    }
+
     setConfirming(true);
     setProcessingLabel(t('voice.saving'));
 
