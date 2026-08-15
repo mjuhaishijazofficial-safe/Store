@@ -8,11 +8,23 @@ import { useToast } from '@/lib/toast-context';
 import SaleReceiptModal from '@/components/SaleReceiptModal';
 import CartReceiptModal from '@/components/CartReceiptModal';
 import { useSectionGuard } from '@/lib/use-section-guard';
-import { groupHistoryLogs, HistoryLog } from '@/lib/history-grouping';
+import { groupHistoryLogs, HistoryLog, isStockInReason, HistoryReason } from '@/lib/history-grouping';
 
 type Log = HistoryLog;
 
 const PAGE_SIZE = 50;
+
+const REASON_OPTIONS: HistoryReason[] = ['sale', 'purchase', 'return', 'transfer_in', 'transfer_out', 'adjustment', 'slip_scan'];
+
+const REASON_LABELS: Record<HistoryReason, (t: (key: any) => string) => string> = {
+  purchase: t => t('history.purchaseIn'),
+  sale: t => t('history.saleOut'),
+  return: t => t('history.returnLabel'),
+  transfer_in: t => t('history.transferIn'),
+  transfer_out: t => t('history.transferOut'),
+  adjustment: t => t('history.adjustmentLabel'),
+  slip_scan: t => t('history.slipScanLabel')
+};
 
 function fmt(n: number) {
   return '₨' + Number(n || 0).toLocaleString('en-IN');
@@ -40,23 +52,83 @@ export default function HistoryPage() {
   const [returnReason, setReturnReason] = useState('');
   const [returningNow, setReturningNow] = useState(false);
 
+  // Filters (spec: History filterable by item/branch/date/reason). Branch
+  // filter only renders when the shop actually has more than one branch
+  // — nothing to filter by otherwise. 'all' means unfiltered for every
+  // field, matching the RLS-scoped default the page always used to show.
+  const [itemOptions, setItemOptions] = useState<{ id: string; name: string }[]>([]);
+  const [branchOptions, setBranchOptions] = useState<{ id: string; name: string }[]>([]);
+  const [filterItem, setFilterItem] = useState('all');
+  const [filterBranch, setFilterBranch] = useState('all');
+  const [filterReason, setFilterReason] = useState('all');
+  const [filterFrom, setFilterFrom] = useState('');
+  const [filterTo, setFilterTo] = useState('');
+
   useEffect(() => { init(); }, [shopId]);
+  // Any filter change re-queries from scratch — same as a fresh page load.
+  useEffect(() => { if (shopId) loadLogs(true); }, [filterItem, filterBranch, filterReason, filterFrom, filterTo]);
 
   async function init() {
+    const [{ data: itemRows }, { data: branchRows }] = await Promise.all([
+      supabase.from('items').select('id, name').eq('shop_id', shopId).order('name'),
+      supabase.from('branches').select('id, name').eq('shop_id', shopId).order('is_main', { ascending: false })
+    ]);
+    setItemOptions(itemRows || []);
+    setBranchOptions(branchRows || []);
     await loadLogs(true);
     setLoading(false);
   }
 
+  // History now reads from stock_movements — the same ledger every
+  // stock-affecting flow (sale, return, purchase, slip-scan, transfer,
+  // manual adjustment) writes to via record_stock_movement, so this list
+  // is guaranteed consistent with actual stock changes instead of being
+  // its own separate read of `transactions` that could drift from it.
+  // Rows backed by a `transactions` entry (everything except transfers —
+  // see confirm_stock_transfer in supabase/schema.sql) are enriched with
+  // that row's amount/customer_id/sale_ref so receipts, Khata-aware
+  // returns and cart-sale grouping keep working exactly as before.
   async function loadLogs(reset: boolean) {
     const offset = reset ? 0 : logs.length;
-    const { data } = await supabase
-      .from('transactions')
-      .select('*')
+    let query = supabase
+      .from('stock_movements')
+      .select('id, item_id, branch_id, quantity_change, reason, reference_type, reference_id, created_at, items(name, unit)')
       .eq('shop_id', shopId)
       .order('created_at', { ascending: false })
       .range(offset, offset + PAGE_SIZE - 1);
 
-    const newRows = data || [];
+    if (filterItem !== 'all') query = query.eq('item_id', filterItem);
+    if (filterBranch !== 'all') query = query.eq('branch_id', filterBranch);
+    if (filterReason !== 'all') query = query.eq('reason', filterReason);
+    if (filterFrom) query = query.gte('created_at', filterFrom);
+    if (filterTo) query = query.lte('created_at', `${filterTo}T23:59:59`);
+
+    const { data } = await query;
+    const movements = data || [];
+
+    const txnIds = movements.filter(m => m.reference_type === 'transaction' && m.reference_id).map(m => m.reference_id as string);
+    let txnById = new Map<string, { amount: number; customer_id: string | null; sale_ref: string | null }>();
+    if (txnIds.length > 0) {
+      const { data: txns } = await supabase.from('transactions').select('id, amount, customer_id, sale_ref').in('id', txnIds);
+      txnById = new Map((txns || []).map(tx => [tx.id, tx]));
+    }
+
+    const newRows: Log[] = movements.map((m: any) => {
+      const txn = m.reference_type === 'transaction' ? txnById.get(m.reference_id) : null;
+      return {
+        id: m.id,
+        item_id: m.item_id,
+        item_name: m.items?.name || '—',
+        qty: Math.abs(m.quantity_change),
+        unit: m.items?.unit || null,
+        type: m.reason as HistoryReason,
+        amount: txn?.amount || 0,
+        created_at: m.created_at,
+        sale_ref: txn?.sale_ref || null,
+        customer_id: txn?.customer_id || null
+      };
+    });
+
     setLogs(reset ? newRows : prev => [...prev, ...newRows]);
     setHasMore(newRows.length === PAGE_SIZE);
   }
@@ -115,7 +187,36 @@ export default function HistoryPage() {
 
   return (
     <div>
-      <h1 className="font-display text-xl font-700 mb-5">{t('history.title')}</h1>
+      <h1 className="font-display text-xl font-700 mb-3">{t('history.title')}</h1>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
+        <select className="input text-xs" value={filterItem} onChange={e => setFilterItem(e.target.value)}>
+          <option value="all">{t('history.filterItem')}: {t('history.filterAll')}</option>
+          {itemOptions.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
+        </select>
+        {branchOptions.length > 1 && (
+          <select className="input text-xs" value={filterBranch} onChange={e => setFilterBranch(e.target.value)}>
+            <option value="all">{t('history.filterBranch')}: {t('history.filterAll')}</option>
+            {branchOptions.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+          </select>
+        )}
+        <select className="input text-xs" value={filterReason} onChange={e => setFilterReason(e.target.value)}>
+          <option value="all">{t('history.filterReason')}: {t('history.filterAll')}</option>
+          {REASON_OPTIONS.map(r => <option key={r} value={r}>{REASON_LABELS[r](t)}</option>)}
+        </select>
+        <div className="flex gap-1 col-span-2 sm:col-span-1">
+          <input type="date" className="input text-xs" value={filterFrom} onChange={e => setFilterFrom(e.target.value)} title={t('history.filterFrom')} />
+          <input type="date" className="input text-xs" value={filterTo} onChange={e => setFilterTo(e.target.value)} title={t('history.filterTo')} />
+        </div>
+      </div>
+      {(filterItem !== 'all' || filterBranch !== 'all' || filterReason !== 'all' || filterFrom || filterTo) && (
+        <button
+          onClick={() => { setFilterItem('all'); setFilterBranch('all'); setFilterReason('all'); setFilterFrom(''); setFilterTo(''); }}
+          className="text-chalkdim text-xs underline mb-4 -mt-2 block"
+        >
+          {t('history.filterClear')}
+        </button>
+      )}
 
       {loading && <div className="text-chalkdim text-sm text-center py-10">{t('common.loading')}</div>}
 
@@ -130,9 +231,10 @@ export default function HistoryPage() {
             const l = g.rows[0];
             const d = new Date(l.created_at);
             const when = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + ' • ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-            const sign = l.type === 'purchase' ? '+' : '−';
-            const color = l.type === 'purchase' ? 'text-mirch' : l.type === 'return' ? 'text-haldi' : 'text-dhania';
-            const typeLabel = l.type === 'purchase' ? t('history.purchaseIn') : l.type === 'return' ? t('history.returnLabel') : t('history.saleOut');
+            const stockIn = isStockInReason(l.type);
+            const sign = stockIn ? '+' : '−';
+            const color = l.type === 'purchase' || l.type === 'slip_scan' ? 'text-mirch' : l.type === 'return' || l.type === 'transfer_in' ? 'text-haldi' : 'text-dhania';
+            const typeLabel = REASON_LABELS[l.type](t);
             return (
               <div key={g.key} className="card p-3 px-4 flex justify-between items-center">
                 <div>

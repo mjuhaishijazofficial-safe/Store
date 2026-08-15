@@ -5,13 +5,19 @@
 // loads them) — grouping only merges *adjacent* rows, which is right for
 // that ordering since a cart's line items are inserted back-to-back.
 
+// Mirrors stock_movements.reason (supabase/schema.sql) plus the original
+// 'purchase' | 'sale' | 'return' transactions.type values — History now
+// sources rows from the ledger, whose reason column is a superset of the
+// old transactions.type domain.
+export type HistoryReason = 'purchase' | 'sale' | 'return' | 'transfer_in' | 'transfer_out' | 'adjustment' | 'slip_scan';
+
 export type HistoryLog = {
   id: string;
   item_id: string | null;
   item_name: string;
   qty: number;
   unit: string | null;
-  type: 'purchase' | 'sale' | 'return';
+  type: HistoryReason;
   amount: number;
   created_at: string;
   sale_ref: string | null;
@@ -22,6 +28,14 @@ export type HistoryLog = {
   // care about Khata still construct a valid HistoryLog.
   customer_id?: string | null;
 };
+
+// Which reasons put stock back on the shelf vs take it off — drives the
+// +/− sign and color in the History list. Kept here (not duplicated in
+// the page) since it's a property of the reason domain itself.
+const STOCK_IN_REASONS = new Set<HistoryReason>(['purchase', 'return', 'transfer_in', 'slip_scan']);
+export function isStockInReason(reason: HistoryReason): boolean {
+  return STOCK_IN_REASONS.has(reason);
+}
 
 export type HistoryGroup = { key: string; rows: HistoryLog[] };
 

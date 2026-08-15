@@ -46,6 +46,15 @@ export default function InventoryPage() {
   const [editing, setEditing] = useState<Item | null>(null);
   const [moveItem, setMoveItem] = useState<Item | null>(null);
   const [moveType, setMoveType] = useState<'purchase' | 'sale'>('purchase');
+  // Stock Out's own reason, separate from moveType — moveType decides
+  // the sign (this always subtracts), moveReason is what actually lands
+  // in stock_movements.reason for History/Reports to filter on. 'sale'
+  // covers the common "sold at counter" case (matches this modal's own
+  // default use, per Slip-Scan/openMove callers); 'adjustment' covers
+  // everything else stock leaves for — damage, expiry writeoff, a count
+  // correction — without inventing new reasons the DB CHECK constraint
+  // doesn't already know about.
+  const [moveReason, setMoveReason] = useState<'sale' | 'adjustment'>('sale');
   const [loading, setLoading] = useState(true);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -186,6 +195,7 @@ export default function InventoryPage() {
     setMoveItem(it);
     setMoveType(type);
     setMoveForm({ qty: 0, amount: 0 });
+    setMoveReason('sale');
     setBoxMode(false);
     setBoxCount(0);
     setPiecesPerBox(1);
@@ -223,7 +233,8 @@ export default function InventoryPage() {
       p_item_id: moveItem.id,
       p_type: moveType,
       p_qty: moveForm.qty,
-      p_amount: amount
+      p_amount: amount,
+      p_reason: moveType === 'sale' ? moveReason : null
     });
 
     if (err) { showToast(t('common.error'), 'error'); return; }
@@ -562,6 +573,20 @@ export default function InventoryPage() {
                     </label>
                   </div>
                 )}
+              </>
+            )}
+
+            {moveType === 'sale' && (
+              <>
+                <label className="block text-xs text-chalkdim mb-1">{t('inventory.stockOutReason')}</label>
+                <select
+                  className="input mb-3"
+                  value={moveReason}
+                  onChange={e => setMoveReason(e.target.value as 'sale' | 'adjustment')}
+                >
+                  <option value="sale">{t('inventory.reasonSale')}</option>
+                  <option value="adjustment">{t('inventory.reasonAdjustment')}</option>
+                </select>
               </>
             )}
 
