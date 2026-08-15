@@ -72,12 +72,20 @@ export async function POST(req: Request) {
       headers: { Authorization: `Bearer ${apiKey}` },
       body: upstream
     });
-  } catch {
+  } catch (e: any) {
+    console.error('[voice/transcribe] fetch to OpenAI threw', e?.message || e);
     return NextResponse.json({ error: 'transcribe_failed' }, { status: 502 });
   }
 
   if (!res.ok) {
-    return NextResponse.json({ error: 'transcribe_failed' }, { status: 502 });
+    // Logged server-side (visible in Vercel's function logs) — OpenAI's
+    // actual error text (bad/revoked key, no billing on the account,
+    // unsupported audio format...) is what actually explains a 502 here;
+    // a bare 'transcribe_failed' with nothing else was undiagnosable
+    // from the browser console alone, which is exactly what happened.
+    const upstreamBody = await res.text().catch(() => '');
+    console.error('[voice/transcribe] OpenAI responded', res.status, upstreamBody.slice(0, 500));
+    return NextResponse.json({ error: 'transcribe_failed', upstreamStatus: res.status }, { status: 502 });
   }
   const data = await res.json().catch(() => null);
 
