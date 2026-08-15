@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Baloo+Bhaijaan+2:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Baloo+Bhaijaan+2:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Noto+Nastaliq+Urdu:wght@400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -189,6 +189,35 @@ body {
 
 .font-mono {
   font-family: 'JetBrains Mono', monospace;
+}
+
+/* Nastaliq typography for Urdu (spec: "Jameel Noori Nastaleeq").
+   Jameel Noori Nastaleeq itself is a proprietary font with no web-
+   licensed CDN copy, so it's listed FIRST to be picked up from the
+   reader's own machine when installed (common on Urdu-using Windows
+   systems) — and Noto Nastaliq Urdu, Google's open-licensed Nastaliq
+   face, carries everyone else. Self-hosting Jameel Noori later needs
+   nothing but an @font-face block declaring that exact family name;
+   this stack already prefers it.
+
+   Scoped to the Urdu locale only (html[lang="ur"], set in
+   app/layout.tsx) — the English UI keeps Inter/Baloo untouched. */
+html[lang='ur'] body,
+html[lang='ur'] .font-display {
+  font-family: 'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', 'Baloo Bhaijaan 2', sans-serif;
+  /* Nastaliq's steeply sloping baseline needs far more vertical room
+     than a Latin face — at normal line-height the descenders of one
+     line collide with the line below and the text becomes unreadable. */
+  line-height: 2.1;
+}
+
+/* Numbers, currency and code stay in the Latin monospace face even
+   under Urdu — a Nastaliq face renders digits with the same sloping
+   baseline, which makes columns of figures (every price, balance and
+   quantity in this app) impossible to scan or line up. */
+html[lang='ur'] .font-mono {
+  font-family: 'JetBrains Mono', monospace;
+  line-height: 1.5;
 }
 
 .card {

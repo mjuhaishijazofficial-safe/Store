@@ -16,10 +16,10 @@ import type { SttProvider } from './types';
 // (what this used to do) can't work across a silent room and a busy
 // shop floor at once — too high and a soft speaker never registers at
 // all, too low and background hum reads as endless speech.
-const CALIBRATION_MS = 350;        // ambient-noise sampling window at the very start, before speech is expected.
-const NOISE_MARGIN = 0.012;        // how far above the measured noise floor RMS must rise to count as speech.
-const MIN_SPEECH_RMS = 0.015;      // absolute floor — protects against a near-silent calibration making the threshold hair-trigger.
-const SILENCE_DURATION_MS = 900;   // quiet time after speech before auto-stopping.
+const CALIBRATION_MS = 250;        // ambient-noise sampling window at the very start, before speech is expected.
+const NOISE_MARGIN = 0.006;        // how far above the measured noise floor RMS must rise to count as speech. Deliberately small — a soft or distant speaker barely clears the room's own floor, and missing their speech entirely is a far worse failure than briefly treating a cough as speech (the transcript just ignores it).
+const MIN_SPEECH_RMS = 0.008;      // absolute floor — protects against a near-silent calibration making the threshold hair-trigger.
+const SILENCE_DURATION_MS = 800;   // quiet time after speech before auto-stopping.
 const NO_SPEECH_TIMEOUT_MS = 7000; // if nothing is ever heard, give up rather than recording (and later uploading) 20s of silence.
 const MAX_RECORDING_MS = 20000;    // hard ceiling regardless of everything above.
 

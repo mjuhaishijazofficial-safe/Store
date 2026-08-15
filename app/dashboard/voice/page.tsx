@@ -8,7 +8,7 @@ import { useShop } from '@/lib/shop-context';
 import { useToast } from '@/lib/toast-context';
 import { useSectionGuard } from '@/lib/use-section-guard';
 import { getSttProvider } from '@/lib/voice/stt-provider';
-import { speak, stopSpeaking, isTtsSupported } from '@/lib/voice/tts';
+import { speak, stopSpeaking, isTtsSupported, primeTts } from '@/lib/voice/tts';
 import { ArrowLeftIcon, MicIcon, SpeakerOnIcon, SpeakerOffIcon } from '@/components/icons';
 
 const VOICE_REPLY_KEY = 'eagle:voiceReplyEnabled';
@@ -127,6 +127,11 @@ export default function VoicePage() {
       return;
     }
     starting.current = true;
+    // Runs inside this click handler on purpose — Chrome only permits
+    // speech after a real user gesture, so priming here is what lets
+    // Eagle's *first* reply actually be spoken instead of silently
+    // dropped (see lib/voice/tts.ts).
+    if (voiceReplyOn) primeTts();
     setStage('listening');
     setTranscript('');
     setErrorMsg('');
@@ -327,15 +332,15 @@ export default function VoicePage() {
             listening/processing (pure CSS, no live audio-amplitude
             wiring — a steady "breathing" animation reads as "alive"
             just as well and is far simpler/more reliable). */}
-        <div className="relative w-40 h-40 flex items-center justify-center mb-6">
+        <div className="relative w-56 h-56 sm:w-64 sm:h-64 flex items-center justify-center mb-6">
           {(listening || transcribing || processing) && (
             <>
               <span className="absolute inset-0 rounded-full bg-haldi/20 animate-ping" style={{ animationDuration: '1.8s' }} />
-              <span className="absolute inset-2 rounded-full bg-haldi/25 animate-ping" style={{ animationDuration: '1.8s', animationDelay: '0.3s' }} />
-              <span className="absolute inset-6 rounded-full bg-haldi/30 animate-ping" style={{ animationDuration: '1.8s', animationDelay: '0.6s' }} />
+              <span className="absolute inset-3 rounded-full bg-haldi/25 animate-ping" style={{ animationDuration: '1.8s', animationDelay: '0.3s' }} />
+              <span className="absolute inset-8 rounded-full bg-haldi/30 animate-ping" style={{ animationDuration: '1.8s', animationDelay: '0.6s' }} />
             </>
           )}
-          <div className={`relative w-28 h-28 rounded-full gradient-brand shadow-glow flex items-center justify-center text-5xl transition-transform ${listening ? 'scale-110' : ''}`}>
+          <div className={`relative w-40 h-40 sm:w-44 sm:h-44 rounded-full gradient-brand shadow-glow flex items-center justify-center text-7xl sm:text-8xl transition-transform ${listening ? 'scale-110' : ''}`}>
             🦅
           </div>
         </div>
