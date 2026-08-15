@@ -54,7 +54,13 @@ async function askOpenAI(prompt: string, jsonSchema?: Record<string, unknown>): 
               }
             }
           : {}),
-        temperature: 0.2,
+        // 0 for structured classification (parse-command) — this is
+        // "which of these 15 actions is this", not creative writing;
+        // any temperature above 0 buys unpredictability with no upside
+        // for a task that has one right answer. A conversational
+        // general-question answer (no schema) keeps a little warmth so
+        // it doesn't read as robotic.
+        temperature: jsonSchema ? 0 : 0.3,
         max_tokens: 400
       })
     }, OPENAI_TIMEOUT_MS);

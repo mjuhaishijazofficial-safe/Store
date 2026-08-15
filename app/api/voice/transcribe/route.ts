@@ -64,15 +64,23 @@ export async function POST(req: Request) {
 
   const upstream = new FormData();
   upstream.append('file', audio, 'command.webm');
-  upstream.append('model', 'whisper-1');
+  // gpt-4o-mini-transcribe, not whisper-1 — OpenAI's newer transcription
+  // model, live-verified against this account (2026-08): same
+  // /v1/audio/transcriptions endpoint, same file/model/prompt/language
+  // params, noticeably better real-word accuracy for exactly the kind
+  // of Roman-Urdu/English-mixed, product-name-heavy speech this app
+  // deals with. gpt-4o-transcribe (bigger, slower, marginally more
+  // accurate still) is a one-line env override via VOICE_STT_MODEL if
+  // ever needed; whisper-1 remains a safe fallback name to roll back to.
+  upstream.append('model', process.env.VOICE_STT_MODEL || 'gpt-4o-mini-transcribe');
   // Language is deliberately NOT pinned. It used to be forced to 'ur',
-  // which made Whisper try to hear every command as Urdu — an English
-  // sentence then came back mangled into Urdu-ish nonsense that nothing
-  // downstream could parse. Left unset, Whisper detects the language
-  // itself per recording, so Urdu, English and the Roman-Urdu mix real
-  // shopkeepers actually speak all transcribe correctly.
+  // which made transcription try to hear every command as Urdu — an
+  // English sentence then came back mangled into Urdu-ish nonsense that
+  // nothing downstream could parse. Left unset, the model detects the
+  // language itself per recording, so Urdu, English and the Roman-Urdu
+  // mix real shopkeepers actually speak all transcribe correctly.
   //
-  // Whisper's "prompt" is a vocabulary/spelling hint, not an instruction
+  // The "prompt" param is a vocabulary/spelling hint, not an instruction
   // — it biases what words Whisper is likely to hear without
   // constraining the language. A fixed generic list ('khata', 'stock'...)
   // was still missing this SHOP's actual product/customer names, which
