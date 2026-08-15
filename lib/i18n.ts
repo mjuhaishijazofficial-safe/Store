@@ -609,6 +609,7 @@ export const dict = {
   'voice.answerStock': { ur: '{item} ka stock {qty} {unit} hai', en: '{item} stock is {qty} {unit}' },
   'voice.errItemNotFound': { ur: '"{name}" naam ka item nahi mila', en: 'No item found named "{name}"' },
   'voice.doneCustomerAdded': { ur: 'Customer add ho gaya ✓', en: 'Customer added ✓' },
+  'voice.doneOpeningStatement': { ur: '{name} ka statement khol raha hoon...', en: 'Opening {name}\'s statement...' },
   'voice.confirmPrompt': { ur: 'Confirm karne ke liye button dabayein', en: 'Tap the button below to confirm' },
   'voice.muteReply': { ur: 'Eagle ki awaaz band karein', en: 'Mute Eagle\'s voice' },
   'voice.unmuteReply': { ur: 'Eagle ki awaaz chalu karein', en: 'Unmute Eagle\'s voice' },

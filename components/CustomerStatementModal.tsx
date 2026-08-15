@@ -25,12 +25,19 @@ export default function CustomerStatementModal({
   customerName,
   customerPhone,
   shopName,
+  autoPrint,
   onClose
 }: {
   customerId: string;
   customerName: string;
   customerPhone: string | null;
   shopName: string;
+  // Set by Eagle's "print_statement" voice command — the modal opens
+  // the browser's print dialog itself the moment data is ready, instead
+  // of waiting for the normal manual "Print" tap, so a spoken "Ahsan ka
+  // khata print kar do" actually reaches the printer without a second
+  // click.
+  autoPrint?: boolean;
   onClose: () => void;
 }) {
   const supabase = createClient();
@@ -51,6 +58,10 @@ export default function CustomerStatementModal({
         .eq('customer_id', customerId)
         .order('created_at', { ascending: true });
       setEntries(data || []);
+      // A print triggered before the DOM has actually painted the new
+      // rows prints a blank/stale page — one frame's wait is enough for
+      // the browser to finish laying the table out first.
+      if (autoPrint) requestAnimationFrame(() => requestAnimationFrame(() => window.print()));
     })();
     return () => document.body.classList.remove('printing-receipt');
   }, [customerId]);

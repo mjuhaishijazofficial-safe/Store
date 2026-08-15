@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useLang } from '@/lib/i18n-context';
 import { useShop } from '@/lib/shop-context';
@@ -23,7 +24,7 @@ const CLIENT_TIMEOUT_MS = 20000;
 type Stage = 'idle' | 'listening' | 'transcribing' | 'processing' | 'confirm' | 'error' | 'done';
 
 type ParsedIntent = {
-  action: 'khata_purchase' | 'khata_payment' | 'khata_return' | 'add_customer' | 'check_balance' | 'check_stock' | 'general_query' | 'unknown';
+  action: 'khata_purchase' | 'khata_payment' | 'khata_return' | 'add_customer' | 'check_balance' | 'check_stock' | 'print_statement' | 'general_query' | 'unknown';
   customer_name: string | null;
   customer_phone: string | null;
   item_name: string | null;
@@ -58,6 +59,7 @@ export default function VoicePage() {
   const supabase = createClient();
   const { t, lang } = useLang();
   const { shopId } = useShop();
+  const router = useRouter();
   const { showToast } = useToast();
   useSectionGuard('khata');
 
@@ -309,6 +311,25 @@ export default function VoicePage() {
 
     if (intent.action === 'check_balance' || intent.action === 'check_stock') {
       await answerLookup(intent);
+      return;
+    }
+
+    // Navigates to the customer's own page with the print dialog
+    // already opening there (CustomerStatementModal's autoPrint prop,
+    // triggered by ?autoPrint=1 — see app/dashboard/khata/[id]/page.tsx)
+    // rather than trying to print from this page, which has no printer-
+    // ready statement view of its own to reuse.
+    if (intent.action === 'print_statement') {
+      if (!intent.customer_name) { await answerGeneralQuery(rawText); return; }
+      const customer = await findBestMatch('customers', intent.customer_name);
+      if (!customer) {
+        setStage('error');
+        setErrorMsg(t('voice.errCustomerNotFound').replace('{name}', intent.customer_name));
+        return;
+      }
+      setAnswerText(t('voice.doneOpeningStatement').replace('{name}', customer.name));
+      setStage('done');
+      router.push(`/dashboard/khata/${customer.id}?autoPrint=1`);
       return;
     }
 

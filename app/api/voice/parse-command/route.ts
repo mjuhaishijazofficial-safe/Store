@@ -10,17 +10,18 @@ const PROMPT = `You are parsing one spoken voice command given to "Eagle", a voi
 
 Recognize exactly these actions:
 - "khata_purchase": a customer received/bought goods on credit (e.g. "Zuhair ke khata mein 4 kilo cheeni add karo", "Ali ko 2 packet biscuit diye", "Zuhair se 500 rupay ka saman gaya")
-- "khata_payment": a customer paid money against their balance (e.g. "Zuhair ne 500 rupay diye", "Ali se payment mil gayi 1000 rupay". "Zuhair ne paisa nahi diya" is NOT a payment — only a clearly stated amount actually received counts)
+- "khata_payment": the shop RECEIVED money from a customer — a repayment, a part payment, or an advance paid up front (e.g. "Zuhair ne 500 rupay diye", "Ali se payment mil gayi 1000 rupay", "Ali ne mujhe 1000 rupay advance diya", "Bilal ne 2000 jama karaye"). An advance counts here exactly like any other payment: money came in. "Zuhair ne paisa nahi diya" is NOT a payment — only a clearly stated amount actually received counts.
 - "khata_return": a customer returned goods (e.g. "Ali ne cheeni wapas ki", "Zuhair ka saman return ho gaya")
 - "add_customer": create a NEW customer record (e.g. "naya customer add karo Zuhair", "Ali naam ka customer bana do", "naya khata kholo Bilal ka", "add a new customer named Ahmed"). A phone number may or may not be spoken.
 - "check_balance": asking how much a customer owes (e.g. "Zuhair ka balance kitna hai", "Ali kitne ka udhaar hai", "how much does Bilal owe")
 - "check_stock": asking how much of an item is in stock (e.g. "cheeni kitni bachi hai", "Dalda ka stock kya hai", "how much rice do we have")
+- "print_statement": print / show / open a customer's full khata statement (e.g. "Ahsan ka khata nikal ke sara data print kar do", "Zuhair ka statement print karo", "Ali ka poora hisaab nikalo", "print Bilal's account statement")
 - "general_query": anything else — a question, a search request, a calculation, general conversation (e.g. "aaj USD ka rate kya hai", "Google par ye search karo: ...", "2500 ka 15 percent kitna hota hai", "shukriya", "tum kaun ho")
 
 If a command sounds like it's trying to be a money-affecting Khata action (mentions a customer and goods/money) but is missing the customer name or is too ambiguous to act on safely, return action "unknown" — never guess on those. Only fall back to "general_query" when the command clearly isn't about the shop's own records at all.
 
 Fields:
-- customer_name: the customer's name exactly as spoken, not invented. Used by khata_* actions, add_customer and check_balance.
+- customer_name: the customer's name exactly as spoken, not invented. Used by khata_* actions, add_customer, check_balance and print_statement.
 - customer_phone: a phone number if one was spoken for add_customer, null otherwise.
 - item_name: product name — for khata_purchase/khata_return and check_stock, null otherwise.
 - qty: the numeric quantity spoken, null if not mentioned.
@@ -36,7 +37,7 @@ Reply with JSON only.`;
 const RESPONSE_SCHEMA = {
   type: 'object',
   properties: {
-    action: { type: 'string', enum: ['khata_purchase', 'khata_payment', 'khata_return', 'add_customer', 'check_balance', 'check_stock', 'general_query', 'unknown'] },
+    action: { type: 'string', enum: ['khata_purchase', 'khata_payment', 'khata_return', 'add_customer', 'check_balance', 'check_stock', 'print_statement', 'general_query', 'unknown'] },
     customer_name: { type: ['string', 'null'] },
     customer_phone: { type: ['string', 'null'] },
     item_name: { type: ['string', 'null'] },

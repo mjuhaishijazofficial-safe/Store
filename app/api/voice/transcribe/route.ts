@@ -65,11 +65,17 @@ export async function POST(req: Request) {
   const upstream = new FormData();
   upstream.append('file', audio, 'command.webm');
   upstream.append('model', 'whisper-1');
-  // Roman-Urdu speech transcribes far more usefully when Whisper is told
-  // the source language is Urdu (ur) — otherwise it tends to guess
-  // English and mangle the result. This still lets English words in a
-  // mixed-language command through fine; Whisper doesn't hard-reject them.
-  upstream.append('language', 'ur');
+  // Language is deliberately NOT pinned. It used to be forced to 'ur',
+  // which made Whisper try to hear every command as Urdu — an English
+  // sentence then came back mangled into Urdu-ish nonsense that nothing
+  // downstream could parse. Left unset, Whisper detects the language
+  // itself per recording, so Urdu, English and the Roman-Urdu mix real
+  // shopkeepers actually speak all transcribe correctly.
+  //
+  // The prompt below is Whisper's own context hint — it biases spelling
+  // toward the vocabulary this app expects (Urdu shop terms and the
+  // wake word) without constraining the language.
+  upstream.append('prompt', 'Eagle, khata, udhaar, customer, stock, balance, rupay, kilo, packet, advance, payment.');
 
   let res: Response;
   try {

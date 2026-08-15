@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { useLang } from '@/lib/i18n-context';
@@ -46,6 +46,7 @@ function fmt(n: number) {
 export default function KhataDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const customerId = params.id as string;
   const supabase = createClient();
   const { t } = useLang();
@@ -70,7 +71,12 @@ export default function KhataDetailPage() {
 
   const [modalType, setModalType] = useState<EntryType | null>(null);
   const [editOpen, setEditOpen] = useState(false);
-  const [statementOpen, setStatementOpen] = useState(false);
+  // ?autoPrint=1 (arriving from Eagle's "print_statement" voice
+  // command) opens the statement already set to print itself, instead
+  // of landing on a bare customer page the shopkeeper still has to tap
+  // "Print Statement" on.
+  const wantsAutoPrint = searchParams.get('autoPrint') === '1';
+  const [statementOpen, setStatementOpen] = useState(wantsAutoPrint);
   const [form, setForm] = useState({ item_name: '', qty: '', amount: '', note: '' });
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'bank' | 'easypaisa' | 'jazzcash'>('cash');
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
@@ -536,6 +542,7 @@ export default function KhataDetailPage() {
           customerName={customer.name}
           customerPhone={customer.phone}
           shopName={shopName || 'Dukaan'}
+          autoPrint={wantsAutoPrint}
           onClose={() => setStatementOpen(false)}
         />
       )}
