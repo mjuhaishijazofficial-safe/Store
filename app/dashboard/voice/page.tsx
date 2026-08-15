@@ -13,7 +13,7 @@ import { ArrowLeftIcon, MicIcon, SpeakerOnIcon, SpeakerOffIcon } from '@/compone
 
 const VOICE_REPLY_KEY = 'eagle:voiceReplyEnabled';
 
-type Stage = 'idle' | 'listening' | 'processing' | 'confirm' | 'error' | 'done';
+type Stage = 'idle' | 'listening' | 'transcribing' | 'processing' | 'confirm' | 'error' | 'done';
 
 type ParsedIntent = {
   action: 'khata_purchase' | 'khata_payment' | 'khata_return' | 'general_query' | 'unknown';
@@ -135,7 +135,11 @@ export default function VoicePage() {
       // its own cloud recognition, Whisper's route hints the same
       // language server-side); "Eagle" itself and any English words in
       // a mixed command still come through fine either way.
-      const text = await stt.current.listen(lang === 'ur' ? 'ur-PK' : 'en-PK');
+      const text = await stt.current.listen(
+        lang === 'ur' ? 'ur-PK' : 'en-PK',
+        undefined,
+        phase => setStage(phase === 'transcribing' ? 'transcribing' : 'listening')
+      );
       setTranscript(text);
       await handleTranscript(text);
     } catch (e: any) {
@@ -297,6 +301,7 @@ export default function VoicePage() {
   }
 
   const listening = stage === 'listening';
+  const transcribing = stage === 'transcribing';
   const processing = stage === 'processing';
 
   return (
@@ -323,7 +328,7 @@ export default function VoicePage() {
             wiring — a steady "breathing" animation reads as "alive"
             just as well and is far simpler/more reliable). */}
         <div className="relative w-40 h-40 flex items-center justify-center mb-6">
-          {(listening || processing) && (
+          {(listening || transcribing || processing) && (
             <>
               <span className="absolute inset-0 rounded-full bg-haldi/20 animate-ping" style={{ animationDuration: '1.8s' }} />
               <span className="absolute inset-2 rounded-full bg-haldi/25 animate-ping" style={{ animationDuration: '1.8s', animationDelay: '0.3s' }} />
@@ -340,6 +345,7 @@ export default function VoicePage() {
         <div className="text-sm text-chalkdim min-h-[3rem] max-w-sm px-4">
           {stage === 'idle' && t('voice.tapToSpeak')}
           {listening && (transcript ? `"${transcript}"` : t('voice.listening'))}
+          {transcribing && t('voice.transcribing')}
           {processing && t('voice.thinking')}
           {stage === 'error' && <span className="text-mirch">{errorMsg}</span>}
           {stage === 'done' && (

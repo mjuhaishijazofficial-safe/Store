@@ -576,6 +576,7 @@ export const dict = {
   'voice.tapToSpeak': { ur: 'Bolne ke liye mic dabayein', en: 'Tap the mic to speak' },
   'voice.tapToStop': { ur: 'Bolein — chup hote hi khud ruk jayega (ya dobara dabayein)', en: 'Speak — it stops automatically when you pause (or tap again)' },
   'voice.listening': { ur: 'Eagle sun raha hai...', en: 'Eagle is listening...' },
+  'voice.transcribing': { ur: 'Aawaz ko text mein badal raha hai...', en: 'Converting speech to text...' },
   'voice.thinking': { ur: 'Eagle samajh raha hai...', en: 'Eagle is thinking...' },
   'voice.done': { ur: 'Ho gaya ✓', en: 'Done ✓' },
   'voice.confirm': { ur: 'Haan, kar do', en: 'Yes, do it' },

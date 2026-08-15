@@ -18,7 +18,7 @@ import type { SttProvider } from './types';
 // listening and never responds" (silence used to require a second tap
 // the UI only hinted at in small text under the button).
 const SILENCE_THRESHOLD = 10; // 0-255 volume scale (analyser byte data) — below this counts as quiet. Tune up if a noisy shop floor trips silence detection while someone is still mid-sentence.
-const SILENCE_DURATION_MS = 1400; // how long it has to stay quiet after real speech was heard before auto-stopping.
+const SILENCE_DURATION_MS = 900; // how long it has to stay quiet after real speech was heard before auto-stopping. Was 1400ms — trimmed since every extra ms here is pure dead air on top of the transcribe+parse round trips that follow, and 900ms is still comfortably longer than a natural mid-sentence breath.
 const MAX_RECORDING_MS = 20000; // hard ceiling regardless of silence detection — never records forever even if silence detection somehow never fires.
 
 let mediaRecorder: MediaRecorder | null = null;
@@ -30,7 +30,7 @@ export const whisperStt: SttProvider = {
     return typeof window !== 'undefined' && !!navigator.mediaDevices?.getUserMedia && !!(window as any).MediaRecorder;
   },
 
-  async listen(lang) {
+  async listen(lang, _onInterim, onPhase) {
     // Surfaces the real reason instead of a generic "could not access
     // microphone" — getUserMedia's DOMException.name is what actually
     // distinguishes "you said no", "no mic exists", "another app has it
@@ -106,6 +106,7 @@ export const whisperStt: SttProvider = {
 
     activeStream?.getTracks().forEach(t => t.stop());
     activeStream = null;
+    onPhase?.('transcribing');
 
     try {
       const form = new FormData();

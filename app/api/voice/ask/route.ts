@@ -46,16 +46,20 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'query required' }, { status: 400 });
   }
 
+  // Grounded and plain answers are fired in parallel, not one-then-the-
+  // other — sequentially, a quota-exhausted/failing grounding call still
+  // costs its own full round trip before the fallback even starts,
+  // roughly doubling response time on every single general_query while
+  // grounding stays unavailable. Racing them costs only the slower of
+  // the two, and the grounded one wins whenever it actually succeeds.
   const model = process.env.GEMINI_MODEL || 'gemini-flash-latest';
-  let answer = await callGemini(apiKey, model, query.trim(), true);
-  let grounded = !!answer;
-  if (!answer) {
-    // Grounding unavailable/quota-exhausted on this key/model — still
-    // worth answering from the model's own knowledge rather than
-    // failing outright; just not guaranteed current.
-    answer = await callGemini(apiKey, model, query.trim(), false);
-    grounded = false;
-  }
+  const q = query.trim();
+  const [groundedResult, plainResult] = await Promise.all([
+    callGemini(apiKey, model, q, true),
+    callGemini(apiKey, model, q, false)
+  ]);
+  const answer = groundedResult || plainResult;
+  const grounded = !!groundedResult;
 
   if (!answer) return NextResponse.json({ error: 'ai_request_failed' }, { status: 502 });
   return NextResponse.json({ answer, grounded });
