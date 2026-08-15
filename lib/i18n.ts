@@ -586,6 +586,7 @@ export const dict = {
   'voice.errNetwork': { ur: 'Internet connection check karein', en: 'Check your internet connection' },
   'voice.errRecording': { ur: 'Recording mein masla aaya', en: 'Something went wrong while recording' },
   'voice.errGeneric': { ur: 'Kuch ghalat ho gaya, dobara try karein', en: 'Something went wrong, please try again' },
+  'voice.errRateLimited': { ur: 'Aaj ki AI limit khatam ho gayi — thori der baad try karein', en: 'Today\'s AI usage limit is used up — please try again later' },
   'voice.errMicDenied': { ur: 'Microphone permission block hai — browser settings mein is site ke liye mic allow karein', en: 'Microphone permission is blocked — allow it for this site in your browser settings' },
   'voice.errMicNotFound': { ur: 'Is device par koi microphone nahi mila', en: 'No microphone found on this device' },
   'voice.errMicBusy': { ur: 'Microphone kisi aur app mein khula hai', en: 'Microphone is in use by another app' },

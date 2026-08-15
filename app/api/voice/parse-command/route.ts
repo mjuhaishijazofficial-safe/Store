@@ -62,7 +62,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const model = process.env.GEMINI_MODEL || 'gemini-flash-latest';
+    const model = process.env.GEMINI_MODEL || 'gemini-flash-lite-latest';
     const res = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -71,7 +71,16 @@ export async function POST(req: Request) {
         generationConfig: { responseMimeType: 'application/json', responseSchema: RESPONSE_SCHEMA }
       })
     }, PARSE_TIMEOUT_MS);
-    if (!res.ok) return NextResponse.json({ error: 'ai_request_failed' }, { status: 502 });
+    if (!res.ok) {
+      const detail = await res.text().catch(() => '');
+      console.error('[voice/parse-command] Gemini responded', res.status, detail.slice(0, 400));
+      // 429 here means the free-tier daily quota is spent, which is a
+      // completely different problem from "the AI couldn't understand
+      // you" — the user needs to know to wait or upgrade, not to try
+      // rephrasing their sentence.
+      if (res.status === 429) return NextResponse.json({ error: 'rate_limited' }, { status: 429 });
+      return NextResponse.json({ error: 'ai_request_failed' }, { status: 502 });
+    }
     const data = await res.json();
     const aiText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
     const parsed = JSON.parse(aiText.trim());

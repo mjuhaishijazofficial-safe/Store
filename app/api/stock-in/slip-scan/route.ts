@@ -73,12 +73,12 @@ export async function POST(req: Request) {
 
   let aiText: string;
   try {
-    // 'gemini-flash-latest' is a Google-maintained alias, not a pinned
+    // A Google-maintained alias, not a pinned
     // snapshot — verified live against this key's account (2026-08):
     // 'gemini-2.0-flash' itself has been retired for new API keys
     // ("no longer available to new users"), the alias keeps this
     // working without needing a code change on Google's next model bump.
-    const model = process.env.GEMINI_MODEL || 'gemini-flash-latest';
+    const model = process.env.GEMINI_MODEL || 'gemini-flash-lite-latest';
     const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },

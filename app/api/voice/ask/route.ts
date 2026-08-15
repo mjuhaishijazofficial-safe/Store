@@ -67,7 +67,7 @@ export async function POST(req: Request) {
   // roughly doubling response time on every single general_query while
   // grounding stays unavailable. Racing them costs only the slower of
   // the two, and the grounded one wins whenever it actually succeeds.
-  const model = process.env.GEMINI_MODEL || 'gemini-flash-latest';
+  const model = process.env.GEMINI_MODEL || 'gemini-flash-lite-latest';
   const q = query.trim();
   const [groundedResult, plainResult] = await Promise.all([
     callGemini(apiKey, model, q, true),

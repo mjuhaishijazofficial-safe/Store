@@ -196,12 +196,17 @@ export default function VoicePage() {
       }, CLIENT_TIMEOUT_MS);
       const data = await res.json();
       if (!res.ok) {
-        // A missing API key is a real dead end (nothing downstream can
-        // work either); anything else is worth still trying to answer
-        // as a plain question rather than giving up on what was said.
+        // A missing API key or a spent quota are real dead ends
+        // (nothing downstream can work either, and the fallback would
+        // fail the same way); anything else is worth still trying to
+        // answer as a plain question rather than giving up on what was
+        // said.
         if (data.error === 'not_configured') {
           setStage('error');
           setErrorMsg(t('voice.errGeminiNotConfigured'));
+        } else if (data.error === 'rate_limited') {
+          setStage('error');
+          setErrorMsg(t('voice.errRateLimited'));
         } else {
           await answerGeneralQuery(text);
         }
