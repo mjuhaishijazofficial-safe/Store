@@ -75,6 +75,7 @@ export default function KhataDetailPage() {
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'bank' | 'easypaisa' | 'jazzcash'>('cash');
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [savingEntry, setSavingEntry] = useState(false);
 
   useEffect(() => { init(); }, [customerId, shopId]);
 
@@ -202,12 +203,17 @@ export default function KhataDetailPage() {
   }
 
   async function saveEntry() {
-    if (!shopId || !modalType) return;
+    // savingEntry guards against a double-tap firing this twice — this
+    // creates real debt/stock movements, so a duplicate here is a much
+    // bigger problem than the duplicate-customer bug this same pattern
+    // fixed elsewhere in the app.
+    if (!shopId || !modalType || savingEntry) return;
     const amount = Number(form.amount);
     if (!amount || amount <= 0) return;
 
     const qtyNum = form.qty ? Number(form.qty) : null;
     const wasAdvance = total < 0;
+    setSavingEntry(true);
 
     // Atomic: the ledger insert and the linked inventory stock deduction
     // happen in one DB transaction (record_khata_entry) instead of two
@@ -224,6 +230,7 @@ export default function KhataDetailPage() {
       p_payment_method: modalType === 'payment' ? paymentMethod : 'cash'
     });
 
+    setSavingEntry(false);
     if (err) { showToast(t('common.error'), 'error'); return; }
 
     setModalType(null);
@@ -506,7 +513,7 @@ export default function KhataDetailPage() {
             <input className="input mb-5" value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} />
             <div className="flex gap-2">
               <button onClick={() => setModalType(null)} className="btn-secondary flex-1">{t('khataDetail.cancel')}</button>
-              <button onClick={saveEntry} className="btn-primary flex-1">{t('khataDetail.save')}</button>
+              <button onClick={saveEntry} disabled={savingEntry} className="btn-primary flex-1">{savingEntry ? t('khataDetail.loading') : t('khataDetail.save')}</button>
             </div>
           </div>
         </div>

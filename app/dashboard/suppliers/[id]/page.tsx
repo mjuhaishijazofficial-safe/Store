@@ -56,6 +56,7 @@ export default function SupplierDetailPage() {
   const [editOpen, setEditOpen] = useState(false);
   const [form, setForm] = useState({ item_name: '', qty: '', amount: '', note: '' });
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'bank' | 'easypaisa' | 'jazzcash'>('cash');
+  const [savingEntry, setSavingEntry] = useState(false);
 
   useEffect(() => { loadAll(); }, [supplierId, shopId]);
 
@@ -110,9 +111,13 @@ export default function SupplierDetailPage() {
   const modalNeedsItem = modalType === 'purchase' || modalType === 'return';
 
   async function saveEntry() {
-    if (!shopId || !modalType) return;
+    // savingEntry guards against a double-tap firing two inserts for the
+    // same entry — same fix as Khata's own saveEntry, same reasoning:
+    // this moves real supplier debt, not just a display value.
+    if (!shopId || !modalType || savingEntry) return;
     const amount = Number(form.amount);
     if (!amount || amount <= 0) return;
+    setSavingEntry(true);
 
     const { error: err } = await supabase.from('supplier_entries').insert({
       shop_id: shopId,
@@ -125,6 +130,7 @@ export default function SupplierDetailPage() {
       payment_method: modalType === 'payment' ? paymentMethod : 'cash'
     });
 
+    setSavingEntry(false);
     if (err) { showToast(t('common.error'), 'error'); return; }
     setModalType(null);
     await loadAll();
@@ -235,7 +241,7 @@ export default function SupplierDetailPage() {
             <input className="input mb-5" value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} />
             <div className="flex gap-2">
               <button onClick={() => setModalType(null)} className="btn-secondary flex-1">{t('suppliersDetail.cancel')}</button>
-              <button onClick={saveEntry} className="btn-primary flex-1">{t('suppliersDetail.save')}</button>
+              <button onClick={saveEntry} disabled={savingEntry} className="btn-primary flex-1">{savingEntry ? t('khataDetail.loading') : t('suppliersDetail.save')}</button>
             </div>
           </div>
         </div>

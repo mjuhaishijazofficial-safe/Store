@@ -47,6 +47,7 @@ export default function ExpensesPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState<{ category: Category; amount: string; note: string; paymentMethod: 'cash' | 'bank' | 'easypaisa' | 'jazzcash' }>({ category: 'rent', amount: '', note: '', paymentMethod: 'cash' });
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => { init(); }, [shopId]);
 
@@ -89,8 +90,12 @@ export default function ExpensesPage() {
   }
 
   async function save() {
+    // saving guards against a double-tap firing two inserts for the same
+    // expense — same fix as Khata/Supplier saveEntry, same reasoning:
+    // this feeds Reports' Net Profit, not just a display list.
     const amount = Number(form.amount);
-    if (!amount || amount <= 0 || !shopId) return;
+    if (!amount || amount <= 0 || !shopId || saving) return;
+    setSaving(true);
     const { error: err } = await supabase.from('expenses').insert({
       shop_id: shopId,
       category: form.category,
@@ -98,6 +103,7 @@ export default function ExpensesPage() {
       note: form.note.trim() || null,
       payment_method: form.paymentMethod
     });
+    setSaving(false);
     if (err) { showToast(t('common.error'), 'error'); return; }
     setModalOpen(false);
     await init();
@@ -186,7 +192,7 @@ export default function ExpensesPage() {
 
             <div className="flex gap-2">
               <button onClick={() => setModalOpen(false)} className="btn-secondary flex-1">{t('contact.cancel')}</button>
-              <button onClick={save} className="btn-primary flex-1">{t('contact.save')}</button>
+              <button onClick={save} disabled={saving} className="btn-primary flex-1">{saving ? t('khataDetail.loading') : t('contact.save')}</button>
             </div>
           </div>
         </div>

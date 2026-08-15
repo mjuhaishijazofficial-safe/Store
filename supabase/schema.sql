@@ -1467,9 +1467,19 @@ create table if not exists plans (
 insert into plans (name, price, billing_interval, features)
 select 'Standard', 999, 'month', array['Unlimited items', 'Unlimited khata customers', 'AI Slip-Scan stock-in', 'Multi-branch + staff roles', 'WhatsApp receipts & reminders']
 where not exists (select 1 from plans);
--- No RLS — same "admin-only, unreachable via anon/authenticated roles"
--- pattern as admin_actions; only the service-role client (Super
--- Admin's own routes) ever touches this table.
+-- RLS enabled with zero policies — "admin-only, unreachable via
+-- anon/authenticated roles" (same lockdown as admin_actions above; only
+-- the service-role client, i.e. Super Admin's own routes, ever touches
+-- this table — service_role bypasses RLS entirely regardless of
+-- policies, so this doesn't block it). The table previously had no
+-- `enable row level security` call at all despite the comment claiming
+-- this exact pattern — that's a real gap, not a stylistic one: Supabase
+-- grants anon/authenticated roles full CRUD on public-schema tables by
+-- default, and RLS being OFF means nothing gates that grant. Without
+-- this line, any signed-in user's own JWT (or the public anon key)
+-- could read/edit/delete every shop's pricing plan directly via the
+-- REST API, entirely outside the app's own admin routes.
+alter table plans enable row level security;
 
 -- Support tickets — a dukaandar raises one from their own shop
 -- (Settings > Support); Super Admin sees every shop's tickets in one

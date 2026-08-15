@@ -32,6 +32,7 @@ export default function SuppliersPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({ name: '', phone: '' });
+  const [savingSupplier, setSavingSupplier] = useState(false);
 
   useEffect(() => { loadAll(); }, [shopId]);
 
@@ -59,12 +60,17 @@ export default function SuppliersPage() {
   }
 
   async function saveSupplier() {
-    if (!form.name.trim()) return;
+    // savingSupplier guards against a double-tap double-inserting the
+    // same supplier — same duplicate-insert bug already found and fixed
+    // for Khata customers and Inventory items earlier.
+    if (!form.name.trim() || savingSupplier) return;
+    setSavingSupplier(true);
     const { error: err } = await supabase.from('suppliers').insert({
       shop_id: shopId,
       name: form.name.trim(),
       phone: form.phone.trim() || null
     });
+    setSavingSupplier(false);
     if (err) { showToast(t('common.error'), 'error'); return; }
     setModalOpen(false);
     await loadAll();
@@ -152,7 +158,7 @@ export default function SuppliersPage() {
             <input className="input mb-5" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="03xx-xxxxxxx" />
             <div className="flex gap-2">
               <button onClick={() => setModalOpen(false)} className="btn-secondary flex-1">{t('suppliers.cancel')}</button>
-              <button onClick={saveSupplier} className="btn-primary flex-1">{t('suppliers.save')}</button>
+              <button onClick={saveSupplier} disabled={savingSupplier} className="btn-primary flex-1">{savingSupplier ? t('khataDetail.loading') : t('suppliers.save')}</button>
             </div>
           </div>
         </div>
