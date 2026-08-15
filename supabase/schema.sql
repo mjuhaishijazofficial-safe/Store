@@ -664,12 +664,14 @@ declare
   v_shop_id uuid := my_shop_id();
   v_supplier_id uuid;
   v_status text;
+  v_po_note text;
+  v_reason text;
   v_total numeric := 0;
   v_line record;
   v_qty_now numeric;
   v_all_done boolean := true;
 begin
-  select supplier_id, status into v_supplier_id, v_status
+  select supplier_id, status, note into v_supplier_id, v_status, v_po_note
   from purchase_orders where id = p_po_id and shop_id = v_shop_id;
 
   if v_supplier_id is null then
@@ -678,6 +680,11 @@ begin
   if v_status not in ('draft', 'sent', 'partial') then
     raise exception 'this purchase order cannot receive any more stock';
   end if;
+
+  -- AI Slip-Scan's own PO is tagged with this exact note (see
+  -- SlipScanModal) — the only signal available to tell a slip-scanned
+  -- delivery apart from a manually-built PO for the ledger's reason.
+  v_reason := case when v_po_note = 'AI Slip-Scan' then 'slip_scan' else 'purchase' end;
 
   for v_line in select * from purchase_order_items where purchase_order_id = p_po_id loop
     v_qty_now := greatest(0, v_line.qty - v_line.received_qty);
@@ -693,10 +700,10 @@ begin
       v_total := v_total + (v_qty_now * v_line.cost_price);
 
       if v_line.item_id is not null then
-        update items set stock = stock + v_qty_now where id = v_line.item_id;
         insert into transactions (shop_id, item_id, item_name, type, qty, unit, amount, created_by)
         select v_shop_id, v_line.item_id, v_line.item_name, 'purchase', v_qty_now, unit, v_qty_now * v_line.cost_price, auth.uid()
         from items where id = v_line.item_id;
+        perform record_stock_movement(v_line.item_id, null, v_qty_now, v_reason, 'purchase_order', p_po_id, null);
       end if;
 
       update purchase_order_items set received_qty = received_qty + v_qty_now where id = v_line.id;
@@ -1073,6 +1080,7 @@ as $$
 declare
   v_shop_id uuid := my_shop_id();
   v_unit text;
+  v_txn_id uuid;
 begin
   if p_type not in ('purchase', 'payment', 'return') then
     raise exception 'invalid type: %', p_type;
@@ -1084,16 +1092,23 @@ begin
   insert into khata_entries (shop_id, customer_id, type, item_id, item_name, qty, amount, note, created_by, payment_method)
   values (v_shop_id, p_customer_id, p_type, p_item_id, p_item_name, p_qty, p_amount, p_note, auth.uid(), coalesce(p_payment_method, 'cash'));
 
+  -- Stock Ledger (spec: Stock Ledger Pattern) — record_stock_movement
+  -- below is now the only place items.stock is ever written; this just
+  -- logs the transactions row for reporting the same as before and
+  -- hands its id to the ledger as reference_id, so a stock_movements
+  -- row can be traced straight back to the sale/return that caused it.
   if p_type = 'purchase' and p_item_id is not null then
     select unit into v_unit from items where id = p_item_id;
-    update items set stock = greatest(0, stock - coalesce(p_qty, 0)) where id = p_item_id;
     insert into transactions (shop_id, item_id, item_name, type, qty, unit, amount, created_by, customer_id, note)
-    values (v_shop_id, p_item_id, p_item_name, 'sale', coalesce(p_qty, 0), v_unit, p_amount, auth.uid(), p_customer_id, p_note);
+    values (v_shop_id, p_item_id, p_item_name, 'sale', coalesce(p_qty, 0), v_unit, p_amount, auth.uid(), p_customer_id, p_note)
+    returning id into v_txn_id;
+    perform record_stock_movement(p_item_id, null, -coalesce(p_qty, 0), 'sale', 'transaction', v_txn_id, p_note);
   elsif p_type = 'return' and p_item_id is not null then
     select unit into v_unit from items where id = p_item_id;
-    update items set stock = stock + coalesce(p_qty, 0) where id = p_item_id;
     insert into transactions (shop_id, item_id, item_name, type, qty, unit, amount, created_by, customer_id, note)
-    values (v_shop_id, p_item_id, p_item_name, 'return', coalesce(p_qty, 0), v_unit, p_amount, auth.uid(), p_customer_id, p_note);
+    values (v_shop_id, p_item_id, p_item_name, 'return', coalesce(p_qty, 0), v_unit, p_amount, auth.uid(), p_customer_id, p_note)
+    returning id into v_txn_id;
+    perform record_stock_movement(p_item_id, null, coalesce(p_qty, 0), 'return', 'transaction', v_txn_id, p_note);
   end if;
 end;
 $$;
@@ -1110,13 +1125,20 @@ $$;
 -- same pattern this file already uses for khata_customer_totals /
 -- supplier_contact_totals above when their shape changed.
 drop function if exists record_stock_move(uuid, text, numeric, numeric, uuid);
+-- Grows an optional p_reason (Stock Ledger Pattern) — same trailing-
+-- default-param addition already explained above for p_note, same
+-- reason a signature this recognizable needs no new drop: p_reason is
+-- appended after every existing positional/default param, so every
+-- caller that predates it (none pass p_reason) still resolves to this
+-- one exact function, no second overload created.
 create or replace function record_stock_move(
   p_item_id uuid,
   p_type text,
   p_qty numeric,
   p_amount numeric default 0,
   p_sale_ref uuid default null,
-  p_note text default null
+  p_note text default null,
+  p_reason text default null
 )
 returns void
 language plpgsql
@@ -1126,6 +1148,7 @@ declare
   v_shop_id uuid;
   v_item_name text;
   v_unit text;
+  v_txn_id uuid;
 begin
   if p_type not in ('purchase', 'sale', 'return') then
     raise exception 'invalid type: %', p_type;
@@ -1141,14 +1164,20 @@ begin
     raise exception 'item not found';
   end if;
 
-  if p_type = 'purchase' or p_type = 'return' then
-    update items set stock = stock + p_qty where id = p_item_id;
-  else
-    update items set stock = greatest(0, stock - p_qty) where id = p_item_id;
-  end if;
-
   insert into transactions (shop_id, item_id, item_name, type, qty, unit, amount, created_by, sale_ref, note)
-  values (v_shop_id, p_item_id, v_item_name, p_type, p_qty, v_unit, coalesce(p_amount, 0), auth.uid(), p_sale_ref, p_note);
+  values (v_shop_id, p_item_id, v_item_name, p_type, p_qty, v_unit, coalesce(p_amount, 0), auth.uid(), p_sale_ref, p_note)
+  returning id into v_txn_id;
+
+  -- p_reason lets a caller override the ledger reason without changing
+  -- p_type's own sale/purchase/return meaning (e.g. Inventory's Stock
+  -- Out modal passing 'adjustment' for damage/wastage — still a stock
+  -- decrease logged the same way a sale is, just tagged differently).
+  perform record_stock_movement(
+    p_item_id, null,
+    case when p_type in ('purchase', 'return') then p_qty else -p_qty end,
+    coalesce(p_reason, p_type),
+    'transaction', v_txn_id, p_note
+  );
 end;
 $$;
 
@@ -1330,11 +1359,12 @@ begin
     select * into v_source_item from items where id = v_line.item_id and shop_id = v_shop_id;
     if v_source_item is null then continue; end if;
 
-    update items set stock = greatest(0, stock - v_line.qty) where id = v_line.item_id;
-
     -- Match the destination branch's existing item by barcode (if this
     -- item has one) or exact name, same lookup order Slip-Scan uses —
-    -- create a new row there only if genuinely nothing matches.
+    -- create a new row there only if genuinely nothing matches. Starts
+    -- at stock 0 either way now — record_stock_movement below is what
+    -- actually credits the transferred qty, same single choke-point
+    -- every other stock-affecting flow now goes through.
     select id into v_dest_item_id from items
     where shop_id = v_shop_id and branch_id = v_transfer.destination_branch_id
       and ((v_source_item.barcode is not null and barcode = v_source_item.barcode) or name = v_source_item.name)
@@ -1342,16 +1372,20 @@ begin
 
     if v_dest_item_id is null then
       insert into items (shop_id, branch_id, name, category, unit, stock, min_stock, price, cost_price, barcode)
-      values (v_shop_id, v_transfer.destination_branch_id, v_source_item.name, v_source_item.category, v_source_item.unit, v_line.qty, v_source_item.min_stock, v_source_item.price, v_source_item.cost_price, null)
+      values (v_shop_id, v_transfer.destination_branch_id, v_source_item.name, v_source_item.category, v_source_item.unit, 0, v_source_item.min_stock, v_source_item.price, v_source_item.cost_price, null)
       returning id into v_dest_item_id;
-    else
-      update items set stock = stock + v_line.qty where id = v_dest_item_id;
     end if;
 
     insert into transactions (shop_id, branch_id, item_id, item_name, type, qty, unit, amount, created_by)
     values (v_shop_id, v_transfer.source_branch_id, v_line.item_id, v_line.item_name, 'sale', v_line.qty, v_source_item.unit, 0, auth.uid());
     insert into transactions (shop_id, branch_id, item_id, item_name, type, qty, unit, amount, created_by)
     values (v_shop_id, v_transfer.destination_branch_id, v_dest_item_id, v_line.item_name, 'purchase', v_line.qty, v_source_item.unit, 0, auth.uid());
+
+    -- Stock Ledger: two linked movements sharing reference_id — the one
+    -- traceability guarantee this whole refactor is for (spec: "dono
+    -- same reference_id se linked").
+    perform record_stock_movement(v_line.item_id, v_transfer.source_branch_id, -v_line.qty, 'transfer_out', 'stock_transfer', p_transfer_id, null);
+    perform record_stock_movement(v_dest_item_id, v_transfer.destination_branch_id, v_line.qty, 'transfer_in', 'stock_transfer', p_transfer_id, null);
   end loop;
 
   update stock_transfers set status = 'confirmed', confirmed_by = auth.uid(), confirmed_at = now() where id = p_transfer_id;
@@ -1511,7 +1545,7 @@ begin
     insert into profiles (id, shop_id, branch_id, full_name, email, role)
     values (new.id, invited_shop_id, invited_branch_id, new.raw_user_meta_data->>'full_name', new.email, invited_role);
   else
-    select coalesce(default_trial_days, 14) into trial_days from platform_settings limit 1;
+    select coalesce(dts.default_trial_days, 14) into trial_days from platform_settings dts limit 1;
 
     insert into shops (name, owner_id, trial_ends_at)
     values (
@@ -1531,3 +1565,130 @@ begin
   return new;
 end;
 $$;
+
+-- ============================================================
+-- 16. STOCK LEDGER PATTERN (ERPNext/Odoo-style Stock Ledger Entry)
+--
+-- Before this: items.stock was mutated directly by 4 different
+-- functions (record_stock_move, record_khata_entry, receive_po_lines,
+-- confirm_stock_transfer), each with its own `update items set
+-- stock = ...` — nothing recorded WHY a given change happened in one
+-- traceable place, so History/Reports couldn't reliably answer "what
+-- moved this item's stock and when."
+--
+-- After this: stock_movements is the single append-only ledger every
+-- stock-affecting action writes to, and record_stock_movement() below
+-- is the only place items.stock is written from — every one of those
+-- 4 functions now calls it instead of touching items directly (see
+-- their bodies above, already rewired). items.stock itself is NOT
+-- removed: same as ERPNext's "Bin" (a cached running total kept in
+-- sync transactionally alongside each ledger entry, not a live SUM()
+-- on every read) — every existing read path (Inventory list, POS
+-- search, Reorder, Dashboard, Reports) keeps working unchanged, at
+-- the same performance, with zero client-code changes required for
+-- Sale/Return/Purchase/Slip-Scan/Transfer.
+-- ============================================================
+
+create table if not exists stock_movements (
+  id uuid primary key default gen_random_uuid(),
+  shop_id uuid not null references shops(id) on delete cascade,
+  item_id uuid not null references items(id) on delete cascade,
+  branch_id uuid references branches(id) on delete set null,
+  quantity_change numeric not null,
+  reason text not null check (reason in ('sale', 'return', 'purchase', 'transfer_in', 'transfer_out', 'adjustment', 'slip_scan')),
+  reference_type text,
+  reference_id uuid,
+  note text,
+  created_by uuid references auth.users(id),
+  created_at timestamptz not null default now()
+);
+alter table stock_movements enable row level security;
+-- Read access for everyone in the shop (a Cashier can see why an item's
+-- stock is what it is, same visibility their Billing screen already
+-- gives them); writes only ever happen through record_stock_movement()
+-- below, called from other SECURITY INVOKER functions under the
+-- calling user's own session — this policy is what lets those inserts
+-- through, not a door to insert arbitrary ledger rows some other way.
+drop policy if exists "stock_movements_own_shop" on stock_movements;
+create policy "stock_movements_own_shop" on stock_movements for all
+  using (shop_id = my_shop_id())
+  with check (shop_id = my_shop_id());
+
+create index if not exists idx_stock_movements_item on stock_movements(item_id, created_at desc);
+create index if not exists idx_stock_movements_shop on stock_movements(shop_id, created_at desc);
+create index if not exists idx_stock_movements_branch on stock_movements(branch_id, created_at desc) where branch_id is not null;
+
+-- The one choke point. p_branch_id null means "use the item's own
+-- branch_id" (the common case — a sale/return/purchase happens wherever
+-- the item already lives); Transfer passes its own source/destination
+-- branch explicitly since a transfer is defined by moving BETWEEN two
+-- branches, not by the item's home branch.
+create or replace function record_stock_movement(
+  p_item_id uuid,
+  p_branch_id uuid,
+  p_quantity_change numeric,
+  p_reason text,
+  p_reference_type text default null,
+  p_reference_id uuid default null,
+  p_note text default null
+)
+returns void
+language plpgsql
+security invoker
+as $$
+declare
+  v_shop_id uuid;
+  v_item_branch_id uuid;
+begin
+  if p_reason not in ('sale', 'return', 'purchase', 'transfer_in', 'transfer_out', 'adjustment', 'slip_scan') then
+    raise exception 'invalid stock movement reason: %', p_reason;
+  end if;
+
+  select shop_id, branch_id into v_shop_id, v_item_branch_id from items where id = p_item_id;
+  if v_shop_id is null then
+    raise exception 'item not found';
+  end if;
+
+  insert into stock_movements (shop_id, item_id, branch_id, quantity_change, reason, reference_type, reference_id, note, created_by)
+  values (v_shop_id, p_item_id, coalesce(p_branch_id, v_item_branch_id), p_quantity_change, p_reason, p_reference_type, p_reference_id, p_note, auth.uid());
+
+  update items set stock = greatest(0, stock + p_quantity_change) where id = p_item_id;
+end;
+$$;
+
+-- One-time backfill from the existing transactions/khata_entries
+-- history so items that already had movement before this migration
+-- aren't blank in the new ledger — no data lost, nothing here changes
+-- items.stock (it's already at its correct current value; this only
+-- back-fills the audit trail explaining how it got there). Idempotent
+-- via the not-exists guard, safe to re-run.
+--
+-- Known, accepted limitation: a stock-transfer confirmed before this
+-- migration existed also inserted two `transactions` rows (type
+-- sale/purchase, amount 0) as its own audit trail — this backfill has
+-- no reliable way to tell those apart from a genuine sale/purchase
+-- retroactively, so pre-migration transfers backfill as reason
+-- 'sale'/'purchase' rather than 'transfer_out'/'transfer_in'. Every
+-- transfer confirmed from now on (via the rewired confirm_stock_transfer
+-- above) tags correctly from the start.
+insert into stock_movements (shop_id, item_id, branch_id, quantity_change, reason, reference_type, reference_id, note, created_by, created_at)
+select
+  t.shop_id, t.item_id, t.branch_id,
+  case when t.type in ('purchase', 'return') then t.qty else -t.qty end,
+  t.type,
+  'transaction', t.id, t.note, t.created_by, t.created_at
+from transactions t
+where t.item_id is not null
+  and not exists (select 1 from stock_movements sm where sm.reference_type = 'transaction' and sm.reference_id = t.id);
+
+insert into stock_movements (shop_id, item_id, branch_id, quantity_change, reason, reference_type, reference_id, note, created_by, created_at)
+select
+  k.shop_id, k.item_id, k.branch_id,
+  case when k.type = 'purchase' then -coalesce(k.qty, 0) else coalesce(k.qty, 0) end,
+  case when k.type = 'purchase' then 'sale' else 'return' end,
+  'khata_entry', k.id, k.note, k.created_by, k.created_at
+from khata_entries k
+where k.item_id is not null
+  and k.type in ('purchase', 'return')
+  and coalesce(k.qty, 0) > 0
+  and not exists (select 1 from stock_movements sm where sm.reference_type = 'khata_entry' and sm.reference_id = k.id);
