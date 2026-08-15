@@ -122,6 +122,17 @@ export default function VoicePage() {
   }
 
   const [pendingClarify, setPendingClarify] = useState<PendingClarify | null>(null);
+  // What Eagle is doing right now, in plain words — set at each real
+  // step (not just once for the whole "processing" stage) so the screen
+  // shows actual progress ("Zuhair ko dhoond raha hoon...", "Save kar
+  // raha hoon...") instead of one static "thinking" the whole time.
+  const [processingLabel, setProcessingLabel] = useState('');
+  // Flipped by the Cancel button; checked right after every await in the
+  // pipeline so a cancel actually stops the in-flight command instead of
+  // just hiding the UI while it keeps running in the background and
+  // still lands a result (or worse, still executes a write) after the
+  // user already walked away from it.
+  const cancelledRef = useRef(false);
 
   // Hands-free (wake-word) mode — off by default. Unlike voiceReplyOn,
   // this changes what the microphone does (listens continuously
@@ -175,8 +186,22 @@ export default function VoicePage() {
     setErrorMsg('');
     setResolved(null);
     setAnswerText('');
+    setProcessingLabel('');
     pendingClarify?.cancel();
     setPendingClarify(null);
+  }
+
+  // The Cancel button — visible the entire time Eagle is doing anything
+  // on its own (listening, transcribing, thinking), not just once a
+  // confirm/clarify card is already up. Stops the mic if it's still
+  // recording, flags the in-flight command as abandoned so the pipeline
+  // bails out at its next checkpoint instead of finishing and acting
+  // anyway, and drops straight back to idle.
+  function cancelAll() {
+    cancelledRef.current = true;
+    stt.current.stop();
+    stopSpeaking();
+    reset();
   }
 
   // Guards against a fast double-tap on "start listening" firing
@@ -210,6 +235,8 @@ export default function VoicePage() {
       return;
     }
     starting.current = true;
+    // A fresh command — any earlier cancel no longer applies.
+    cancelledRef.current = false;
     if (delayMs > 0) await new Promise(r => setTimeout(r, delayMs));
     // Runs inside this click handler on purpose — Chrome only permits
     // speech after a real user gesture, so priming here is what lets
@@ -229,6 +256,7 @@ export default function VoicePage() {
         undefined,
         phase => setStage(phase === 'transcribing' ? 'transcribing' : 'listening')
       );
+      if (cancelledRef.current) return;
       setTranscript(text);
       await handleTranscript(text);
     } catch (e: any) {
@@ -291,12 +319,14 @@ export default function VoicePage() {
 
   async function handleTranscript(text: string) {
     setStage('processing');
+    setProcessingLabel(t('voice.thinking'));
     try {
       const res = await fetchWithTimeout('/api/voice/parse-command', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ transcript: text, history: history.current })
       }, CLIENT_TIMEOUT_MS);
+      if (cancelledRef.current) return;
       const data = await res.json();
       if (!res.ok) {
         // A missing API key or a spent quota are real dead ends
@@ -346,6 +376,7 @@ export default function VoicePage() {
   async function findBestMatch(table: 'customers' | 'items' | 'suppliers', spoken: string): Promise<MatchRow | null> {
     const cols = table === 'items' ? 'id, name, price' : 'id, name';
     const clean = spoken.trim();
+    setProcessingLabel(t('voice.searchingFor').replace('{name}', clean));
 
     async function queryPattern(pattern: string): Promise<MatchRow[]> {
       const { data } = await supabase.from(table).select(cols).eq('shop_id', shopId).ilike('name', `%${pattern}%`);
@@ -391,12 +422,14 @@ export default function VoicePage() {
   // Khata/stock. No confirm step: nothing here is reversible-because-
   // nothing-happened, so there's nothing to confirm before doing.
   async function answerGeneralQuery(query: string) {
+    setProcessingLabel(t('voice.searchingAnswer'));
     try {
       const res = await fetchWithTimeout('/api/voice/ask', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ query, history: history.current })
       }, CLIENT_TIMEOUT_MS);
+      if (cancelledRef.current) return;
       const data = await res.json();
       if (!res.ok || !data.answer) {
         const msg = data.error === 'not_configured' ? t('voice.errGeminiNotConfigured') : t('voice.errParse');
@@ -749,6 +782,7 @@ export default function VoicePage() {
   async function confirmExecute() {
     if (!resolved || confirming) return;
     setConfirming(true);
+    setProcessingLabel(t('voice.saving'));
 
     if (resolved.intent.action === 'add_customer') {
       // customerId set means resolveIntent found this exact name already
@@ -879,10 +913,22 @@ export default function VoicePage() {
   return (
     <div className="min-h-[80vh] flex flex-col">
       <div className="flex items-center justify-between mb-2">
-        <Link href="/dashboard/khata" className="text-xs text-chalkdim hover:text-haldi inline-flex items-center gap-1">
-          <ArrowLeftIcon className="w-3.5 h-3.5" />
-          {t('khataDetail.back')}
-        </Link>
+        {/* Cancel takes the Back link's own spot the moment Eagle is
+            doing anything on its own — the first, most reachable
+            control on the whole screen, exactly when it's most needed
+            (mid-listen, mid-upload, mid-think), not buried below a card
+            that only appears once Eagle is already done deciding. */}
+        {(listening || transcribing || processing) ? (
+          <button onClick={cancelAll} className="text-xs text-mirch font-700 inline-flex items-center gap-1">
+            <ArrowLeftIcon className="w-3.5 h-3.5" />
+            {t('voice.cancel')}
+          </button>
+        ) : (
+          <Link href="/dashboard/khata" className="text-xs text-chalkdim hover:text-haldi inline-flex items-center gap-1">
+            <ArrowLeftIcon className="w-3.5 h-3.5" />
+            {t('khataDetail.back')}
+          </Link>
+        )}
         <div className="flex items-center gap-3">
           {isWakeWordSupported() && (
             <button
@@ -930,7 +976,7 @@ export default function VoicePage() {
           {stage === 'idle' && (handsFreeOn ? t('voice.waitingForWake') : t('voice.tapToSpeak'))}
           {listening && (transcript ? `"${transcript}"` : t('voice.listening'))}
           {transcribing && t('voice.transcribing')}
-          {processing && t('voice.thinking')}
+          {processing && (processingLabel || t('voice.thinking'))}
           {stage === 'clarify' && pendingClarify && (
             t('voice.clarifyPrompt').replace('{names}', pendingClarify.candidates.map(c => c.name).join(t('voice.clarifyOr')))
           )}
