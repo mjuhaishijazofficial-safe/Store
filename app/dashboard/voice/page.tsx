@@ -86,11 +86,19 @@ export default function VoicePage() {
       await handleTranscript(text);
     } catch (e: any) {
       const reason = e?.message || 'speech_error';
+      console.error('[Eagle] listen failed', reason);
       setStage('error');
       setErrorMsg(
         reason === 'whisper_not_configured' ? t('voice.errWhisperNotConfigured')
         : reason === 'no_speech' ? t('voice.errNoSpeech')
         : reason === 'not_supported' ? t('voice.notSupported')
+        // getUserMedia's real DOMException name (see whisper-stt.ts) —
+        // each one is a genuinely different fix for the user, not
+        // interchangeable "mic broken" noise.
+        : reason === 'mic_NotAllowedError' ? t('voice.errMicDenied')
+        : reason === 'mic_NotFoundError' ? t('voice.errMicNotFound')
+        : reason === 'mic_NotReadableError' ? t('voice.errMicBusy')
+        : reason.startsWith('mic_') ? `${t('voice.errMic')} (${reason.slice(4)})`
         : t('voice.errMic')
       );
     }

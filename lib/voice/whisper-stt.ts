@@ -19,7 +19,16 @@ export const whisperStt: SttProvider = {
   },
 
   async listen(lang) {
-    activeStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    // Surfaces the real reason instead of a generic "could not access
+    // microphone" — getUserMedia's DOMException.name is what actually
+    // distinguishes "you said no", "no mic exists", "another app has it
+    // open", and "this page isn't secure enough to even ask" from each
+    // other; VoicePage maps each to its own message.
+    try {
+      activeStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (e: any) {
+      throw new Error(`mic_${e?.name || 'unknown'}`);
+    }
     const chunks: BlobPart[] = [];
     mediaRecorder = new MediaRecorder(activeStream);
     mediaRecorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };

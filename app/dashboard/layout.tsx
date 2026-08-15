@@ -148,8 +148,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
           {/* Theme/language toggles live here — top-right of every
               dashboard page's content — rather than in the sidebar
               footer, which now stays just the trial badge + a centered
-              Sign Out. */}
+              Sign Out. Eagle sits alongside them — same reasoning,
+              always-reachable chrome rather than competing for space in
+              the nav list. Khata-gated: no point showing it to a staff
+              member who can't open Khata at all, same as the nav link. */}
           <div className="flex justify-end gap-2 mb-4 no-print">
+            {hasSection(profile.role, allowedSections, 'khata') && (shop?.voice_commands_enabled ?? true) && <VoiceLauncherButton />}
             <ThemeToggle />
             <LanguageToggle />
           </div>
@@ -170,10 +174,6 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <AppLockGate>{children}</AppLockGate>
         </main>
       </div>
-      {/* Eagle voice commands are Khata-shaped (see app/dashboard/voice)
-          — no point showing the launcher to a staff member who can't
-          open Khata at all, same gate the nav link above already uses. */}
-      {hasSection(profile.role, allowedSections, 'khata') && (shop?.voice_commands_enabled ?? true) && <VoiceLauncherButton />}
     </ShopProvider>
   );
 }
