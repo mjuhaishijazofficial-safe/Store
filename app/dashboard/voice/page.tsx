@@ -106,15 +106,27 @@ export default function VoicePage() {
     setAnswerText('');
   }
 
+  // Guards against a fast double-tap on "start listening" firing
+  // toggleListening() twice before the first call's setStage('listening')
+  // has actually taken effect — whisper-stt.ts holds its recorder/stream
+  // in module-level singletons, so two concurrent listen() calls would
+  // stomp on each other (second getUserMedia call overwriting the first
+  // one's stream/recorder references), which is exactly the kind of bug
+  // that looks like "the button doesn't respond, I have to tap it
+  // several times" from the outside.
+  const starting = useRef(false);
+
   async function toggleListening() {
     if (stage === 'listening') {
       stt.current.stop();
       return;
     }
+    if (starting.current) return;
     if (!stt.current.isSupported) {
       showToast(t('voice.notSupported'), 'error');
       return;
     }
+    starting.current = true;
     setStage('listening');
     setTranscript('');
     setErrorMsg('');
@@ -150,6 +162,8 @@ export default function VoicePage() {
         : reason.startsWith('recording_failed') ? `${t('voice.errRecording')} (${reason.slice(18).trim()})`
         : t('voice.errGeneric')
       );
+    } finally {
+      starting.current = false;
     }
   }
 
