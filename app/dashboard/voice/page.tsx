@@ -9,9 +9,16 @@ import { useToast } from '@/lib/toast-context';
 import { useSectionGuard } from '@/lib/use-section-guard';
 import { getSttProvider } from '@/lib/voice/stt-provider';
 import { speak, stopSpeaking, isTtsSupported, primeTts } from '@/lib/voice/tts';
+import { fetchWithTimeout } from '@/lib/voice/fetch-timeout';
 import { ArrowLeftIcon, MicIcon, SpeakerOnIcon, SpeakerOffIcon } from '@/components/icons';
 
 const VOICE_REPLY_KEY = 'eagle:voiceReplyEnabled';
+
+// Slightly longer than the server routes' own upstream timeouts, so a
+// route that times out internally still gets to return its own proper
+// error instead of the browser giving up on it first — but bounded
+// regardless, so nothing can leave the UI stuck in "thinking" forever.
+const CLIENT_TIMEOUT_MS = 20000;
 
 type Stage = 'idle' | 'listening' | 'transcribing' | 'processing' | 'confirm' | 'error' | 'done';
 
@@ -179,21 +186,27 @@ export default function VoicePage() {
   async function handleTranscript(text: string) {
     setStage('processing');
     try {
-      const res = await fetch('/api/voice/parse-command', {
+      const res = await fetchWithTimeout('/api/voice/parse-command', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ transcript: text })
-      });
+      }, CLIENT_TIMEOUT_MS);
       const data = await res.json();
       if (!res.ok) {
-        setStage('error');
-        setErrorMsg(data.error === 'not_configured' ? t('voice.errGeminiNotConfigured') : t('voice.errParse'));
+        // A missing API key is a real dead end (nothing downstream can
+        // work either); anything else is worth still trying to answer
+        // as a plain question rather than giving up on what was said.
+        if (data.error === 'not_configured') {
+          setStage('error');
+          setErrorMsg(t('voice.errGeminiNotConfigured'));
+        } else {
+          await answerGeneralQuery(text);
+        }
         return;
       }
       await resolveIntent(data as ParsedIntent, text);
     } catch {
-      setStage('error');
-      setErrorMsg(t('voice.errParse'));
+      await answerGeneralQuery(text);
     }
   }
 
@@ -217,11 +230,11 @@ export default function VoicePage() {
   // nothing-happened, so there's nothing to confirm before doing.
   async function answerGeneralQuery(query: string) {
     try {
-      const res = await fetch('/api/voice/ask', {
+      const res = await fetchWithTimeout('/api/voice/ask', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ query })
-      });
+      }, CLIENT_TIMEOUT_MS);
       const data = await res.json();
       if (!res.ok || !data.answer) {
         setStage('error');
@@ -241,9 +254,13 @@ export default function VoicePage() {
       await answerGeneralQuery(intent.query || rawText);
       return;
     }
+    // Never dead-end on "I didn't understand". If it isn't a Khata
+    // command, it's still something the user said out loud and expects
+    // an answer to — hand it to the general-question path instead of
+    // refusing. Only Khata actions (which move money and stock) need
+    // to be certain; a spoken question does not.
     if (intent.action === 'unknown' || !intent.customer_name) {
-      setStage('error');
-      setErrorMsg(t('voice.errUnclear').replace('{text}', rawText));
+      await answerGeneralQuery(rawText);
       return;
     }
 

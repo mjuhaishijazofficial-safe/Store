@@ -1,5 +1,11 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { fetchWithTimeout } from '@/lib/voice/fetch-timeout';
+
+// Intent parsing is a small text-only call and should be fast; if it
+// isn't back in this long something is wrong upstream and waiting
+// longer only makes the assistant feel broken.
+const PARSE_TIMEOUT_MS = 7000;
 
 // Voice Command feature: transcript text in, a structured Khata action
 // out. Same Gemini generateContent + responseSchema pattern as AI
@@ -52,14 +58,14 @@ export async function POST(req: Request) {
 
   try {
     const model = process.env.GEMINI_MODEL || 'gemini-flash-latest';
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+    const res = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         contents: [{ role: 'user', parts: [{ text: `${PROMPT}\n\nCommand: "${transcript.trim()}"` }] }],
         generationConfig: { responseMimeType: 'application/json', responseSchema: RESPONSE_SCHEMA }
       })
-    });
+    }, PARSE_TIMEOUT_MS);
     if (!res.ok) return NextResponse.json({ error: 'ai_request_failed' }, { status: 502 });
     const data = await res.json();
     const aiText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';

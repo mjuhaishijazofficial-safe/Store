@@ -1,5 +1,11 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { fetchWithTimeout } from '@/lib/voice/fetch-timeout';
+
+// A few seconds of audio transcribes in about a second normally —
+// anything past this is a stall, and waiting it out just leaves the
+// user staring at a spinner.
+const WHISPER_TIMEOUT_MS = 15000;
 
 // Voice Command feature, Whisper leg: audio in, transcript out. Runs
 // server-side deliberately (not a direct client -> OpenAI call) so
@@ -67,11 +73,11 @@ export async function POST(req: Request) {
 
   let res: Response;
   try {
-    res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+    res = await fetchWithTimeout('https://api.openai.com/v1/audio/transcriptions', {
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}` },
       body: upstream
-    });
+    }, WHISPER_TIMEOUT_MS);
   } catch (e: any) {
     console.error('[voice/transcribe] fetch to OpenAI threw', e?.message || e);
     return NextResponse.json({ error: 'transcribe_failed' }, { status: 502 });

@@ -1,5 +1,12 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { fetchWithTimeout } from '@/lib/voice/fetch-timeout';
+
+// Grounded search is the slow leg (it does real web lookups); the plain
+// call is fast. Bounding them separately means a stalled grounding
+// request can't hold up an answer the plain call already has ready.
+const GROUNDED_TIMEOUT_MS = 6000;
+const PLAIN_TIMEOUT_MS = 8000;
 
 // Voice Command feature, "general_query" leg: anything Eagle was asked
 // that isn't Khata-shaped (a question, a search request, a
@@ -15,14 +22,14 @@ const SYSTEM_PROMPT = 'You are Eagle, a helpful voice assistant inside a Pakista
 
 async function callGemini(apiKey: string, model: string, query: string, withSearch: boolean): Promise<string | null> {
   try {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+    const res = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         contents: [{ role: 'user', parts: [{ text: `${SYSTEM_PROMPT}\n\nQuestion: ${query}` }] }],
         ...(withSearch ? { tools: [{ google_search: {} }] } : {})
       })
-    });
+    }, withSearch ? GROUNDED_TIMEOUT_MS : PLAIN_TIMEOUT_MS);
     if (!res.ok) return null;
     const data = await res.json();
     const parts = data?.candidates?.[0]?.content?.parts;

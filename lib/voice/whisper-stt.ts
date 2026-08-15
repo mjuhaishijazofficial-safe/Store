@@ -1,6 +1,12 @@
 'use client';
 
 import type { SttProvider } from './types';
+import { fetchWithTimeout } from './fetch-timeout';
+
+// Bounded so a stalled upload can't leave the UI sitting in
+// "transcribing" indefinitely — slightly above the route's own Whisper
+// timeout so the server still gets to answer first when it can.
+const TRANSCRIBE_TIMEOUT_MS = 18000;
 
 // Records mic audio and sends it to /api/voice/transcribe, which calls
 // OpenAI Whisper server-side (OPENAI_API_KEY). Same SttProvider shape as
@@ -160,7 +166,7 @@ export const whisperStt: SttProvider = {
       const form = new FormData();
       form.append('audio', blob, 'command.webm');
       form.append('lang', lang);
-      const res = await fetch('/api/voice/transcribe', { method: 'POST', body: form });
+      const res = await fetchWithTimeout('/api/voice/transcribe', { method: 'POST', body: form }, TRANSCRIBE_TIMEOUT_MS);
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error === 'not_configured' ? 'whisper_not_configured' : 'transcribe_failed');
