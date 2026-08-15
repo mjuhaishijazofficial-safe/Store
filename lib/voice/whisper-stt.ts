@@ -4,14 +4,26 @@ import type { SttProvider } from './types';
 
 // Paid upgrade path (once there's budget): records raw audio and sends
 // it to /api/voice/transcribe, which calls OpenAI Whisper server-side
-// (OPENAI_API_KEY). Push-to-talk, not silence-detection — MediaRecorder
-// has no built-in "stopped talking" signal the way SpeechRecognition
-// does, so the caller (VoiceCommandButton) calls stop() itself on the
-// second tap. Same SttProvider shape as webSpeechStt — swapping the
-// active provider is a one-line env change (NEXT_PUBLIC_VOICE_STT_PROVIDER),
-// nothing else in the voice-command feature has to change.
+// (OPENAI_API_KEY). Same SttProvider shape as webSpeechStt — swapping
+// the active provider is a one-line env change
+// (NEXT_PUBLIC_VOICE_STT_PROVIDER), nothing else in the voice-command
+// feature has to change.
+//
+// Auto-stops on its own once the speaker goes quiet, via a Web Audio
+// AnalyserNode watching the mic's own volume level — MediaRecorder has
+// no built-in "stopped talking" signal the way SpeechRecognition does,
+// so this is hand-rolled. stop() is still exposed for an early manual
+// cut-off (a second tap on the mic button), but nobody should actually
+// need it in normal use — that's the whole fix for "it just sits there
+// listening and never responds" (silence used to require a second tap
+// the UI only hinted at in small text under the button).
+const SILENCE_THRESHOLD = 10; // 0-255 volume scale (analyser byte data) — below this counts as quiet. Tune up if a noisy shop floor trips silence detection while someone is still mid-sentence.
+const SILENCE_DURATION_MS = 1400; // how long it has to stay quiet after real speech was heard before auto-stopping.
+const MAX_RECORDING_MS = 20000; // hard ceiling regardless of silence detection — never records forever even if silence detection somehow never fires.
+
 let mediaRecorder: MediaRecorder | null = null;
 let activeStream: MediaStream | null = null;
+let stopFn: (() => void) | null = null;
 
 export const whisperStt: SttProvider = {
   get isSupported() {
@@ -29,6 +41,15 @@ export const whisperStt: SttProvider = {
     } catch (e: any) {
       throw new Error(`mic_${e?.name || 'unknown'}`);
     }
+
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    const audioCtx = new AudioCtx();
+    const source = audioCtx.createMediaStreamSource(activeStream);
+    const analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 512;
+    source.connect(analyser);
+    const levelData = new Uint8Array(analyser.frequencyBinCount);
+
     const chunks: BlobPart[] = [];
     mediaRecorder = new MediaRecorder(activeStream);
     mediaRecorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
@@ -38,7 +59,36 @@ export const whisperStt: SttProvider = {
     });
     mediaRecorder.start();
 
+    let rafId = 0;
+    let silenceStartedAt: number | null = null;
+    let speechHeard = false;
+    const startedAt = Date.now();
+
+    stopFn = () => {
+      cancelAnimationFrame(rafId);
+      audioCtx.close().catch(() => {});
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+    };
+
+    function watchLevel() {
+      analyser.getByteFrequencyData(levelData);
+      const avg = levelData.reduce((sum, v) => sum + v, 0) / levelData.length;
+      const now = Date.now();
+
+      if (avg > SILENCE_THRESHOLD) {
+        speechHeard = true;
+        silenceStartedAt = null;
+      } else if (speechHeard) {
+        if (silenceStartedAt === null) silenceStartedAt = now;
+        else if (now - silenceStartedAt > SILENCE_DURATION_MS) { stopFn?.(); return; }
+      }
+      if (now - startedAt > MAX_RECORDING_MS) { stopFn?.(); return; }
+      rafId = requestAnimationFrame(watchLevel);
+    }
+    watchLevel();
+
     const blob = await recorded;
+    stopFn = null;
     activeStream.getTracks().forEach(t => t.stop());
     activeStream = null;
 
@@ -56,6 +106,6 @@ export const whisperStt: SttProvider = {
   },
 
   stop() {
-    if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+    stopFn?.();
   }
 };
