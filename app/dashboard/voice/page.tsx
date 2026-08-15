@@ -8,9 +8,11 @@ import { useLang } from '@/lib/i18n-context';
 import { useShop } from '@/lib/shop-context';
 import { useToast } from '@/lib/toast-context';
 import { useSectionGuard } from '@/lib/use-section-guard';
+import { hasSection, type Section } from '@/lib/permissions';
 import { getSttProvider } from '@/lib/voice/stt-provider';
 import { speak, stopSpeaking, isTtsSupported, primeTts } from '@/lib/voice/tts';
 import { fetchWithTimeout } from '@/lib/voice/fetch-timeout';
+import { startOfTodayPKT } from '@/lib/pkt-time';
 import { startWakeWordListener, isWakeWordSupported, type WakeWordHandle } from '@/lib/voice/wake-word';
 import { ArrowLeftIcon, MicIcon, SpeakerOnIcon, SpeakerOffIcon, EarIcon } from '@/components/icons';
 
@@ -40,23 +42,30 @@ type MatchRow = { id: string; name: string; price?: number };
 type PendingClarify = { candidates: MatchRow[]; resolve: (row: MatchRow) => void; cancel: () => void };
 
 type ParsedIntent = {
-  action: 'khata_purchase' | 'khata_payment' | 'khata_return' | 'add_customer' | 'check_balance' | 'check_stock' | 'print_statement' | 'general_query' | 'unknown';
+  action:
+    | 'khata_purchase' | 'khata_payment' | 'khata_return' | 'add_customer' | 'check_balance' | 'check_stock' | 'print_statement'
+    | 'stock_in' | 'stock_out' | 'add_expense' | 'check_expense_total' | 'check_sales_total' | 'check_supplier_balance' | 'supplier_payment'
+    | 'general_query' | 'unknown';
   customer_name: string | null;
   customer_phone: string | null;
+  supplier_name: string | null;
   item_name: string | null;
   qty: number | null;
   unit: string | null;
   amount: number | null;
+  expense_category: 'rent' | 'salary' | 'utility' | 'marketing' | 'other' | null;
   query: string | null;
 };
 
 type ResolvedCommand = {
   intent: ParsedIntent;
   rawText: string;
-  // Null for add_customer — that action is what creates the customer,
-  // so there's nothing to resolve to beforehand.
+  // Null for add_customer (creates the customer) and for actions that
+  // don't involve one (stock_in/out, add_expense, supplier_payment).
   customerId: string | null;
   customerName: string;
+  // Null except for supplier_payment.
+  supplierId: string | null;
   itemId: string | null;
   amount: number;
   summary: string;
@@ -75,10 +84,19 @@ function fmt(n: number) {
 export default function VoicePage() {
   const supabase = createClient();
   const { t, lang } = useLang();
-  const { shopId } = useShop();
+  const { shopId, role, allowedSections } = useShop();
   const router = useRouter();
   const { showToast } = useToast();
   useSectionGuard('khata');
+
+  // Eagle can now touch Inventory/Expenses/Suppliers, not just Khata —
+  // each of those actions is gated on the same per-staff section
+  // whitelist those modules' own pages already enforce (lib/permissions.ts),
+  // so a Cashier not granted "Expenses" in Settings can't get around
+  // that by asking Eagle instead of opening the page.
+  function hasVoiceSection(section: Section) {
+    return hasSection(role, allowedSections, section);
+  }
 
   const [stage, setStage] = useState<Stage>('idle');
   const [transcript, setTranscript] = useState('');
@@ -311,7 +329,7 @@ export default function VoicePage() {
   // once a real answer comes back. No match at all stays unresolved
   // rather than guessing — this is money, guessing wrong is worse than
   // asking again.
-  async function findBestMatch(table: 'customers' | 'items', spoken: string): Promise<MatchRow | null> {
+  async function findBestMatch(table: 'customers' | 'items' | 'suppliers', spoken: string): Promise<MatchRow | null> {
     const cols = table === 'items' ? 'id, name, price' : 'id, name';
     const { data } = await supabase.from(table).select(cols).eq('shop_id', shopId).ilike('name', `%${spoken.trim()}%`);
     const rows = (data || []) as unknown as MatchRow[];
@@ -368,6 +386,15 @@ export default function VoicePage() {
   // real actions rather than being left to the general-question path
   // precisely because that path can only guess; these read the actual
   // records.
+  function requireSection(section: Section, rawText: string): boolean {
+    if (hasVoiceSection(section)) return true;
+    const msg = t('voice.errNoAccess');
+    setStage('error');
+    setErrorMsg(msg);
+    pushHistory(rawText, msg);
+    return false;
+  }
+
   async function answerLookup(intent: ParsedIntent, rawText: string) {
     if (intent.action === 'check_balance') {
       if (!intent.customer_name) { await answerGeneralQuery(intent.query || rawText); return; }
@@ -391,21 +418,71 @@ export default function VoicePage() {
       return;
     }
 
-    // check_stock
-    if (!intent.item_name) { await answerGeneralQuery(intent.query || rawText); return; }
-    const item = await findBestMatch('items', intent.item_name);
-    if (!item) {
-      const msg = t('voice.errItemNotFound').replace('{name}', intent.item_name);
+    if (intent.action === 'check_stock') {
+      if (!requireSection('inventory', rawText)) return;
+      if (!intent.item_name) { await answerGeneralQuery(intent.query || rawText); return; }
+      const item = await findBestMatch('items', intent.item_name);
+      if (!item) {
+        const msg = t('voice.errItemNotFound').replace('{name}', intent.item_name);
+        setStage('error');
+        setErrorMsg(msg);
+        pushHistory(rawText, msg);
+        return;
+      }
+      const { data: full } = await supabase.from('items').select('name, stock, unit').eq('id', item.id).single();
+      const answer = t('voice.answerStock')
+        .replace('{item}', full?.name || item.name)
+        .replace('{qty}', String(full?.stock ?? 0))
+        .replace('{unit}', full?.unit || '');
+      setAnswerText(answer);
+      setStage('done');
+      pushHistory(rawText, answer);
+      return;
+    }
+
+    if (intent.action === 'check_expense_total') {
+      if (!requireSection('expenses', rawText)) return;
+      const { data: rows } = await supabase.from('expenses').select('amount').eq('shop_id', shopId).gte('created_at', startOfTodayPKT().toISOString());
+      const total = (rows || []).reduce((s: number, r: any) => s + (r.amount || 0), 0);
+      const answer = t('voice.answerExpenseTotal').replace('{amount}', fmt(total));
+      setAnswerText(answer);
+      setStage('done');
+      pushHistory(rawText, answer);
+      return;
+    }
+
+    if (intent.action === 'check_sales_total') {
+      if (!requireSection('reports', rawText)) return;
+      // Every sale — cash (record_stock_move) and khata (record_khata_entry)
+      // alike — lands in `transactions` with type 'sale'/'return' (see
+      // supabase/schema.sql); same source Reports' own Total Sales figure
+      // reads from, so this answer always agrees with that page.
+      const { data: rows } = await supabase.from('transactions').select('type, amount').eq('shop_id', shopId).in('type', ['sale', 'return']).gte('created_at', startOfTodayPKT().toISOString());
+      const total = (rows || []).reduce((s: number, r: any) => s + (r.type === 'sale' ? (r.amount || 0) : -(r.amount || 0)), 0);
+      const answer = t('voice.answerSalesTotal').replace('{amount}', fmt(Math.max(0, total)));
+      setAnswerText(answer);
+      setStage('done');
+      pushHistory(rawText, answer);
+      return;
+    }
+
+    // check_supplier_balance
+    if (!requireSection('suppliers', rawText)) return;
+    if (!intent.supplier_name) { await answerGeneralQuery(intent.query || rawText); return; }
+    const supplier = await findBestMatch('suppliers', intent.supplier_name);
+    if (!supplier) {
+      const msg = t('voice.errSupplierNotFound').replace('{name}', intent.supplier_name);
       setStage('error');
       setErrorMsg(msg);
       pushHistory(rawText, msg);
       return;
     }
-    const { data: full } = await supabase.from('items').select('name, stock, unit').eq('id', item.id).single();
-    const answer = t('voice.answerStock')
-      .replace('{item}', full?.name || item.name)
-      .replace('{qty}', String(full?.stock ?? 0))
-      .replace('{unit}', full?.unit || '');
+    const { data: supplierTotals } = await supabase.rpc('supplier_contact_totals', { p_supplier_id: supplier.id }).single();
+    const st = supplierTotals as any;
+    const owed = (st?.given || 0) - (st?.paid || 0) - (st?.returned || 0);
+    const answer = (owed > 0 ? t('voice.answerSupplierOwes') : t('voice.answerSupplierClear'))
+      .replace('{supplier}', supplier.name)
+      .replace('{amount}', fmt(Math.abs(owed)));
     setAnswerText(answer);
     setStage('done');
     pushHistory(rawText, answer);
@@ -417,8 +494,93 @@ export default function VoicePage() {
       return;
     }
 
-    if (intent.action === 'check_balance' || intent.action === 'check_stock') {
+    if (
+      intent.action === 'check_balance' || intent.action === 'check_stock'
+      || intent.action === 'check_expense_total' || intent.action === 'check_sales_total' || intent.action === 'check_supplier_balance'
+    ) {
       await answerLookup(intent, rawText);
+      return;
+    }
+
+    // Removes damaged/miscounted stock or logs a fresh delivery —
+    // reuses record_stock_move exactly the way Inventory's own Stock
+    // In/Stock Out buttons do, including the same p_reason: 'adjustment'
+    // tag Stock Out's manual dropdown already uses (see
+    // app/dashboard/inventory/page.tsx), so a voice-triggered removal
+    // shows up in History identically to a manual one.
+    if (intent.action === 'stock_in' || intent.action === 'stock_out') {
+      if (!requireSection('inventory', rawText)) return;
+      if (!intent.item_name) { await answerGeneralQuery(rawText); return; }
+      const item = await findBestMatch('items', intent.item_name);
+      if (!item) {
+        const msg = t('voice.errItemNotFound').replace('{name}', intent.item_name);
+        setStage('error');
+        setErrorMsg(msg);
+        pushHistory(rawText, msg);
+        return;
+      }
+      const qty = intent.qty || 0;
+      if (!qty || qty <= 0) {
+        const msg = t('voice.errNoQty');
+        setStage('error');
+        setErrorMsg(msg);
+        pushHistory(rawText, msg);
+        return;
+      }
+      const amount = intent.amount ?? (item.price ? qty * item.price : 0);
+      const summary = (intent.action === 'stock_in' ? t('voice.summaryStockIn') : t('voice.summaryStockOut'))
+        .replace('{item}', item.name)
+        .replace('{qty}', String(qty))
+        .replace('{unit}', intent.unit || '');
+      setResolved({ intent, rawText, customerId: null, supplierId: null, customerName: item.name, itemId: item.id, amount, summary });
+      setStage('confirm');
+      pushHistory(rawText, summary);
+      return;
+    }
+
+    if (intent.action === 'add_expense') {
+      if (!requireSection('expenses', rawText)) return;
+      const amount = intent.amount || 0;
+      if (!amount || amount <= 0) {
+        const msg = t('voice.errNoAmount');
+        setStage('error');
+        setErrorMsg(msg);
+        pushHistory(rawText, msg);
+        return;
+      }
+      const category = intent.expense_category || 'other';
+      const summary = t('voice.summaryAddExpense')
+        .replace('{category}', t(`expenses.cat${category.charAt(0).toUpperCase()}${category.slice(1)}` as any))
+        .replace('{amount}', fmt(amount));
+      setResolved({ intent, rawText, customerId: null, supplierId: null, customerName: category, itemId: null, amount, summary });
+      setStage('confirm');
+      pushHistory(rawText, summary);
+      return;
+    }
+
+    if (intent.action === 'supplier_payment') {
+      if (!requireSection('suppliers', rawText)) return;
+      if (!intent.supplier_name) { await answerGeneralQuery(rawText); return; }
+      const supplier = await findBestMatch('suppliers', intent.supplier_name);
+      if (!supplier) {
+        const msg = t('voice.errSupplierNotFound').replace('{name}', intent.supplier_name);
+        setStage('error');
+        setErrorMsg(msg);
+        pushHistory(rawText, msg);
+        return;
+      }
+      const amount = intent.amount || 0;
+      if (!amount || amount <= 0) {
+        const msg = t('voice.errNoAmount');
+        setStage('error');
+        setErrorMsg(msg);
+        pushHistory(rawText, msg);
+        return;
+      }
+      const summary = t('voice.summarySupplierPayment').replace('{supplier}', supplier.name).replace('{amount}', fmt(amount));
+      setResolved({ intent, rawText, customerId: null, supplierId: supplier.id, customerName: supplier.name, itemId: null, amount, summary });
+      setStage('confirm');
+      pushHistory(rawText, summary);
       return;
     }
 
@@ -461,7 +623,7 @@ export default function VoicePage() {
       const summary = t('voice.summaryAddCustomer')
         .replace('{name}', name)
         .replace('{phone}', intent.customer_phone?.trim() || '—');
-      setResolved({ intent, rawText, customerId: null, customerName: name, itemId: null, amount: 0, summary });
+      setResolved({ intent, rawText, customerId: null, supplierId: null, customerName: name, itemId: null, amount: 0, summary });
       setStage('confirm');
       pushHistory(rawText, summary);
       return;
@@ -509,7 +671,7 @@ export default function VoicePage() {
       : intent.action === 'khata_return' ? t('voice.summaryReturn').replace('{customer}', customer.name).replace('{item}', itemLabel).replace('{amount}', fmt(amount))
       : t('voice.summaryPayment').replace('{customer}', customer.name).replace('{amount}', fmt(amount));
 
-    setResolved({ intent, rawText, customerId: customer.id, customerName: customer.name, itemId, amount, summary });
+    setResolved({ intent, rawText, customerId: customer.id, supplierId: null, customerName: customer.name, itemId, amount, summary });
     setStage('confirm');
     pushHistory(rawText, summary);
   }
@@ -537,6 +699,77 @@ export default function VoicePage() {
       // 500 rupay bhi de do" then resolves against a customer who
       // genuinely exists now, not one still theoretical at that point.
       pushHistory(resolved.rawText, t('voice.doneCustomerAdded'));
+      return;
+    }
+
+    if (resolved.intent.action === 'stock_in' || resolved.intent.action === 'stock_out') {
+      // Same RPC, same p_reason convention Inventory's own Stock Out
+      // modal uses for a manual damage/loss/correction entry — see
+      // supabase/schema.sql's record_stock_move.
+      const { error: stockErr } = await supabase.rpc('record_stock_move', {
+        p_item_id: resolved.itemId,
+        p_type: resolved.intent.action === 'stock_in' ? 'purchase' : 'sale',
+        p_qty: resolved.intent.qty,
+        p_amount: resolved.amount,
+        p_note: t('voice.voiceEntryNote'),
+        p_reason: resolved.intent.action === 'stock_out' ? 'adjustment' : null
+      });
+      setConfirming(false);
+      if (stockErr) {
+        setStage('error');
+        setErrorMsg(t('common.error'));
+        return;
+      }
+      const done = `${resolved.summary} ${t('voice.doneConfirmedSuffix')}`;
+      setAnswerText(done);
+      setStage('done');
+      pushHistory(resolved.rawText, done);
+      return;
+    }
+
+    if (resolved.intent.action === 'add_expense') {
+      const { error: expErr } = await supabase.from('expenses').insert({
+        shop_id: shopId,
+        category: resolved.intent.expense_category || 'other',
+        amount: resolved.amount,
+        note: t('voice.voiceEntryNote'),
+        payment_method: 'cash'
+      });
+      setConfirming(false);
+      if (expErr) {
+        setStage('error');
+        setErrorMsg(t('common.error'));
+        return;
+      }
+      const done = `${resolved.summary} ${t('voice.doneConfirmedSuffix')}`;
+      setAnswerText(done);
+      setStage('done');
+      pushHistory(resolved.rawText, done);
+      return;
+    }
+
+    if (resolved.intent.action === 'supplier_payment') {
+      // Direct insert, same as Suppliers' own "Payment Given" entry —
+      // supplier_entries has no RPC wrapper (no linked inventory
+      // side-effect to keep atomic with, unlike Khata/stock moves).
+      const { error: supErr } = await supabase.from('supplier_entries').insert({
+        shop_id: shopId,
+        supplier_id: resolved.supplierId,
+        type: 'payment',
+        amount: resolved.amount,
+        note: t('voice.voiceEntryNote'),
+        payment_method: 'cash'
+      });
+      setConfirming(false);
+      if (supErr) {
+        setStage('error');
+        setErrorMsg(t('common.error'));
+        return;
+      }
+      const done = `${resolved.summary} ${t('voice.doneConfirmedSuffix')}`;
+      setAnswerText(done);
+      setStage('done');
+      pushHistory(resolved.rawText, done);
       return;
     }
 
