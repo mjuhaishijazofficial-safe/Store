@@ -43,6 +43,11 @@ export type ShopInfo = {
   // Smart Reorder platform-wide during a rollout; true (default) means
   // no restriction, unchanged from before this existed.
   smartReorderEnabled: boolean;
+  // "Eagle" Voice Commands — Owner-level on/off (Settings), separate
+  // from the platform-wide Smart Reorder flag above since this one
+  // touches microphone permission and a paid third-party API, not just
+  // a computed suggestion list.
+  voiceCommandsEnabled: boolean;
 };
 
 const ShopContext = createContext<ShopInfo | null>(null);

@@ -1826,3 +1826,26 @@ begin
   update khata_entries set reversed_at = now() where id = v_entry.id;
 end;
 $$;
+
+-- ============================================================
+-- 18. VOICE COMMANDS (tap-to-talk: mic button -> Whisper transcription
+-- -> Gemini intent parsing -> existing record_khata_entry). Nothing new
+-- executes here that Khata's own UI doesn't already call — voice is
+-- just another way to fill in the same form. This section only adds
+-- what's genuinely new: an off switch, and a per-shop daily cap so a
+-- stuck mic/client bug can't run up real Whisper API cost unnoticed.
+-- ============================================================
+
+alter table shops add column if not exists voice_commands_enabled boolean not null default true;
+
+create table if not exists voice_command_log (
+  id uuid primary key default gen_random_uuid(),
+  shop_id uuid not null references shops(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+alter table voice_command_log enable row level security;
+drop policy if exists "voice_command_log_own_shop" on voice_command_log;
+create policy "voice_command_log_own_shop" on voice_command_log for all
+  using (shop_id = my_shop_id())
+  with check (shop_id = my_shop_id());
+create index if not exists idx_voice_command_log_shop_date on voice_command_log(shop_id, created_at);

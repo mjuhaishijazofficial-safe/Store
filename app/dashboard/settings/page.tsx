@@ -29,6 +29,7 @@ export default function SettingsPage() {
   const [fbrNtn, setFbrNtn] = useState('');
   const [taxRate, setTaxRate] = useState(0);
   const [savingFbr, setSavingFbr] = useState(false);
+  const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [tickets, setTickets] = useState<{ id: string; subject: string; status: string; created_at: string }[]>([]);
   const [ticketSubject, setTicketSubject] = useState('');
   const [ticketMessage, setTicketMessage] = useState('');
@@ -46,7 +47,7 @@ export default function SettingsPage() {
 
   async function init() {
     if (isOwner) {
-      const { data: shop } = await supabase.from('shops').select('name, budget, receipt_phone, receipt_footer, cashier_discount_cap_percent, fbr_enabled, fbr_ntn, tax_rate_percent').eq('id', shopId).single();
+      const { data: shop } = await supabase.from('shops').select('name, budget, receipt_phone, receipt_footer, cashier_discount_cap_percent, fbr_enabled, fbr_ntn, tax_rate_percent, voice_commands_enabled').eq('id', shopId).single();
       setName(shop?.name || '');
       setBudget(shop?.budget || 0);
       setReceiptPhone(shop?.receipt_phone || '');
@@ -55,6 +56,7 @@ export default function SettingsPage() {
       setFbrEnabled(shop?.fbr_enabled || false);
       setFbrNtn(shop?.fbr_ntn || '');
       setTaxRate(shop?.tax_rate_percent || 0);
+      setVoiceEnabled(shop?.voice_commands_enabled ?? true);
 
       const { data: tix } = await supabase.from('support_tickets').select('id, subject, status, created_at').eq('shop_id', shopId).order('created_at', { ascending: false }).limit(10);
       setTickets(tix || []);
@@ -107,6 +109,13 @@ export default function SettingsPage() {
     setSavingFbr(false);
     if (err) { showToast(t('common.error'), 'error'); return; }
     showToast(t('settings.saved'), 'success');
+    router.refresh();
+  }
+
+  async function saveVoiceToggle(next: boolean) {
+    setVoiceEnabled(next);
+    const { error: err } = await supabase.from('shops').update({ voice_commands_enabled: next }).eq('id', shopId);
+    if (err) { showToast(t('common.error'), 'error'); setVoiceEnabled(!next); return; }
     router.refresh();
   }
 
@@ -244,6 +253,15 @@ export default function SettingsPage() {
               </>
             )}
             <button onClick={saveFbr} disabled={savingFbr} className="btn-secondary w-full">{savingFbr ? t('settings.saving') : t('settings.save')}</button>
+          </div>
+
+          <div className="mt-10 pt-6 border-t border-chalk/10">
+            <div className="text-xs text-chalkdim uppercase tracking-wide font-700 mb-1">{t('settings.voiceTitle')}</div>
+            <div className="text-chalkdim text-xs mb-3">{t('settings.voiceHint')}</div>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={voiceEnabled} onChange={e => saveVoiceToggle(e.target.checked)} />
+              <span className="font-600">{t('settings.voiceEnable')}</span>
+            </label>
           </div>
 
           <div className="mt-10 pt-6 border-t border-chalk/10">

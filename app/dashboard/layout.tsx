@@ -6,6 +6,7 @@ import ConnectionBanner from '@/components/ConnectionBanner';
 import AppLockGate from '@/components/AppLockGate';
 import ThemeToggle from '@/components/ThemeToggle';
 import LanguageToggle from '@/components/LanguageToggle';
+import VoiceLauncherButton from '@/components/VoiceLauncherButton';
 import { getServerT } from '@/lib/i18n-server';
 import { ShopProvider } from '@/lib/shop-context';
 import { isAdmin } from '@/lib/admin';
@@ -27,7 +28,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('shop_id, branch_id, full_name, role, allowed_sections, shops(name, subscription_status, trial_ends_at, receipt_phone, receipt_footer, cashier_discount_cap_percent, grace_ends_at, fbr_enabled, tax_rate_percent)')
+    .select('shop_id, branch_id, full_name, role, allowed_sections, shops(name, subscription_status, trial_ends_at, receipt_phone, receipt_footer, cashier_discount_cap_percent, grace_ends_at, fbr_enabled, tax_rate_percent, voice_commands_enabled)')
     .eq('id', user.id)
     .single();
 
@@ -131,7 +132,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const trialLabel = shop?.subscription_status === 'trialing' && !trialExpired ? t('billing.statusTrialing') : undefined;
 
   return (
-    <ShopProvider value={{ shopId: profile.shop_id, role: profile.role as 'owner' | 'manager' | 'cashier', shopName: shop?.name || '', allowedSections, receiptPhone: shop?.receipt_phone || null, receiptFooter: shop?.receipt_footer || null, cashierDiscountCapPercent: shop?.cashier_discount_cap_percent || 0, locked, branchId: profile.branch_id || null, branches: branches || [], fbrEnabled: shop?.fbr_enabled || false, taxRatePercent: shop?.tax_rate_percent || 0, smartReorderEnabled }}>
+    <ShopProvider value={{ shopId: profile.shop_id, role: profile.role as 'owner' | 'manager' | 'cashier', shopName: shop?.name || '', allowedSections, receiptPhone: shop?.receipt_phone || null, receiptFooter: shop?.receipt_footer || null, cashierDiscountCapPercent: shop?.cashier_discount_cap_percent || 0, locked, branchId: profile.branch_id || null, branches: branches || [], fbrEnabled: shop?.fbr_enabled || false, taxRatePercent: shop?.tax_rate_percent || 0, smartReorderEnabled, voiceCommandsEnabled: shop?.voice_commands_enabled ?? true }}>
       <ConnectionBanner />
       {/* Sidebar + main are flex siblings (not fixed+margin) so the
           sidebar's own collapse toggle reflows main content with no
@@ -169,6 +170,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <AppLockGate>{children}</AppLockGate>
         </main>
       </div>
+      {/* Eagle voice commands are Khata-shaped (see app/dashboard/voice)
+          — no point showing the launcher to a staff member who can't
+          open Khata at all, same gate the nav link above already uses. */}
+      {hasSection(profile.role, allowedSections, 'khata') && (shop?.voice_commands_enabled ?? true) && <VoiceLauncherButton />}
     </ShopProvider>
   );
 }
