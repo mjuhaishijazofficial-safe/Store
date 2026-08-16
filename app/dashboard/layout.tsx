@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import DashboardSidebar from '@/components/DashboardSidebar';
 import ConnectionBanner from '@/components/ConnectionBanner';
+import EnterToSave from '@/components/EnterToSave';
 import AppLockGate from '@/components/AppLockGate';
 import ThemeToggle from '@/components/ThemeToggle';
 import LanguageToggle from '@/components/LanguageToggle';
@@ -134,6 +135,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   return (
     <ShopProvider value={{ shopId: profile.shop_id, role: profile.role as 'owner' | 'manager' | 'cashier', shopName: shop?.name || '', allowedSections, receiptPhone: shop?.receipt_phone || null, receiptFooter: shop?.receipt_footer || null, cashierDiscountCapPercent: shop?.cashier_discount_cap_percent || 0, locked, branchId: profile.branch_id || null, branches: branches || [], fbrEnabled: shop?.fbr_enabled || false, taxRatePercent: shop?.tax_rate_percent || 0, smartReorderEnabled, voiceCommandsEnabled: shop?.voice_commands_enabled ?? true }}>
       <ConnectionBanner />
+      <EnterToSave />
       {/* Sidebar + main are flex siblings (not fixed+margin) so the
           sidebar's own collapse toggle reflows main content with no
           state syncing between the server-rendered shell and the
