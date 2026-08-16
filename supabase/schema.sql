@@ -414,6 +414,17 @@ $$;
 -- live — the drop is a no-op on a truly fresh database (nothing exists
 -- yet to drop) and a fix on one that's already been upgraded.
 drop function if exists record_khata_entry(uuid, text, uuid, text, numeric, numeric, text, text);
+-- A much older 7-arg version (from before p_payment_method existed at
+-- all) was still live alongside the 8-arg one above — `create or
+-- replace` never removes a stranded overload with a genuinely
+-- different parameter list, only the drop above (which targets the
+-- 8-arg signature) ever ran. Any caller that omitted p_payment_method
+-- — relying on its default — hit "could not choose the best candidate
+-- function" on EVERY call, because both overloads matched equally.
+-- This is what silently broke Billing's Khata sales, History's Khata
+-- returns, and Khata's own quick Add Credit modal (all three omitted
+-- it) while the two call sites that did pass it worked fine.
+drop function if exists record_khata_entry(uuid, text, uuid, text, numeric, numeric, text);
 create or replace function record_khata_entry(
   p_customer_id uuid,
   p_type text,

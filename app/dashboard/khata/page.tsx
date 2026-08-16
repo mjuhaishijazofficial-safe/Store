@@ -179,7 +179,13 @@ export default function KhataPage() {
       p_item_name: null,
       p_qty: null,
       p_amount: amount,
-      p_note: quickNote.trim() || null
+      p_note: quickNote.trim() || null,
+      // Omitting this entirely used to make PostgREST unable to pick
+      // between record_khata_entry's two live overloads (7-arg vs
+      // 8-arg) and fail every single call with "could not choose the
+      // best candidate function" — silently, since the modal just
+      // showed the generic error toast with no obvious cause.
+      p_payment_method: 'cash'
     });
     setSavingQuickEntry(false);
     if (err) { showToast(t('common.error'), 'error'); return; }

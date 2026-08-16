@@ -169,7 +169,11 @@ export default function HistoryPage() {
           p_item_name: returnFor.item_name,
           p_qty: qty,
           p_amount: amount,
-          p_note: returnReason.trim() || null
+          p_note: returnReason.trim() || null,
+          // Required — omitting it makes PostgREST unable to pick
+          // between record_khata_entry's two live overloads and fail
+          // every khata-mode return with an ambiguous-function error.
+          p_payment_method: 'cash'
         })
       : await supabase.rpc('record_stock_move', {
           p_item_id: returnFor.item_id,

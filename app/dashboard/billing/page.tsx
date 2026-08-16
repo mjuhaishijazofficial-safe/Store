@@ -200,7 +200,11 @@ export default function BillingPage() {
               p_item_name: line.name,
               p_qty: line.qty,
               p_amount: amount,
-              p_note: null
+              p_note: null,
+              // Required — omitting it makes PostgREST unable to pick
+              // between record_khata_entry's two live overloads and
+              // fail every khata sale with an ambiguous-function error.
+              p_payment_method: 'cash'
             })
           : await supabase.rpc('record_stock_move', {
               p_item_id: line.itemId,
