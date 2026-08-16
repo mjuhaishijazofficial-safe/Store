@@ -72,16 +72,16 @@ Deploy hone ke baad, Stripe webhook endpoint ko production URL par update karein
 - **Row-Level Security policies** ensure karti hain ke koi bhi query sirf apni shop ka data return kare — chahe frontend code mein bug ho ya koi manually API call kare, database level par hi data leak nahi ho sakta.
 - Naye shop owners add karne ke liye kuch alag se karne ki zaroorat nahi — wo bas `/signup` se apna account bana lete hain aur unki apni alag dukaan turant ready hoti hai.
 
-## What's included vs what to add next
+## What's included
 
-**Ready:**
-- Signup/login, per-shop data isolation
-- Inventory CRUD, purchase/sale stock movements, budget tracking, reorder alerts
-- 14-day free trial, Stripe subscription checkout + customer portal + webhook sync
+- Signup/login, per-shop data isolation, Staff accounts (roles/permissions), Multi-Branch
+- Billing/POS, Inventory (+ AI Slip-Scan stock-in), Suppliers, Purchase Orders
+- Khata (customer credit ledger) — reversal instead of delete, per-entry invoice numbers, print statement, WhatsApp reminder
+- Stock Ledger Pattern — every stock-affecting action (sale/return/purchase/transfer/adjustment) writes to an append-only `stock_movements` ledger; History/Reports read from it
+- **Eagle** — voice assistant (tap-to-talk or hands-free wake-word): Khata entries, inventory/expense/supplier commands, stock lookups, WhatsApp statements, all by voice (`lib/voice/`, `app/api/voice/*`, `app/dashboard/voice`) — needs `OPENAI_API_KEY` (speech + understanding) and optionally `GEMINI_API_KEY` (live web search for general questions)
+- Reports, Admin panel (Super Admin: plans, settings, support tickets, payment claims), 14-day free trial + Stripe subscription (checkout, portal, webhook, grace period)
 
 **Aap khud add kar sakte hain (ya mujhse keh sakte hain):**
-- Staff accounts (multiple users per shop, roles/permissions)
-- SMS/WhatsApp reorder alerts
-- Reports/export (Excel, PDF)
-- Multi-currency / multi-language toggle
-- Admin dashboard (aap sab shops ko monitor kar sakein — kitni active hain, MRR, churn)
+- SMS reorder alerts (WhatsApp reminders already exist for Khata)
+- Reports export (Excel/PDF)
+- Multi-currency toggle
