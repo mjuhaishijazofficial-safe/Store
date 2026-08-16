@@ -106,6 +106,7 @@ export default function ExpensesPage() {
     setSaving(false);
     if (err) { showToast(t('common.error'), 'error'); return; }
     setModalOpen(false);
+    showToast(t('settings.saved'), 'success');
     await init();
   }
 

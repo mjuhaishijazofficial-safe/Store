@@ -240,6 +240,7 @@ export default function KhataDetailPage() {
     if (err) { showToast(t('common.error'), 'error'); return; }
 
     setModalType(null);
+    showToast(t('settings.saved'), 'success');
     const [, newTotal] = await Promise.all([loadEntries(true), loadBalance()]);
     await reloadItems();
 

@@ -73,6 +73,7 @@ export default function SuppliersPage() {
     setSavingSupplier(false);
     if (err) { showToast(t('common.error'), 'error'); return; }
     setModalOpen(false);
+    showToast(t('settings.saved'), 'success');
     await loadAll();
   }
 

@@ -21,6 +21,20 @@ export default function EnterToSave() {
       const btn = modal.querySelector<HTMLButtonElement>('button.btn-primary:not(:disabled)');
       if (btn) {
         e.preventDefault();
+        // Immediate visual acknowledgment that Enter was registered —
+        // the actual save is async (a network round trip), so without
+        // this the button looks unresponsive for that gap and someone
+        // presses Enter again, unsure if the first one did anything.
+        // Each button's own loading/disabled state (already built into
+        // every one of these) takes over right after for the real
+        // in-progress feedback; this just covers the instant before that.
+        btn.style.transition = 'transform 0.1s ease, filter 0.1s ease';
+        btn.style.transform = 'scale(0.95)';
+        btn.style.filter = 'brightness(0.9)';
+        setTimeout(() => {
+          btn.style.transform = '';
+          btn.style.filter = '';
+        }, 150);
         btn.click();
       }
     }
