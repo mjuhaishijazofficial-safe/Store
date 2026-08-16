@@ -89,7 +89,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const initialPalette: Palette = cookiePalette === 'navy' || cookiePalette === 'spice' || cookiePalette === 'sabz' ? cookiePalette : DEFAULT_PALETTE;
 
   return (
-    <html lang={initialLang === 'en' ? 'en' : 'ur'} dir={initialLang === 'ur' ? 'rtl' : 'ltr'} data-theme={initialTheme} data-palette={initialPalette}>
+    <html lang={initialLang === 'en' ? 'en' : 'ur'} dir="ltr" data-theme={initialTheme} data-palette={initialPalette}>
       <body>
         <ThemeProvider initialTheme={initialTheme}>
           <PaletteProvider initialPalette={initialPalette}>
